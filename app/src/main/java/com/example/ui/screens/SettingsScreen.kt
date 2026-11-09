@@ -31,8 +31,20 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import android.content.Context
+import android.widget.Toast
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import com.example.worker.BackupWorker
+import com.example.worker.RestoreWorker
+import kotlin.system.exitProcess
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -224,6 +236,113 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Impor Data JSON (File / Teks)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    var backupWorkId by remember { mutableStateOf<java.util.UUID?>(null) }
+                    var restoreWorkId by remember { mutableStateOf<java.util.UUID?>(null) }
+                    var showRestoreSuccessDialog by remember { mutableStateOf(false) }
+
+                    backupWorkId?.let { workId ->
+                        val workInfoState = WorkManager.getInstance(context).getWorkInfoByIdLiveData(workId).observeAsState()
+                        val workInfo = workInfoState.value
+                        if (workInfo != null) {
+                            if (workInfo.state == WorkInfo.State.SUCCEEDED) {
+                                Toast.makeText(context, "Backup berhasil diunggah!", Toast.LENGTH_LONG).show()
+                                backupWorkId = null
+                            } else if (workInfo.state == WorkInfo.State.FAILED) {
+                                val errorMsg = workInfo.outputData.getString("error_message") ?: "Gagal! Pastikan Anda sudah Login Google & melakukan Upload."
+                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                backupWorkId = null
+                            }
+                        }
+                    }
+
+                    restoreWorkId?.let { workId ->
+                        val workInfoState = WorkManager.getInstance(context).getWorkInfoByIdLiveData(workId).observeAsState()
+                        val workInfo = workInfoState.value
+                        if (workInfo != null) {
+                            if (workInfo.state == WorkInfo.State.SUCCEEDED) {
+                                Toast.makeText(context, "Restore data berhasil!", Toast.LENGTH_LONG).show()
+                                showRestoreSuccessDialog = true
+                                restoreWorkId = null
+                            } else if (workInfo.state == WorkInfo.State.FAILED) {
+                                val errorMsg = workInfo.outputData.getString("error_message") ?: "Gagal! Pastikan Anda sudah Login Google & melakukan Upload."
+                                Toast.makeText(context, errorMsg, Toast.LENGTH_LONG).show()
+                                restoreWorkId = null
+                            }
+                        }
+                    }
+
+                    if (showRestoreSuccessDialog) {
+                        AlertDialog(
+                            onDismissRequest = {},
+                            title = { Text("Restore Berhasil") },
+                            text = { Text("Aplikasi akan ditutup untuk memuat data baru.") },
+                            confirmButton = {
+                                Button(onClick = {
+                                    showRestoreSuccessDialog = false
+                                    exitProcess(0)
+                                }) {
+                                    Text("Tutup Aplikasi")
+                                }
+                            }
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val account = com.example.util.GoogleDriveHelper.getLastSignedInAccount(context)
+                                if (account == null) {
+                                    val activity = context.findActivity()
+                                    if (activity != null) {
+                                        com.example.util.GoogleDriveHelper.signInWithGoogle(activity)
+                                    } else {
+                                        Toast.makeText(context, "Belum login Google", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    val workRequest = OneTimeWorkRequestBuilder<BackupWorker>().build()
+                                    WorkManager.getInstance(context).enqueue(workRequest)
+                                    backupWorkId = workRequest.id
+                                    Toast.makeText(context, "Upload dimulai...", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_manual_upload")
+                        ) {
+                            Text("Upload Sekarang", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                val account = com.example.util.GoogleDriveHelper.getLastSignedInAccount(context)
+                                if (account == null) {
+                                    val activity = context.findActivity()
+                                    if (activity != null) {
+                                        com.example.util.GoogleDriveHelper.signInWithGoogle(activity)
+                                    } else {
+                                        Toast.makeText(context, "Belum login Google", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    val workRequest = OneTimeWorkRequestBuilder<RestoreWorker>().build()
+                                    WorkManager.getInstance(context).enqueue(workRequest)
+                                    restoreWorkId = workRequest.id
+                                    Toast.makeText(context, "Restore dimulai...", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("btn_manual_restore")
+                        ) {
+                            Text("Restore Data", fontSize = 12.sp, color = MaterialTheme.colorScheme.onError)
+                        }
+                    }
                 }
             }
         }
@@ -320,4 +439,10 @@ fun SettingsMenuRow(
             modifier = Modifier.size(16.dp)
         )
     }
+}
+
+private fun Context.findActivity(): android.app.Activity? = when (this) {
+    is android.app.Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

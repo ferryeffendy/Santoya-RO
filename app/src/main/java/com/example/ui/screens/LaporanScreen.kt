@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MoneyOff
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,6 +67,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
 import com.example.util.FormatUtils
+import com.example.util.PdfExporter
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -92,6 +95,7 @@ fun LaporanScreen(
     onBack: () -> Unit = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
 
@@ -168,38 +172,7 @@ fun LaporanScreen(
     val projectedProfit = monthNetProfit + (dailyAvgProfit * remainingDays)
 
     Scaffold(
-        modifier = modifier.testTag("laporan_screen"),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Laporan Laba / Rugi",
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "Santoya • Analisis Keuangan",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Kembali ke Beranda"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        }
+        modifier = modifier.testTag("laporan_screen")
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -208,6 +181,14 @@ fun LaporanScreen(
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item {
+                Text(
+                    text = "Santoya • Analisis Keuangan",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -235,13 +216,74 @@ fun LaporanScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                             }
-                            Text(
-                                text = if (startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDateShort(startTime)} - ${FormatUtils.formatDateShort(endTime)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDateShort(startTime)} - ${FormatUtils.formatDateShort(endTime)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                IconButton(
+                                    onClick = {
+                                        val html = buildString {
+                                        val totalGalon = filteredTx.sumOf { it.transaksi.jumlah }
+                                        val totalLunas = pendapatanLunas
+                                        val totalKasbon = filteredTx.filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }.sumOf { it.transaksi.total_harga }
+                                        val totalKomisi = totalKomisiKurir
+                                        val netProfit = labaBersih
+                                            append("<html><head><style>")
+                                            append("body { font-family: Arial, sans-serif; padding: 20px; color: #333; }")
+                                            append("h1 { color: #0284C7; font-size: 20px; margin-bottom: 2px; }")
+                                            append(".subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }")
+                                            append(".card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 15px; }")
+                                            append("table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }")
+                                            append("th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }")
+                                            append("th { background: #f1f5f9; }")
+                                            append(".right { text-align: right; }")
+                                            append("</style></head><body>")
+                                            append("<h1>Laporan Keuangan Santoya RO</h1>")
+                                            append("<div class='subtitle'>Periode: ${if (startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDate(startTime)} s/d ${FormatUtils.formatDate(endTime)}"}</div>")
+                                            
+                                            append("<div class='card'>")
+                                            append("<b>Ringkasan Finansial:</b><br/>")
+                                            append("• Total Galon Terjual: $totalGalon Galon<br/>")
+                                            append("• Pendapatan Lunas: ${FormatUtils.formatRupiah(totalLunas)}<br/>")
+                                            append("• Piutang Kasbon: ${FormatUtils.formatRupiah(totalKasbon)}<br/>")
+                                            append("• Komisi Kurir: ${FormatUtils.formatRupiah(totalKomisi)}<br/>")
+                                            append("• Total Pengeluaran: ${FormatUtils.formatRupiah(totalPengeluaran)}<br/>")
+                                            append("<b>• Laba Bersih: ${FormatUtils.formatRupiah(netProfit)}</b>")
+                                            append("</div>")
+
+                                            append("<h3>Daftar Transaksi (${filteredTx.size})</h3>")
+                                            append("<table><thead><tr><th>No</th><th>Tanggal</th><th>Pelanggan</th><th>Jumlah</th><th>Total</th><th>Status</th></tr></thead><tbody>")
+                                            filteredTx.forEachIndexed { idx, item ->
+                                                append("<tr>")
+                                                append("<td>${idx + 1}</td>")
+                                                append("<td>${FormatUtils.formatDateShort(item.transaksi.tanggal)}</td>")
+                                                append("<td>${item.pelanggan?.nama ?: "-"}</td>")
+                                                append("<td>${item.transaksi.jumlah}</td>")
+                                                append("<td class='right'>${FormatUtils.formatRupiah(item.transaksi.total_harga)}</td>")
+                                                append("<td>${item.transaksi.status}</td>")
+                                                append("</tr>")
+                                            }
+                                            append("</tbody></table>")
+
+                                            append("</body></html>")
+                                        }
+                                        PdfExporter.printHtmlAsPdf(context, html, "Laporan_Keuangan_Santoya")
+                                    },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureAsPdf,
+                                        contentDescription = "Export PDF",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(

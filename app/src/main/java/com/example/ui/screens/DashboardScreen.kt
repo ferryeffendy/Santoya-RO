@@ -256,7 +256,7 @@ fun DashboardScreen(
                         )
                         MenuCard(
                             modifier = Modifier.weight(1f),
-                            title = "Laporan Laba/Rugi",
+                            title = "Laporan",
                             subtitle = "Analisis Omzet & Profit",
                             icon = Icons.Default.Assessment,
                             testTag = "nav_laporan_button",
