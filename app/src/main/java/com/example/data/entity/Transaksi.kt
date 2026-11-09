@@ -1,0 +1,49 @@
+package com.example.data.entity
+
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "transaksi",
+    foreignKeys = [
+        ForeignKey(
+            entity = Pelanggan::class,
+            parentColumns = ["id"],
+            childColumns = ["id_pelanggan"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = Kurir::class,
+            parentColumns = ["id"],
+            childColumns = ["id_kurir"],
+            onDelete = ForeignKey.SET_NULL
+        ),
+        ForeignKey(
+            entity = Produk::class,
+            parentColumns = ["id"],
+            childColumns = ["id_produk"],
+            onDelete = ForeignKey.SET_NULL
+        )
+    ],
+    indices = [
+        Index("id_pelanggan"),
+        Index("id_kurir"),
+        Index("id_produk"),
+        Index("tanggal")
+    ]
+)
+data class Transaksi(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val tanggal: Long,
+    val id_pelanggan: Int,
+    val id_kurir: Int?,
+    val id_produk: Int? = null,
+    val jumlah: Int,
+    val harga_satuan: Double,
+    val total_harga: Double,
+    val total_komisi: Double,
+    val metode_bayar: String, // Cash, COD, Transfer
+    val status: String // Lunas, Kasbon
+)

@@ -1,0 +1,6 @@
+{
+  "name": "Santoya RO",
+  "description": "Aplikasi POS Offline Depot Air Minum RO Lengkap",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

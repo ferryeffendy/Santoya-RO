@@ -1,0 +1,882 @@
+package com.example.ui.screen
+
+import android.app.DatePickerDialog
+import android.bluetooth.BluetoothDevice
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.entity.Pelanggan
+import com.example.data.entity.Produk
+import com.example.data.entity.Transaksi
+import com.example.ui.util.Formatters
+import com.example.ui.util.SantoyaReceiptHelper
+import com.example.ui.viewmodel.TransaksiItemUi
+import com.example.ui.viewmodel.TransaksiViewModel
+import java.util.Calendar
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransaksiScreen(
+    viewModel: TransaksiViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val formState by viewModel.formState.collectAsStateWithLifecycle()
+    val pelangganList by viewModel.pelangganList.collectAsStateWithLifecycle()
+    val kurirList by viewModel.kurirList.collectAsStateWithLifecycle()
+    val produkList by viewModel.produkList.collectAsStateWithLifecycle()
+    val transaksiList by viewModel.transaksiListUi.collectAsStateWithLifecycle()
+
+    val receiptHelper = remember { SantoyaReceiptHelper(context) }
+    var showPrinterDialog by remember { mutableStateOf(false) }
+    var pairedDevices by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
+    var pendingReceiptText by remember { mutableStateOf("") }
+
+    fun printReceipt(receiptText: String) {
+        val devices = receiptHelper.getPairedBluetoothDevices()
+        if (devices.isEmpty()) {
+            Toast.makeText(
+                context,
+                "Tidak ada printer Bluetooth yang terhubung. Silakan pasangkan printer di pengaturan HP.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        if (devices.size == 1) {
+            val device = devices.first()
+            @android.annotation.SuppressLint("MissingPermission")
+            val deviceName = device.name ?: device.address
+            Toast.makeText(context, "Mencetak ke $deviceName...", Toast.LENGTH_SHORT).show()
+            coroutineScope.launch {
+                val result = receiptHelper.printViaBluetooth(device.address, receiptText)
+                if (result.isSuccess) {
+                    Toast.makeText(context, "Struk berhasil dicetak!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Gagal mencetak: ${result.exceptionOrNull()?.localizedMessage}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        } else {
+            pairedDevices = devices
+            pendingReceiptText = receiptText
+            showPrinterDialog = true
+        }
+    }
+
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var transaksiToDelete by remember { mutableStateOf<Transaksi?>(null) }
+    var searchQueryPelanggan by remember { mutableStateOf("") }
+    var showAddPelangganDialog by remember { mutableStateOf(false) }
+    var newPelangganNama by remember { mutableStateOf("") }
+    var newPelangganAlamat by remember { mutableStateOf("") }
+    var newPelangganNoHp by remember { mutableStateOf("") }
+    var addPelangganError by remember { mutableStateOf<String?>(null) }
+
+    val selectedPelanggan = pelangganList.find { it.id == formState.selectedPelangganId }
+
+    LaunchedEffect(formState.selectedPelangganId, pelangganList) {
+        if (selectedPelanggan != null) {
+            searchQueryPelanggan = selectedPelanggan.nama
+        } else if (formState.selectedPelangganId == null && formState.jumlah == "1" && searchQueryPelanggan.isEmpty()) {
+            searchQueryPelanggan = ""
+        }
+    }
+
+    val calendar = Calendar.getInstance().apply { timeInMillis = formState.tanggal }
+    val datePickerDialog = remember(context, formState.tanggal) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val selectedCal = Calendar.getInstance().apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                    set(Calendar.HOUR_OF_DAY, 12)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                }
+                viewModel.onTanggalChange(selectedCal.timeInMillis)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    Scaffold(
+        modifier = modifier.testTag("transaksi_screen"),
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text("Transaksi Penjualan", fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            "Santoya Depot Air RO",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Kembali")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+            )
+        },
+        bottomBar = {
+            if (selectedTabIndex == 0) {
+                Surface(
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("Total Tagihan", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    Formatters.formatRupiah(viewModel.hitungPerkiraanHarga()),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            if (formState.selectedKurirId != null) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.secondaryContainer,
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        "Komisi: ${Formatters.formatRupiah(viewModel.hitungPerkiraanKomisi())}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (formState.errorMessage != null) {
+                            Text(
+                                text = formState.errorMessage ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.simpanTransaksi(formState.tanggal) {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Transaksi berhasil disimpan!")
+                                    }
+                                    selectedTabIndex = 1
+                                }
+                            },
+                            enabled = !formState.isSaving,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("simpan_transaksi_button"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            if (formState.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(22.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Simpan Transaksi", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            TabRow(selectedTabIndex = selectedTabIndex) {
+                Tab(
+                    selected = selectedTabIndex == 0,
+                    onClick = { selectedTabIndex = 0 },
+                    text = { Text("Catat Penjualan") }
+                )
+                Tab(
+                    selected = selectedTabIndex == 1,
+                    onClick = { selectedTabIndex = 1 },
+                    text = { Text("Riwayat (${transaksiList.size})") }
+                )
+            }
+
+            if (selectedTabIndex == 0) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { datePickerDialog.show() }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Tanggal Transaksi", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(Formatters.formatDate(formState.tanggal), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                                Text("Ubah", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    item {
+                        var expandedPelanggan by remember { mutableStateOf(false) }
+                        val filteredPelanggan = remember(pelangganList, searchQueryPelanggan) {
+                            if (searchQueryPelanggan.isBlank()) {
+                                pelangganList
+                            } else {
+                                pelangganList.filter {
+                                    it.nama.contains(searchQueryPelanggan.trim(), ignoreCase = true) ||
+                                    it.no_hp.contains(searchQueryPelanggan.trim(), ignoreCase = true) ||
+                                    it.alamat.contains(searchQueryPelanggan.trim(), ignoreCase = true)
+                                }
+                            }
+                        }
+
+                        ExposedDropdownMenuBox(
+                            expanded = expandedPelanggan,
+                            onExpandedChange = { expandedPelanggan = !expandedPelanggan }
+                        ) {
+                            OutlinedTextField(
+                                value = searchQueryPelanggan,
+                                onValueChange = { query ->
+                                    searchQueryPelanggan = query
+                                    expandedPelanggan = true
+                                    val match = pelangganList.find { it.nama.equals(query.trim(), ignoreCase = true) }
+                                    if (match != null) {
+                                        viewModel.onPelangganSelected(match.id)
+                                    } else if (selectedPelanggan != null && selectedPelanggan.nama != query) {
+                                        viewModel.onPelangganSelected(null)
+                                    }
+                                },
+                                label = { Text("Pilih / Cari Pelanggan *") },
+                                placeholder = { Text("Ketik nama atau desa...") },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                trailingIcon = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        IconButton(onClick = {
+                                            newPelangganNama = searchQueryPelanggan.trim()
+                                            newPelangganAlamat = ""
+                                            newPelangganNoHp = ""
+                                            addPelangganError = null
+                                            showAddPelangganDialog = true
+                                        }) {
+                                            Icon(Icons.Default.PersonAdd, contentDescription = "Tambah Baru", tint = MaterialTheme.colorScheme.primary)
+                                        }
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedPelanggan)
+                                    }
+                                },
+                                supportingText = {
+                                    if (selectedPelanggan != null) {
+                                        Text(
+                                            "${selectedPelanggan.nama} | ${selectedPelanggan.alamat.ifBlank { "Depot" }} | Kasbon: ${Formatters.formatRupiah(selectedPelanggan.sisa_kasbon)}",
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(MenuAnchorType.PrimaryEditable),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+
+                            ExposedDropdownMenu(
+                                expanded = expandedPelanggan,
+                                onDismissRequest = { expandedPelanggan = false }
+                            ) {
+                                filteredPelanggan.forEach { p ->
+                                    val isSelected = p.id == formState.selectedPelangganId
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(p.nama, fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                Text("${p.alamat} • Kasbon: ${Formatters.formatRupiah(p.sisa_kasbon)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        },
+                                        trailingIcon = if (isSelected) {
+                                            { Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary) }
+                                        } else null,
+                                        onClick = {
+                                            viewModel.onPelangganSelected(p.id)
+                                            searchQueryPelanggan = p.nama
+                                            expandedPelanggan = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Column {
+                            Text(
+                                text = "Katalog Produk RO",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            val rows = produkList.chunked(2)
+                            rows.forEach { pair ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    pair.forEach { prod ->
+                                        val isSelected = prod.id == formState.selectedProdukId
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(64.dp)
+                                                .clickable { viewModel.onProdukSelected(prod) },
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+                                        ) {
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Text(
+                                                    text = prod.nama_produk,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = Formatters.formatRupiah(prod.harga),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                    if (pair.size == 1) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                            }
+
+                            OutlinedTextField(
+                                value = formState.hargaSatuan,
+                                onValueChange = { viewModel.onHargaSatuanChange(it) },
+                                label = { Text("Harga Satuan (Rp) *") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                supportingText = { Text("Dapat diedit manual jika ada promo/potongan harga") }
+                            )
+                        }
+                    }
+
+                    item {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Jumlah Galon", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val current = formState.jumlah.toIntOrNull() ?: 1
+                                            if (current > 1) viewModel.onJumlahChange((current - 1).toString())
+                                        },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Icon(Icons.Default.Remove, contentDescription = "Kurang", modifier = Modifier.size(18.dp))
+                                    }
+                                    OutlinedTextField(
+                                        value = formState.jumlah,
+                                        onValueChange = { viewModel.onJumlahChange(it) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier
+                                            .width(70.dp)
+                                            .padding(horizontal = 6.dp),
+                                        textStyle = MaterialTheme.typography.titleMedium.copy(textAlign = TextAlign.Center, fontWeight = FontWeight.Bold),
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    OutlinedButton(
+                                        onClick = {
+                                            val current = formState.jumlah.toIntOrNull() ?: 0
+                                            viewModel.onJumlahChange((current + 1).toString())
+                                        },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(0.dp),
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(18.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Column {
+                            Text("Kurir Pengantar", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilterChip(
+                                    selected = formState.selectedKurirId == null,
+                                    onClick = { viewModel.onKurirSelected(null) },
+                                    label = { Text("Ambil Sendiri", maxLines = 1) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                kurirList.take(2).forEach { k ->
+                                    FilterChip(
+                                        selected = formState.selectedKurirId == k.id,
+                                        onClick = { viewModel.onKurirSelected(k.id) },
+                                        label = { Text(k.nama, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Column {
+                            Text("Pembayaran & Status", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf("Cash", "COD", "Transfer").forEach { m ->
+                                    FilterChip(
+                                        selected = formState.metodeBayar.equals(m, ignoreCase = true),
+                                        onClick = { viewModel.onMetodeBayarChange(m) },
+                                        label = { Text(m, maxLines = 1) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                FilterChip(
+                                    selected = formState.status.equals("Lunas", ignoreCase = true),
+                                    onClick = { viewModel.onStatusChange("Lunas") },
+                                    label = { Text("Lunas", maxLines = 1) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                FilterChip(
+                                    selected = formState.status.equals("Kasbon", ignoreCase = true),
+                                    onClick = { viewModel.onStatusChange("Kasbon") },
+                                    label = { Text("Kasbon / Piutang", maxLines = 1) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                                    ),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                if (transaksiList.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                        Text("Belum ada riwayat transaksi", color = MaterialTheme.colorScheme.outline)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(transaksiList, key = { it.transaksi.id }) { itemUi ->
+                            val trx = itemUi.transaksi
+                            val receiptText = remember(itemUi) {
+                                receiptHelper.formatNotaTransaksi(
+                                    noTransaksi = "#TRX-${trx.id}",
+                                    tanggal = Formatters.formatDateTime(trx.tanggal),
+                                    namaPelanggan = itemUi.namaPelanggan,
+                                    namaKurir = itemUi.namaKurir,
+                                    namaProduk = itemUi.namaProduk ?: "Galon Air RO",
+                                    jumlah = trx.jumlah,
+                                    hargaSatuan = trx.harga_satuan,
+                                    totalHarga = trx.total_harga,
+                                    metodeBayar = trx.metode_bayar,
+                                    status = trx.status
+                                )
+                            }
+                            TransaksiCard(
+                                item = itemUi,
+                                onPrint = { printReceipt(receiptText) },
+                                onShare = {
+                                    val result = receiptHelper.shareImageToWhatsApp(receiptText = receiptText, title = "Struk #TRX-${trx.id}")
+                                    if (result.isFailure) {
+                                        Toast.makeText(context, "Gagal membagikan struk", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                onTandaiLunas = { viewModel.tandaiLunas(trx.id) },
+                                onDelete = { transaksiToDelete = trx }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showAddPelangganDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddPelangganDialog = false },
+            title = { Text("Tambah Pelanggan Baru", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = newPelangganNama,
+                        onValueChange = { newPelangganNama = it; addPelangganError = null },
+                        label = { Text("Nama Pelanggan *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    OutlinedTextField(
+                        value = newPelangganAlamat,
+                        onValueChange = { newPelangganAlamat = it },
+                        label = { Text("Alamat / Desa") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    OutlinedTextField(
+                        value = newPelangganNoHp,
+                        onValueChange = { newPelangganNoHp = it.filter { char -> char.isDigit() || char == '+' } },
+                        label = { Text("Nomor HP") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    if (addPelangganError != null) {
+                        Text(addPelangganError ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (newPelangganNama.isBlank()) {
+                        addPelangganError = "Nama wajib diisi!"
+                        return@Button
+                    }
+                    val baru = Pelanggan(nama = newPelangganNama.trim(), alamat = newPelangganAlamat.trim(), no_hp = newPelangganNoHp.trim(), sisa_kasbon = 0.0)
+                    viewModel.insertPelanggan(baru) { ins ->
+                        searchQueryPelanggan = ins.nama
+                        showAddPelangganDialog = false
+                    }
+                }) { Text("Simpan") }
+            },
+            dismissButton = { TextButton(onClick = { showAddPelangganDialog = false }) { Text("Batal") } }
+        )
+    }
+
+    if (showPrinterDialog) {
+        AlertDialog(
+            onDismissRequest = { showPrinterDialog = false },
+            title = { Text("Pilih Printer Bluetooth") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    pairedDevices.forEach { device ->
+                        @android.annotation.SuppressLint("MissingPermission")
+                        val devName = device.name ?: device.address
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showPrinterDialog = false
+                                    coroutineScope.launch {
+                                        receiptHelper.printViaBluetooth(device.address, pendingReceiptText)
+                                    }
+                                },
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Print, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(devName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(device.address, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showPrinterDialog = false }) { Text("Tutup") } }
+        )
+    }
+
+    transaksiToDelete?.let { trx ->
+        AlertDialog(
+            onDismissRequest = { transaksiToDelete = null },
+            title = { Text("Hapus Transaksi") },
+            text = { Text("Hapus transaksi #${trx.id}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.hapusTransaksi(trx)
+                    transaksiToDelete = null
+                }) { Text("Hapus", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { transaksiToDelete = null }) { Text("Batal") } }
+        )
+    }
+}
+
+@Composable
+private fun TransaksiCard(
+    item: TransaksiItemUi,
+    onPrint: () -> Unit,
+    onShare: () -> Unit,
+    onTandaiLunas: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val trx = item.transaksi
+    val isLunas = trx.status.equals("Lunas", ignoreCase = true)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(if (isLunas) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isLunas) Icons.Default.CheckCircle else Icons.Default.HourglassBottom,
+                            contentDescription = null,
+                            tint = if (isLunas) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(item.namaPelanggan, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(Formatters.formatDateTime(trx.tanggal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Row {
+                    IconButton(onClick = onPrint, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Print, contentDescription = "Cetak", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Delete, contentDescription = "Hapus", tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("${item.namaProduk ?: "RO"} x ${trx.jumlah} (${Formatters.formatRupiah(trx.harga_satuan)})", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${trx.metode_bayar} • ${item.namaKurir ?: "Ambil Sendiri"}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(Formatters.formatRupiah(trx.total_harga), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(trx.status, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = if (isLunas) Color(0xFF2E7D32) else Color(0xFFE65100))
+                }
+            }
+            if (!isLunas) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onTandaiLunas,
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Tandai Lunas", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
