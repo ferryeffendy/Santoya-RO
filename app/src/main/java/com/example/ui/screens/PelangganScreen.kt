@@ -951,7 +951,8 @@ private fun KasbonPelangganTab(
                                                 ActiveReceiptDialog(
                                                     title = "Tagihan Kasbon - ${cust.nama}",
                                                     receiptText = receipt,
-                                                    customerPhone = cust.no_hp
+                                                    customerPhone = cust.no_hp,
+                                                    data = Pair(cust, unpaid.map { it.transaksi })
                                                 )
                                             )
                                         },

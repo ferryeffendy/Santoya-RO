@@ -232,7 +232,8 @@ object SantoyaReceiptHelper {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/png"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
-                putExtra(Intent.EXTRA_TEXT, receiptText)
+                clipData = android.content.ClipData.newRawUri("receipt", contentUri)
+                putExtra(Intent.EXTRA_TEXT, "Struk Santoya RO")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 if (!phoneNumber.isNullOrBlank()) {
                     val clean = phoneNumber.replace("[^0-9]".toRegex(), "")
@@ -241,10 +242,12 @@ object SantoyaReceiptHelper {
                 }
             }
             val chooser = Intent.createChooser(intent, "Kirim Gambar Struk Santoya")
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
         } catch (e: Exception) {
-            // Fallback to text share
+            e.printStackTrace()
+            // Fallback to text share if image generation or sharing fails
             shareReceiptText(context, receiptText, phoneNumber)
         }
     }

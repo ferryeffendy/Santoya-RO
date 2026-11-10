@@ -43,6 +43,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -103,6 +104,7 @@ fun LaporanScreen(
     val effectivePengeluaranList = if (pengeluaranList.isNotEmpty()) pengeluaranList else allPengeluaranFromVm
 
     var selectedPeriode by remember { mutableStateOf(LaporanPeriode.BULAN_INI) }
+    var isSummaryMode by remember { mutableStateOf(false) }
     var detailTabIndex by remember { mutableIntStateOf(0) }
     var rankingTabIndex by remember { mutableIntStateOf(0) }
 
@@ -228,11 +230,12 @@ fun LaporanScreen(
                                 IconButton(
                                     onClick = {
                                         val html = buildString {
-                                        val totalGalon = filteredTx.sumOf { it.transaksi.jumlah }
-                                        val totalLunas = pendapatanLunas
-                                        val totalKasbon = filteredTx.filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }.sumOf { it.transaksi.total_harga }
-                                        val totalKomisi = totalKomisiKurir
-                                        val netProfit = labaBersih
+                                            val totalGalon = filteredTx.sumOf { it.transaksi.jumlah }
+                                            val totalLunas = pendapatanLunas
+                                            val totalKasbon = filteredTx.filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }.sumOf { it.transaksi.total_harga }
+                                            val totalKomisi = totalKomisiKurir
+                                            val netProfit = labaBersih
+
                                             append("<html><head><style>")
                                             append("body { font-family: Arial, sans-serif; padding: 20px; color: #333; }")
                                             append("h1 { color: #0284C7; font-size: 20px; margin-bottom: 2px; }")
@@ -256,19 +259,39 @@ fun LaporanScreen(
                                             append("<b>• Laba Bersih: ${FormatUtils.formatRupiah(netProfit)}</b>")
                                             append("</div>")
 
-                                            append("<h3>Daftar Transaksi (${filteredTx.size})</h3>")
-                                            append("<table><thead><tr><th>No</th><th>Tanggal</th><th>Pelanggan</th><th>Jumlah</th><th>Total</th><th>Status</th></tr></thead><tbody>")
-                                            filteredTx.forEachIndexed { idx, item ->
-                                                append("<tr>")
-                                                append("<td>${idx + 1}</td>")
-                                                append("<td>${FormatUtils.formatDateShort(item.transaksi.tanggal)}</td>")
-                                                append("<td>${item.pelanggan?.nama ?: "-"}</td>")
-                                                append("<td>${item.transaksi.jumlah}</td>")
-                                                append("<td class='right'>${FormatUtils.formatRupiah(item.transaksi.total_harga)}</td>")
-                                                append("<td>${item.transaksi.status}</td>")
-                                                append("</tr>")
+                                            if (isSummaryMode) {
+                                                val groupedByDate = filteredTx
+                                                    .groupBy { FormatUtils.formatDateShort(it.transaksi.tanggal) }
+                                                    .map { (tgl, list) ->
+                                                        Triple(tgl, list.sumOf { it.transaksi.jumlah }, list.sumOf { it.transaksi.total_harga })
+                                                    }
+                                                append("<h3>Ringkasan Penjualan Harian (${groupedByDate.size} Hari)</h3>")
+                                                append("<table><thead><tr><th>Tanggal</th><th>Total Galon</th><th class='right'>Total Pendapatan</th></tr></thead><tbody>")
+                                                groupedByDate.forEach { item ->
+                                                    append("<tr>")
+                                                    append("<td>${item.first}</td>")
+                                                    append("<td>${item.second} Galon</td>")
+                                                    append("<td class='right'>${FormatUtils.formatRupiah(item.third)}</td>")
+                                                    append("</tr>")
+                                                }
+                                                append("</tbody></table>")
+                                            } else {
+                                                val limitedTx = filteredTx.sortedByDescending { it.transaksi.tanggal }.take(100)
+                                                append("<h3>Daftar Transaksi (${filteredTx.size})</h3>")
+                                                append("<table><thead><tr><th>No</th><th>Tanggal</th><th>Pelanggan</th><th>Jumlah</th><th class='right'>Total</th><th>Status</th></tr></thead><tbody>")
+                                                limitedTx.forEachIndexed { idx, item ->
+                                                    append("<tr>")
+                                                    append("<td>${idx + 1}</td>")
+                                                    append("<td>${FormatUtils.formatDateShort(item.transaksi.tanggal)}</td>")
+                                                    append("<td>${item.pelanggan?.nama ?: "-"}</td>")
+                                                    append("<td>${item.transaksi.jumlah}</td>")
+                                                    append("<td class='right'>${FormatUtils.formatRupiah(item.transaksi.total_harga)}</td>")
+                                                    append("<td>${item.transaksi.status}</td>")
+                                                    append("</tr>")
+                                                }
+                                                append("</tbody></table>")
+                                                append("<p style='text-align:center; font-style:italic;'>*Hanya menampilkan 100 transaksi terbaru. Gunakan Ekspor CSV untuk data lengkap.</p>")
                                             }
-                                            append("</tbody></table>")
 
                                             append("</body></html>")
                                         }
@@ -284,6 +307,24 @@ fun LaporanScreen(
                                     )
                                 }
                             }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Cetak Mode Ringkasan",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Switch(
+                                checked = isSummaryMode,
+                                onCheckedChange = { isSummaryMode = it },
+                                modifier = Modifier.height(28.dp)
+                            )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         Row(
