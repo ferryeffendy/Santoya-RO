@@ -46,6 +46,7 @@ class SantoyaRepository(private val db: AppDatabase) {
 
     // --- Transaksi ---
     val allTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllWithDetail()
+    val allKasbonTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllKasbonWithDetail()
     fun getTransaksiByDateRange(start: Long, end: Long) = db.transaksiDao().getByDateRangeWithDetail(start, end)
     fun getTransaksiByPelanggan(pelangganId: Int) = db.transaksiDao().getByPelangganWithDetail(pelangganId)
     suspend fun getTransaksiDetailById(id: Int) = db.transaksiDao().getDetailById(id)

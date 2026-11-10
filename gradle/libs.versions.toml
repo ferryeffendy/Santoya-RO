@@ -96,6 +96,8 @@ androidx-credentials = { group = "androidx.credentials", name = "credentials", v
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }
+vico-compose = { group = "com.patrykandpatrick.vico", name = "compose-m3", version = "2.0.0-alpha.25" }
+vico-core = { group = "com.patrykandpatrick.vico", name = "core", version = "2.0.0-alpha.25" }
 
 
 [plugins]

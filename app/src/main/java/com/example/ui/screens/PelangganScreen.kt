@@ -124,7 +124,12 @@ fun PelangganScreen(
                         )
                     }
                 )
-                val kasbonCount = pelangganUiModels.count { it.pelanggan.sisa_kasbon > 0 }
+                val kasbonCount = pelangganUiModels.count { model ->
+                    val p = model.pelanggan
+                    p.sisa_kasbon > 0 || transaksiList.any { t ->
+                        t.transaksi.id_pelanggan == p.id && t.transaksi.status.equals("Kasbon", ignoreCase = true)
+                    }
+                }
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
@@ -745,7 +750,7 @@ private fun KasbonPelangganTab(
     var sortOption by remember { mutableStateOf(KasbonSortOption.TERBANYAK) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val sortedKasbon = viewModel.getSortedKasbonPelanggan(pelangganList, sortOption, searchQuery)
+    val sortedKasbon = viewModel.getSortedKasbonPelanggan(pelangganList, sortOption, searchQuery, transaksiList)
     val totalPiutang = sortedKasbon.sumOf { it.sisa_kasbon }
 
     Column(modifier = Modifier.fillMaxSize()) {

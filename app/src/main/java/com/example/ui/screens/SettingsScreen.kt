@@ -1,9 +1,11 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.clickable
+import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
@@ -27,14 +28,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,15 +44,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.ImportJsonDialog
+import com.example.ui.theme.AccentEmerald
+import com.example.ui.theme.pressClickEffect
 import com.example.util.ExportHelper
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -73,13 +73,13 @@ fun SettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
         item {
-            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "Kelola Master Data",
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -88,6 +88,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -96,15 +97,19 @@ fun SettingsScreen(
                         title = "Master Produk & Harga",
                         subtitle = "${produkList.size} produk terdaftar (Atur jenis & harga galon)",
                         icon = Icons.Default.Sell,
-                        iconColor = Color(0xFF10B981),
+                        iconColor = AccentEmerald,
                         onClick = { viewModel.navigateTo(SantoyaScreen.PRODUK) }
                     )
-                    Spacer(modifier = Modifier.height(1.dp).fillMaxWidth().padding(horizontal = 16.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
                     SettingsMenuRow(
                         title = "Kelola Kurir & Komisi",
                         subtitle = "${kurirList.size} kurir terdaftar (Atur tarif komisi pengantaran)",
                         icon = Icons.Default.LocalShipping,
-                        iconColor = Color(0xFF6366F1),
+                        iconColor = MaterialTheme.colorScheme.tertiary,
                         onClick = { viewModel.navigateTo(SantoyaScreen.KURIR) }
                     )
                 }
@@ -114,7 +119,7 @@ fun SettingsScreen(
         item {
             Text(
                 text = "Backup & Ekspor / Impor Data",
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -123,6 +128,7 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -147,11 +153,18 @@ fun SettingsScreen(
                                     mimeType = "application/json"
                                 )
                             },
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
                         ) {
                             Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Ekspor JSON", fontSize = 13.sp)
+                            Text(
+                                "Ekspor JSON",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
 
                         OutlinedButton(
@@ -167,11 +180,18 @@ fun SettingsScreen(
                                     mimeType = "text/csv"
                                 )
                             },
-                            modifier = Modifier.weight(1f)
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
                         ) {
                             Icon(imageVector = Icons.Default.TableChart, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Ekspor CSV", fontSize = 13.sp)
+                            Text(
+                                "Ekspor CSV",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
 
@@ -179,22 +199,27 @@ fun SettingsScreen(
 
                     FilledTonalButton(
                         onClick = { showImportDialog = true },
-                        modifier = Modifier.fillMaxWidth()
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
                     ) {
                         Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Impor Data JSON (File / Teks)", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "Impor Data JSON (File / Teks)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
         }
-
 
         item {
             Text(
-                text = "Informasi Aplikasi",
-                fontSize = 15.sp,
+                text = "Informasi Sistem",
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -203,28 +228,41 @@ fun SettingsScreen(
             Card(
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Santoya RO • Depot Air Minum",
+                            text = "Santoya RO • Enterprise POS",
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Text(
-                        text = "Sistem Kasir POS Offline v2.0\nDatabase: SQLite Room v4 (santoya_ro_database)\n100% Berjalan Lokal tanpa butuh koneksi internet.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        lineHeight = 18.sp
+                        text = "Sistem Kasir POS Offline v2.0\nDatabase: SQLite Room v4 (santoya_ro_database)\n100% Berjalan Lokal dengan Performa Tinggi.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 
@@ -249,14 +287,14 @@ fun SettingsMenuRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .pressClickEffect(onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
-            color = iconColor.copy(alpha = 0.15f),
-            modifier = Modifier.size(42.dp)
+            color = iconColor.copy(alpha = 0.14f),
+            modifier = Modifier.size(44.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(imageVector = icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(22.dp))
@@ -266,13 +304,14 @@ fun SettingsMenuRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = subtitle,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -280,7 +319,7 @@ fun SettingsMenuRow(
             imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(15.dp)
         )
     }
 }

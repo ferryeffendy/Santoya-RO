@@ -1,15 +1,12 @@
-import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
-  alias(libs.plugins.google.services)
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.aistudio.companion.kzpmrw"
   compileSdk = 36
 
   defaultConfig {
@@ -46,7 +43,9 @@ android {
       signingConfig = signingConfigs.getByName("release")
     }
     debug {
-      signingConfig = signingConfigs.getByName("debugConfig")
+      if (file("${rootDir}/debug.keystore").exists()) {
+        signingConfig = signingConfigs.getByName("debugConfig")
+      }
     }
   }
   compileOptions {
@@ -70,8 +69,6 @@ secrets {
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
-
-googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
 
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
@@ -115,4 +112,6 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   coreLibraryDesugaring(libs.desugar.jdk.libs)
+  implementation(libs.vico.compose)
+  implementation(libs.vico.core)
 }

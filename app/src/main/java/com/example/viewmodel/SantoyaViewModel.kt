@@ -87,10 +87,16 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     val allPelanggan: StateFlow<List<Pelanggan>> = repository.allPelanggan
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val pelangganKasbon: StateFlow<List<Pelanggan>> = repository.pelangganKasbon
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val allPengeluaran: StateFlow<List<Pengeluaran>> = repository.allPengeluaran
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val allTransaksi: StateFlow<List<TransaksiDetail>> = repository.allTransaksiWithDetail
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allKasbonTransaksi: StateFlow<List<TransaksiDetail>> = repository.allKasbonTransaksiWithDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Transaksi Form State ---
@@ -152,8 +158,21 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun incrementTxJumlah() { _txJumlah.update { it + 1 } }
     fun decrementTxJumlah() { _txJumlah.update { (it - 1).coerceAtLeast(1) } }
     fun setTxHargaSatuan(harga: Double) { _txHargaSatuan.value = harga.coerceAtLeast(0.0) }
-    fun setTxMetodeBayar(metode: String) { _txMetodeBayar.value = metode }
-    fun setTxStatus(status: String) { _txStatus.value = status }
+    fun setTxMetodeBayar(metode: String) {
+        _txMetodeBayar.value = metode
+        if (metode.isNotBlank()) {
+            _txStatus.value = "Lunas"
+        }
+    }
+
+    fun setTxStatus(status: String) {
+        _txStatus.value = status
+        if (status.equals("Kasbon", ignoreCase = true)) {
+            _txMetodeBayar.value = ""
+        } else if (status.equals("Lunas", ignoreCase = true) && _txMetodeBayar.value.isBlank()) {
+            _txMetodeBayar.value = "Cash"
+        }
+    }
 
     // --- Feedback / Dialog States ---
     private val _snackbarMessage = MutableStateFlow<String?>(null)
@@ -191,6 +210,13 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
+        val statusVal = _txStatus.value
+        val metodeVal = if (statusVal.equals("Kasbon", ignoreCase = true)) {
+            "-"
+        } else {
+            _txMetodeBayar.value.ifBlank { "Cash" }
+        }
+
         viewModelScope.launch {
             val newId = repository.recordTransaksi(
                 tanggal = _txTanggal.value,
@@ -199,13 +225,15 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 idProduk = produkId,
                 jumlah = _txJumlah.value,
                 hargaSatuan = _txHargaSatuan.value,
-                metodeBayar = _txMetodeBayar.value,
-                status = _txStatus.value
+                metodeBayar = metodeVal,
+                status = statusVal
             )
             showSnackbar("Transaksi #${newId} berhasil dicatat!")
-            // Reset to 1 galon & reset date to now
+            // Reset to 1 galon & reset date & default Lunas/Cash
             _txJumlah.value = 1
             _txTanggal.value = System.currentTimeMillis()
+            _txStatus.value = "Lunas"
+            _txMetodeBayar.value = "Cash"
             onSuccess(newId)
         }
     }
@@ -407,19 +435,42 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun getSortedKasbonPelanggan(
         list: List<Pelanggan>,
         sortOption: KasbonSortOption,
-        query: String = ""
+        query: String = "",
+        transaksiList: List<TransaksiDetail> = emptyList()
     ): List<Pelanggan> {
-        val filtered = list.filter { it.sisa_kasbon > 0 }
+        // Map to store latest and earliest kasbon transaction dates per customer
+        val kasbonDatesMap = transaksiList
+            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+            .groupBy { it.transaksi.id_pelanggan }
+            .mapValues { (_, txs) ->
+                val dates = txs.map { it.transaksi.tanggal }
+                Pair(dates.minOrNull() ?: Long.MAX_VALUE, dates.maxOrNull() ?: Long.MIN_VALUE)
+            }
+
+        val processedList = list.map { p ->
+            val unpaid = transaksiList.filter {
+                it.transaksi.id_pelanggan == p.id &&
+                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
+            }
+            val unpaidTotal = unpaid.sumOf { it.transaksi.total_harga }
+            val effectiveKasbon = if (unpaidTotal > 0) unpaidTotal else p.sisa_kasbon
+            
+            // Store dates in a wrapper or just use them during sort if we keep p as Pelanggan
+            if (effectiveKasbon != p.sisa_kasbon) p.copy(sisa_kasbon = effectiveKasbon) else p
+        }
+
+        val filtered = processedList.filter { it.sisa_kasbon > 0 }
             .filter {
                 if (query.isBlank()) true else {
                     val q = query.lowercase().trim()
                     it.nama.lowercase().contains(q) || it.alamat.lowercase().contains(q) || it.no_hp.contains(q)
                 }
             }
+
         return when (sortOption) {
             KasbonSortOption.TERBANYAK -> filtered.sortedByDescending { it.sisa_kasbon }
-            KasbonSortOption.TERLAMA -> filtered.sortedBy { it.id }
-            KasbonSortOption.TERBARU -> filtered.sortedByDescending { it.id }
+            KasbonSortOption.TERLAMA -> filtered.sortedBy { p -> kasbonDatesMap[p.id]?.first ?: Long.MAX_VALUE }
+            KasbonSortOption.TERBARU -> filtered.sortedByDescending { p -> kasbonDatesMap[p.id]?.second ?: Long.MIN_VALUE }
         }
     }
 

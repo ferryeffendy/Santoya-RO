@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -40,13 +41,14 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,11 +78,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.theme.pressClickEffect
 import com.example.util.FormatUtils
 import com.example.util.SantoyaReceiptHelper
 import com.example.viewmodel.ActiveReceiptDialog
@@ -109,13 +111,25 @@ fun TransaksiScreen(
             Tab(
                 selected = selectedTab == 0,
                 onClick = { viewModel.setTransaksiTab(0) },
-                text = { Text("Catat Penjualan", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Catat Penjualan",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (selectedTab == 0) FontWeight.ExtraBold else FontWeight.SemiBold
+                    )
+                },
                 modifier = Modifier.testTag("tab_catat_penjualan")
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { viewModel.setTransaksiTab(1) },
-                text = { Text("Riwayat Transaksi (${transaksiList.size})", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        "Riwayat Transaksi (${transaksiList.size})",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = if (selectedTab == 1) FontWeight.ExtraBold else FontWeight.SemiBold
+                    )
+                },
                 modifier = Modifier.testTag("tab_riwayat_penjualan")
             )
         }
@@ -175,8 +189,8 @@ fun CatatPenjualanTab(
             val q = searchQuery.trim().lowercase()
             pelangganList.filter {
                 it.nama.lowercase().contains(q) ||
-                it.alamat.lowercase().contains(q) ||
-                it.no_hp.lowercase().contains(q)
+                    it.alamat.lowercase().contains(q) ||
+                    it.no_hp.lowercase().contains(q)
             }
         }
     }
@@ -211,22 +225,23 @@ fun CatatPenjualanTab(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 108.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 118.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 1. Baris Tanggal Ramping
+            // 1. Baris Tanggal Transaksi
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
-                    .clickable { datePickerDialog.show() }
+                    .height(40.dp)
+                    .pressClickEffect { datePickerDialog.show() }
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 10.dp),
+                        .padding(horizontal = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -247,13 +262,19 @@ fun CatatPenjualanTab(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        text = "Ubah Tgl",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = "Ubah Tgl",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            maxLines = 1
+                        )
+                    }
                 }
             }
 
@@ -295,7 +316,7 @@ fun CatatPenjualanTab(
                             Icons.Default.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     },
                     trailingIcon = {
@@ -324,14 +345,14 @@ fun CatatPenjualanTab(
                                     Icons.Default.PersonAdd,
                                     contentDescription = "Tambah Pelanggan Baru",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded)
                         }
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
@@ -423,25 +444,25 @@ fun CatatPenjualanTab(
             if (selectedPelanggan != null) {
                 if (selectedPelanggan.harga_khusus != null || selectedPelanggan.id_kurir_langganan != null) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
+                            .height(26.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Check,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(13.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             val autoDetails = mutableListOf<String>()
                             if (selectedPelanggan.harga_khusus != null && selectedPelanggan.harga_khusus > 0) {
                                 autoDetails.add("Khusus: ${FormatUtils.formatRupiah(selectedPelanggan.harga_khusus)}")
@@ -464,25 +485,25 @@ fun CatatPenjualanTab(
 
                 if (selectedPelanggan.sisa_kasbon > 0) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFF59E0B).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0xFFF59E0B).copy(alpha = 0.16f),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(24.dp)
+                            .height(26.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Receipt,
                                 contentDescription = null,
                                 tint = Color(0xFFB45309),
-                                modifier = Modifier.size(12.dp)
+                                modifier = Modifier.size(13.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Sisa kasbon: ${FormatUtils.formatRupiah(selectedPelanggan.sisa_kasbon)}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -496,28 +517,31 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 4. Katalog Produk (Grid 2 Kolom proporsional, tinggi 44.dp)
+            // 4. Katalog Produk (Grid 2 Kolom dengan micro-interaction)
             val chunkedProduk = produkList.chunked(2)
             chunkedProduk.forEach { pair ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     pair.forEach { prod ->
                         val isSelected = prod.id == selectedProdukId
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(44.dp)
-                                .clickable { viewModel.setTxProdukId(prod.id, prod.harga) },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
+                                .height(46.dp)
+                                .pressClickEffect { viewModel.setTxProdukId(prod.id, prod.harga) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                width = if (isSelected) 1.5.dp else 1.dp,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                            )
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 10.dp),
+                                    .padding(horizontal = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -546,10 +570,10 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 5. Baris Horizontal: Harga Satuan & Counter Galon (Mantap & Proporsional)
+            // 5. Baris Horizontal: Harga Satuan & Counter Galon
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
@@ -574,7 +598,11 @@ fun CatatPenjualanTab(
                         )
                     },
                     singleLine = true,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .weight(1.3f)
@@ -582,17 +610,17 @@ fun CatatPenjualanTab(
                 )
 
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier
                         .weight(1.2f)
-                        .height(54.dp)
+                        .height(56.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(horizontal = 6.dp),
+                            .padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
@@ -609,11 +637,13 @@ fun CatatPenjualanTab(
 
                         Text(
                             text = "$jumlah",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.width(36.dp),
+                            modifier = Modifier
+                                .width(38.dp)
+                                .animateContentSize(),
                             maxLines = 1
                         )
 
@@ -632,7 +662,7 @@ fun CatatPenjualanTab(
             }
 
             // 6. Pilihan Kurir Pengantar
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
                     text = "Kurir Pengantar",
                     style = MaterialTheme.typography.titleSmall,
@@ -657,7 +687,7 @@ fun CatatPenjualanTab(
                                 fontWeight = if (selectedKurirId == null) FontWeight.Bold else FontWeight.Normal
                             )
                         },
-                        modifier = Modifier.height(32.dp)
+                        modifier = Modifier.height(34.dp)
                     )
                     kurirList.forEach { k ->
                         FilterChip(
@@ -672,20 +702,23 @@ fun CatatPenjualanTab(
                                     fontWeight = if (selectedKurirId == k.id) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.height(34.dp)
                         )
                     }
                 }
             }
 
-            // 7. Pilihan Pembayaran & Status (Berdampingan lega, tidak terpotong)
+            // 7. Pilihan Pembayaran & Status
+            val isKasbon = status.equals("Kasbon", ignoreCase = true)
+            val isLunas = status.equals("Lunas", ignoreCase = true)
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Column(
-                    modifier = Modifier.weight(1.3f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Metode Pembayaran",
@@ -697,8 +730,8 @@ fun CatatPenjualanTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        listOf("Cash", "COD", "Transfer").forEach { m ->
-                            val isSelected = metodeBayar.equals(m, ignoreCase = true)
+                        listOf("Cash", "Transfer").forEach { m ->
+                            val isSelected = !isKasbon && metodeBayar.equals(m, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { viewModel.setTxMetodeBayar(m) },
@@ -712,15 +745,15 @@ fun CatatPenjualanTab(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(32.dp)
+                                    .height(34.dp)
                             )
                         }
                     }
                 }
 
                 Column(
-                    modifier = Modifier.weight(1.1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "Status Nota",
@@ -732,8 +765,6 @@ fun CatatPenjualanTab(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        val isLunas = status.equals("Lunas", ignoreCase = true)
-                        val isKasbon = status.equals("Kasbon", ignoreCase = true)
                         FilterChip(
                             selected = isLunas,
                             onClick = { viewModel.setTxStatus("Lunas") },
@@ -751,7 +782,7 @@ fun CatatPenjualanTab(
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(32.dp)
+                                .height(34.dp)
                         )
                         FilterChip(
                             selected = isKasbon,
@@ -770,18 +801,18 @@ fun CatatPenjualanTab(
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(32.dp)
+                                .height(34.dp)
                         )
                     }
                 }
             }
         }
 
-        // 8. Docked Bottom Action Bar
+        // 8. Docked Fintech Bottom Action Bar
         Surface(
-            shadowElevation = 8.dp,
+            shadowElevation = 10.dp,
             color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
@@ -789,7 +820,7 @@ fun CatatPenjualanTab(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -805,7 +836,7 @@ fun CatatPenjualanTab(
                             )
                             Text(
                                 text = FormatUtils.formatRupiah(totalHarga),
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary,
                                 maxLines = 1
@@ -825,24 +856,24 @@ fun CatatPenjualanTab(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f)
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFF59E0B).copy(alpha = 0.18f) else Color(0xFF10B981).copy(alpha = 0.18f)
                     ) {
                         Text(
                             text = status.uppercase(),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFB45309) else Color(0xFF047857),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
                         onClick = {
@@ -865,15 +896,15 @@ fun CatatPenjualanTab(
                                 viewModel.onPelangganSelected(null)
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(vertical = 8.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(38.dp)
+                            .height(42.dp)
                             .testTag("btn_simpan_dan_cetak")
                     ) {
-                        Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "Cetak Struk",
                             style = MaterialTheme.typography.titleSmall,
@@ -889,18 +920,18 @@ fun CatatPenjualanTab(
                                 viewModel.onPelangganSelected(null)
                             }
                         },
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(vertical = 8.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFD97706) else MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier
                             .weight(1f)
-                            .height(38.dp)
+                            .height(42.dp)
                             .testTag("btn_simpan_transaksi")
                     ) {
-                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             "Simpan Transaksi",
                             style = MaterialTheme.typography.titleSmall,
@@ -922,6 +953,7 @@ fun CatatPenjualanTab(
 
         AlertDialog(
             onDismissRequest = { showAddCustomerDialog = false },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Text(
                     text = "Tambah Pelanggan Baru",
@@ -1106,9 +1138,9 @@ fun RiwayatTransaksiTab(
             val q = searchQuery.lowercase().trim()
             transaksiList.filter {
                 (it.pelanggan?.nama?.lowercase()?.contains(q) == true) ||
-                (it.produk?.nama_produk?.lowercase()?.contains(q) == true) ||
-                (it.transaksi.status.lowercase().contains(q)) ||
-                (it.transaksi.id.toString() == q)
+                    (it.produk?.nama_produk?.lowercase()?.contains(q) == true) ||
+                    (it.transaksi.status.lowercase().contains(q)) ||
+                    (it.transaksi.id.toString() == q)
             }
         }
     }
@@ -1117,8 +1149,8 @@ fun RiwayatTransaksiTab(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 14.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
             OutlinedTextField(
@@ -1134,7 +1166,11 @@ fun RiwayatTransaksiTab(
                 },
                 leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("input_search_transaksi")
@@ -1144,7 +1180,7 @@ fun RiwayatTransaksiTab(
         if (filtered.isEmpty()) {
             item {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -1160,11 +1196,14 @@ fun RiwayatTransaksiTab(
         } else {
             items(filtered, key = { it.transaksi.id }) { detail ->
                 val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
-                OutlinedCard(
-                    shape = RoundedCornerShape(12.dp),
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1172,33 +1211,26 @@ fun RiwayatTransaksiTab(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "#${detail.transaksi.id}",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
                                     text = FormatUtils.formatDate(detail.transaksi.tanggal),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                             Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = if (isKasbon) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color(0xFF10B981).copy(alpha = 0.2f)
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isKasbon) Color(0xFFF59E0B).copy(alpha = 0.18f) else Color(0xFF10B981).copy(alpha = 0.18f)
                             ) {
                                 Text(
-                                    text = detail.transaksi.status,
+                                    text = detail.transaksi.status.uppercase(),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isKasbon) Color(0xFFB45309) else Color(0xFF047857),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1207,7 +1239,7 @@ fun RiwayatTransaksiTab(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = detail.pelanggan?.nama ?: "Pelanggan Umum",
-                                    style = MaterialTheme.typography.titleSmall,
+                                    style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
@@ -1224,6 +1256,7 @@ fun RiwayatTransaksiTab(
                                     Text(
                                         text = "Kurir: ${detail.kurir.nama}",
                                         style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1234,8 +1267,8 @@ fun RiwayatTransaksiTab(
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = FormatUtils.formatRupiah(detail.transaksi.total_harga),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
@@ -1253,30 +1286,15 @@ fun RiwayatTransaksiTab(
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isKasbon) {
-                                TextButton(
-                                    onClick = { viewModel.markTransaksiLunas(detail.transaksi.id) },
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        "Lunas",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
                             IconButton(
                                 onClick = { editingTransaksi = detail },
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
                                     contentDescription = "Edit",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
 
@@ -1293,9 +1311,9 @@ fun RiwayatTransaksiTab(
                                         )
                                     )
                                 },
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Print, contentDescription = "Cetak", modifier = Modifier.size(16.dp))
+                                Icon(imageVector = Icons.Default.Print, contentDescription = "Cetak", modifier = Modifier.size(17.dp))
                             }
 
                             IconButton(
@@ -1308,20 +1326,20 @@ fun RiwayatTransaksiTab(
                                         phoneNumber = detail.pelanggan?.no_hp
                                     )
                                 },
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             ) {
-                                Icon(imageVector = Icons.Default.Share, contentDescription = "Bagikan", modifier = Modifier.size(16.dp))
+                                Icon(imageVector = Icons.Default.Share, contentDescription = "Bagikan", modifier = Modifier.size(17.dp))
                             }
 
                             IconButton(
                                 onClick = { viewModel.deleteTransaksi(detail.transaksi) },
-                                modifier = Modifier.size(30.dp)
+                                modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Delete,
                                     contentDescription = "Hapus",
                                     tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                         }
@@ -1342,6 +1360,7 @@ fun RiwayatTransaksiTab(
 
         AlertDialog(
             onDismissRequest = { editingTransaksi = null },
+            shape = RoundedCornerShape(18.dp),
             title = {
                 Text(
                     text = "Edit Transaksi #${detail.transaksi.id}",
@@ -1435,11 +1454,15 @@ fun RiwayatTransaksiTab(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("Cash", "COD", "Transfer").forEach { metode ->
-                            val isSelected = editMetode.equals(metode, ignoreCase = true)
+                        val isEditKasbon = editStatus.equals("Kasbon", ignoreCase = true)
+                        listOf("Cash", "Transfer").forEach { metode ->
+                            val isSelected = !isEditKasbon && editMetode.equals(metode, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { editMetode = metode },
+                                onClick = {
+                                    editMetode = metode
+                                    editStatus = "Lunas"
+                                },
                                 label = {
                                     Text(
                                         metode,
@@ -1462,7 +1485,14 @@ fun RiwayatTransaksiTab(
                             val isSelected = editStatus.equals(st, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { editStatus = st },
+                                onClick = {
+                                    editStatus = st
+                                    if (st.equals("Kasbon", ignoreCase = true)) {
+                                        editMetode = ""
+                                    } else if (st.equals("Lunas", ignoreCase = true) && editMetode.isBlank()) {
+                                        editMetode = "Cash"
+                                    }
+                                },
                                 label = {
                                     Text(
                                         st,

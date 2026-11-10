@@ -22,6 +22,10 @@ interface TransaksiDao {
     fun getByDateRangeWithDetail(startTime: Long, endTime: Long): Flow<List<TransaksiDetail>>
 
     @Transaction
+    @Query("SELECT * FROM transaksi WHERE LOWER(status) = 'kasbon' ORDER BY tanggal DESC")
+    fun getAllKasbonWithDetail(): Flow<List<TransaksiDetail>>
+
+    @Transaction
     @Query("SELECT * FROM transaksi WHERE id_pelanggan = :pelangganId ORDER BY tanggal DESC")
     fun getByPelangganWithDetail(pelangganId: Int): Flow<List<TransaksiDetail>>
 
