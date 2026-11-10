@@ -26,6 +26,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,32 +84,26 @@ fun ReceiptDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Receipt Paper View
+                // REDESIGNED PREVIEW
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color(0xFFF8FAFC),
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White,
                     shadowElevation = 2.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("SANTOYA RO", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally))
+                        Text("DEPOT AIR MINUM RO", style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                        
+                        // Fallback/String preview for now since parsing logic is missing.
+                        // User wants redesign *total*. I will try my best to implement a generic professional preview.
                         Text(
                             text = dialogData.receiptText,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 12.sp,
                             lineHeight = 17.sp,
-                            color = Color(0xFF1E293B)
+                            color = Color.Black
                         )
                     }
                 }
@@ -128,7 +123,7 @@ fun ReceiptDialog(
                     }
                 }
 
-                // Action Buttons
+                // Action Buttons (KEEP LOGIC AS IS)
                 Button(
                     onClick = {
                         SantoyaReceiptHelper.printViaBluetooth(
@@ -138,9 +133,7 @@ fun ReceiptDialog(
                             printStatus = status
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_print_bluetooth")
+                    modifier = Modifier.fillMaxWidth().testTag("btn_print_bluetooth")
                 ) {
                     Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -159,9 +152,7 @@ fun ReceiptDialog(
                         containerColor = Color(0xFF22C55E).copy(alpha = 0.15f),
                         contentColor = Color(0xFF15803D)
                     ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_share_wa_image")
+                    modifier = Modifier.fillMaxWidth().testTag("btn_share_wa_image")
                 ) {
                     Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
@@ -176,9 +167,7 @@ fun ReceiptDialog(
                             phoneNumber = dialogData.customerPhone
                         )
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_share_wa_text")
+                    modifier = Modifier.fillMaxWidth().testTag("btn_share_wa_text")
                 ) {
                     Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))

@@ -56,7 +56,8 @@ data class TodaySummary(
 data class ActiveReceiptDialog(
     val title: String,
     val receiptText: String,
-    val customerPhone: String? = null
+    val customerPhone: String? = null,
+    val data: Any? = null
 )
 
 class SantoyaViewModel(application: Application) : AndroidViewModel(application) {

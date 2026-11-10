@@ -271,7 +271,8 @@ fun PelangganScreen(
                     ActiveReceiptDialog(
                         title = "Bukti Pelunasan Kasbon",
                         receiptText = receipt,
-                        customerPhone = target.no_hp
+                        customerPhone = target.no_hp,
+                        data = Triple(target, nominal, sisa)
                     )
                 )
                 payingKasbonPelanggan = null
@@ -476,7 +477,8 @@ private fun SemuaPelangganTab(
                                     ActiveReceiptDialog(
                                         title = "Tagihan Kasbon - ${item.pelanggan.nama}",
                                         receiptText = receipt,
-                                        customerPhone = item.pelanggan.no_hp
+                                        customerPhone = item.pelanggan.no_hp,
+                                        data = Pair(item.pelanggan, unpaid)
                                     )
                                 )
                             }
@@ -632,7 +634,13 @@ private fun PelangganItemCard(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Est: $days Hari",
+                            text = "Est: ${
+                                when (days) {
+                                    1 -> "Besok"
+                                    2 -> "Lusa"
+                                    else -> "$days Hari"
+                                }
+                            }",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline
                         )

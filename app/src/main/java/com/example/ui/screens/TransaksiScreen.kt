@@ -790,7 +790,8 @@ fun CatatPenjualanTab(
                                         ActiveReceiptDialog(
                                             title = "Struk Nota #${savedDetail.transaksi.id}",
                                             receiptText = text,
-                                            customerPhone = savedDetail.pelanggan?.no_hp
+                                            customerPhone = savedDetail.pelanggan?.no_hp,
+                                            data = savedDetail
                                         )
                                     )
                                 }
