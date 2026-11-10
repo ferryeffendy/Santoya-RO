@@ -102,4 +102,18 @@ object FormatUtils {
         val cal = Calendar.getInstance()
         return cal.get(Calendar.DAY_OF_MONTH)
     }
+
+    fun calculateEstimatedIntervalDays(customerId: Int, transaksiList: List<com.example.data.entity.TransaksiDetail>): Int? {
+        val customerTransactions = transaksiList.filter { it.transaksi.id_pelanggan == customerId }.map { it.transaksi.tanggal }.sorted()
+        if (customerTransactions.size < 2) return null
+        val differences = mutableListOf<Long>()
+        for (i in 0 until customerTransactions.size - 1) {
+            val date1 = java.time.Instant.ofEpochMilli(customerTransactions[i]).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            val date2 = java.time.Instant.ofEpochMilli(customerTransactions[i+1]).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            val diff = java.time.temporal.ChronoUnit.DAYS.between(date1, date2)
+            if (diff > 0) differences.add(diff)
+        }
+        if (differences.isEmpty()) return null
+        return differences.average().toInt()
+    }
 }

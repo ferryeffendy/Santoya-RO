@@ -383,6 +383,16 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- Pelanggan Tab Filtering & Sorting ---
+    fun getFilteredPelangganUiModels(query: String, list: List<PelangganUiModel>): List<PelangganUiModel> {
+        if (query.isBlank()) return list
+        val q = query.lowercase().trim()
+        return list.filter {
+            it.pelanggan.nama.lowercase().contains(q) ||
+            it.pelanggan.alamat.lowercase().contains(q) ||
+            it.pelanggan.no_hp.contains(q)
+        }
+    }
+
     fun getFilteredPelanggan(query: String, list: List<Pelanggan>): List<Pelanggan> {
         if (query.isBlank()) return list
         val q = query.lowercase().trim()
@@ -455,4 +465,21 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             onFinished?.invoke(result)
         }
     }
+
+    fun getPelangganUiModels(
+        pelangganList: List<Pelanggan>,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): List<PelangganUiModel> {
+        return pelangganList.map { p ->
+            PelangganUiModel(
+                pelanggan = p,
+                estimatedIntervalDays = com.example.util.FormatUtils.calculateEstimatedIntervalDays(p.id, transaksiList)
+            )
+        }
+    }
 }
+
+data class PelangganUiModel(
+    val pelanggan: Pelanggan,
+    val estimatedIntervalDays: Int?
+)

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonOff
@@ -88,7 +89,7 @@ import com.example.viewmodel.SantoyaViewModel
 @Composable
 fun PelangganScreen(
     viewModel: SantoyaViewModel,
-    pelangganList: List<Pelanggan> = emptyList(),
+    pelangganUiModels: List<com.example.viewmodel.PelangganUiModel> = emptyList(),
     transaksiList: List<TransaksiDetail> = emptyList(),
     onBack: () -> Unit = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
     modifier: Modifier = Modifier
@@ -115,7 +116,7 @@ fun PelangganScreen(
                     onClick = { selectedTab = 0 },
                     text = {
                         Text(
-                            text = "Semua (${pelangganList.size})",
+                            text = "Semua (${pelangganUiModels.size})",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -123,7 +124,7 @@ fun PelangganScreen(
                         )
                     }
                 )
-                val kasbonCount = pelangganList.count { it.sisa_kasbon > 0 }
+                val kasbonCount = pelangganUiModels.count { it.pelanggan.sisa_kasbon > 0 }
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
@@ -168,29 +169,38 @@ fun PelangganScreen(
             when (selectedTab) {
                 0 -> SemuaPelangganTab(
                     viewModel = viewModel,
-                    pelangganList = pelangganList,
+                    pelangganUiModels = pelangganUiModels,
                     transaksiList = transaksiList,
                     kurirList = kurirList,
                     onEdit = { editingPelanggan = it },
                     onBayarKasbon = { payingKasbonPelanggan = it },
                     onDelete = { pelangganToDelete = it }
                 )
-                1 -> KasbonPelangganTab(
-                    viewModel = viewModel,
-                    pelangganList = pelangganList,
-                    transaksiList = transaksiList,
-                    onBayarKasbon = { payingKasbonPelanggan = it }
-                )
-                2 -> TopRankingTab(
-                    viewModel = viewModel,
-                    pelangganList = pelangganList,
-                    transaksiList = transaksiList
-                )
-                3 -> PasifPelangganTab(
-                    viewModel = viewModel,
-                    pelangganList = pelangganList,
-                    transaksiList = transaksiList
-                )
+                1 -> {
+                    val pelangganList = pelangganUiModels.map { it.pelanggan }
+                    KasbonPelangganTab(
+                        viewModel = viewModel,
+                        pelangganList = pelangganList,
+                        transaksiList = transaksiList,
+                        onBayarKasbon = { payingKasbonPelanggan = it }
+                    )
+                }
+                2 -> {
+                    val pelangganList = pelangganUiModels.map { it.pelanggan }
+                    TopRankingTab(
+                        viewModel = viewModel,
+                        pelangganList = pelangganList,
+                        transaksiList = transaksiList
+                    )
+                }
+                3 -> {
+                    val pelangganList = pelangganUiModels.map { it.pelanggan }
+                    PasifPelangganTab(
+                        viewModel = viewModel,
+                        pelangganList = pelangganList,
+                        transaksiList = transaksiList
+                    )
+                }
             }
         }
 
@@ -387,7 +397,7 @@ fun PelangganScreen(
 @Composable
 private fun SemuaPelangganTab(
     viewModel: SantoyaViewModel,
-    pelangganList: List<Pelanggan>,
+    pelangganUiModels: List<com.example.viewmodel.PelangganUiModel>,
     transaksiList: List<TransaksiDetail>,
     kurirList: List<Kurir> = emptyList(),
     onEdit: (Pelanggan) -> Unit,
@@ -396,7 +406,7 @@ private fun SemuaPelangganTab(
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
-    val filtered = viewModel.getFilteredPelanggan(searchQuery, pelangganList)
+    val filtered = viewModel.getFilteredPelangganUiModels(searchQuery, pelangganUiModels)
 
     Column(modifier = Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -442,43 +452,43 @@ private fun SemuaPelangganTab(
                 contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 84.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filtered, key = { it.id }) { cust ->
+                items(filtered, key = { it.pelanggan.id }) { item ->
                     PelangganItemCard(
-                        pelanggan = cust,
+                        pelangganUiModel = item,
                         kurirList = kurirList,
-                        onEdit = { onEdit(cust) },
-                        onDelete = { onDelete(cust) },
-                        onBayarKasbon = { onBayarKasbon(cust) },
+                        onEdit = { onEdit(item.pelanggan) },
+                        onDelete = { onDelete(item.pelanggan) },
+                        onBayarKasbon = { onBayarKasbon(item.pelanggan) },
                         onCall = {
-                            if (cust.no_hp.isNotBlank()) {
-                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${cust.no_hp}"))
+                            if (item.pelanggan.no_hp.isNotBlank()) {
+                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${item.pelanggan.no_hp}"))
                                 context.startActivity(intent)
                             }
                         },
-                        onPrintKasbon = if (cust.sisa_kasbon > 0) {
+                        onPrintKasbon = if (item.pelanggan.sisa_kasbon > 0) {
                             {
                                 val unpaid = transaksiList.filter {
-                                    it.transaksi.id_pelanggan == cust.id &&
+                                    it.transaksi.id_pelanggan == item.pelanggan.id &&
                                         it.transaksi.status.equals("Kasbon", ignoreCase = true)
                                 }.map { it.transaksi }
-                                val receipt = SantoyaReceiptHelper.generateTagihanKasbon(cust, unpaid)
+                                val receipt = SantoyaReceiptHelper.generateTagihanKasbon(item.pelanggan, unpaid)
                                 viewModel.showReceiptDialog(
                                     ActiveReceiptDialog(
-                                        title = "Tagihan Kasbon - ${cust.nama}",
+                                        title = "Tagihan Kasbon - ${item.pelanggan.nama}",
                                         receiptText = receipt,
-                                        customerPhone = cust.no_hp
+                                        customerPhone = item.pelanggan.no_hp
                                     )
                                 )
                             }
                         } else null,
-                        onShareKasbon = if (cust.sisa_kasbon > 0) {
+                        onShareKasbon = if (item.pelanggan.sisa_kasbon > 0) {
                             {
                                 val unpaid = transaksiList.filter {
-                                    it.transaksi.id_pelanggan == cust.id &&
+                                    it.transaksi.id_pelanggan == item.pelanggan.id &&
                                         it.transaksi.status.equals("Kasbon", ignoreCase = true)
                                 }.map { it.transaksi }
-                                val receipt = SantoyaReceiptHelper.generateTagihanKasbon(cust, unpaid)
-                                SantoyaReceiptHelper.shareReceiptText(context, receipt, cust.no_hp)
+                                val receipt = SantoyaReceiptHelper.generateTagihanKasbon(item.pelanggan, unpaid)
+                                SantoyaReceiptHelper.shareReceiptText(context, receipt, item.pelanggan.no_hp)
                             }
                         } else null
                     )
@@ -490,7 +500,7 @@ private fun SemuaPelangganTab(
 
 @Composable
 private fun PelangganItemCard(
-    pelanggan: Pelanggan,
+    pelangganUiModel: com.example.viewmodel.PelangganUiModel,
     kurirList: List<Kurir> = emptyList(),
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -499,6 +509,7 @@ private fun PelangganItemCard(
     onPrintKasbon: (() -> Unit)? = null,
     onShareKasbon: (() -> Unit)? = null
 ) {
+    val pelanggan = pelangganUiModel.pelanggan
     val hasKasbon = pelanggan.sisa_kasbon > 0
 
     Card(
@@ -602,13 +613,31 @@ private fun PelangganItemCard(
 
             if (pelanggan.alamat.isNotBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Alamat: ${pelanggan.alamat}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Alamat: ${pelanggan.alamat}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    pelangganUiModel.estimatedIntervalDays?.let { days ->
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp),
+                            tint = MaterialTheme.colorScheme.outline
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Est: $days Hari",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
             }
 
             if (pelanggan.harga_khusus != null || pelanggan.id_kurir_langganan != null) {

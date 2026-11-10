@@ -81,6 +81,8 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val pelangganUiModels = remember(pelangganList, transaksiList) { viewModel.getPelangganUiModels(pelangganList, transaksiList) }
+
                 BackHandler(enabled = currentScreen != SantoyaScreen.DASHBOARD) {
                     viewModel.navigateTo(SantoyaScreen.DASHBOARD)
                 }
@@ -161,7 +163,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 SantoyaScreen.PELANGGAN -> PelangganScreen(
                                     viewModel = viewModel,
-                                    pelangganList = pelangganList,
+                                    pelangganUiModels = pelangganUiModels,
                                     transaksiList = transaksiList
                                 )
                                 SantoyaScreen.KURIR -> KurirScreen(
