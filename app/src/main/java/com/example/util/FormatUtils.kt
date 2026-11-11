@@ -15,7 +15,7 @@ object FormatUtils {
         val formatter = NumberFormat.getCurrencyInstance(idLocale)
         formatter.maximumFractionDigits = 0
         formatter.minimumFractionDigits = 0
-        return formatter.format(amount).replace("Rp", "Rp ")
+        return formatter.format(amount).replace("Rp", "Rp ").replace('\u00A0', ' ')
     }
 
     fun formatDate(timestamp: Long): String {
@@ -103,17 +103,97 @@ object FormatUtils {
         return cal.get(Calendar.DAY_OF_MONTH)
     }
 
-    fun calculateEstimatedIntervalDays(customerId: Int, transaksiList: List<com.example.data.entity.TransaksiDetail>): Int? {
-        val customerTransactions = transaksiList.filter { it.transaksi.id_pelanggan == customerId }.map { it.transaksi.tanggal }.sorted()
-        if (customerTransactions.size < 2) return null
+    fun calculateCrmPrediction(
+        customerId: Int,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): CrmOrderPrediction {
+        val zone = java.time.ZoneId.systemDefault()
+        val distinctDates = transaksiList
+            .asSequence()
+            .filter { it.transaksi.id_pelanggan == customerId }
+            .map {
+                java.time.Instant.ofEpochMilli(it.transaksi.tanggal)
+                    .atZone(zone)
+                    .toLocalDate()
+            }
+            .distinct()
+            .sorted()
+            .toList()
+
+        if (distinctDates.size < 2) {
+            return CrmOrderPrediction(
+                status = CrmOrderStatus.INSUFFICIENT_DATA,
+                badgeText = "Belum Terprediksi"
+            )
+        }
+
         val differences = mutableListOf<Long>()
-        for (i in 0 until customerTransactions.size - 1) {
-            val date1 = java.time.Instant.ofEpochMilli(customerTransactions[i]).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-            val date2 = java.time.Instant.ofEpochMilli(customerTransactions[i+1]).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-            val diff = java.time.temporal.ChronoUnit.DAYS.between(date1, date2)
+        for (i in 0 until distinctDates.size - 1) {
+            val diff = java.time.temporal.ChronoUnit.DAYS.between(distinctDates[i], distinctDates[i + 1])
             if (diff > 0) differences.add(diff)
         }
-        if (differences.isEmpty()) return null
-        return differences.average().toInt()
+
+        if (differences.isEmpty()) {
+            return CrmOrderPrediction(
+                status = CrmOrderStatus.INSUFFICIENT_DATA,
+                badgeText = "Belum Terprediksi"
+            )
+        }
+
+        val avgIntervalDays = kotlin.math.round(differences.average()).toInt().coerceAtLeast(1)
+        val lastOrderDate = distinctDates.last()
+        val nextExpectedDate = lastOrderDate.plusDays(avgIntervalDays.toLong())
+        val today = java.time.LocalDate.now(zone)
+        val daysUntilExpected = java.time.temporal.ChronoUnit.DAYS.between(today, nextExpectedDate).toInt()
+
+        val nextExpectedMillis = nextExpectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
+        val shortDateFormatter = SimpleDateFormat("dd MMM", idLocale)
+        val formattedDate = shortDateFormatter.format(Date(nextExpectedMillis))
+
+        val status = when {
+            daysUntilExpected > 1 -> CrmOrderStatus.ACTIVE
+            daysUntilExpected in 0..1 -> CrmOrderStatus.DUE_SOON
+            else -> CrmOrderStatus.OVERDUE
+        }
+
+        val badgeText = when (status) {
+            CrmOrderStatus.ACTIVE -> "Prediksi: $formattedDate"
+            CrmOrderStatus.DUE_SOON -> "Waktunya Order!"
+            CrmOrderStatus.OVERDUE -> "Terlambat ${-daysUntilExpected} Hari"
+            CrmOrderStatus.INSUFFICIENT_DATA -> "Belum Terprediksi"
+        }
+
+        return CrmOrderPrediction(
+            status = status,
+            averageIntervalDays = avgIntervalDays,
+            nextExpectedDateMillis = nextExpectedMillis,
+            nextExpectedDateFormatted = formattedDate,
+            daysUntilExpected = daysUntilExpected,
+            badgeText = badgeText
+        )
+    }
+
+    fun calculateEstimatedIntervalDays(
+        customerId: Int,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): Int? {
+        return calculateCrmPrediction(customerId, transaksiList).averageIntervalDays
     }
 }
+
+enum class CrmOrderStatus {
+    ACTIVE,
+    DUE_SOON,
+    OVERDUE,
+    INSUFFICIENT_DATA
+}
+
+data class CrmOrderPrediction(
+    val status: CrmOrderStatus,
+    val averageIntervalDays: Int? = null,
+    val nextExpectedDateMillis: Long? = null,
+    val nextExpectedDateFormatted: String? = null,
+    val daysUntilExpected: Int? = null,
+    val badgeText: String = "Belum Terprediksi"
+)
+

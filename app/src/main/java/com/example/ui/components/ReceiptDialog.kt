@@ -526,7 +526,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF4F7FB), RoundedCornerShape(10.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -539,7 +539,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 )
                 Text(
                     text = receipt.totalValue,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF0052CC),
                     maxLines = 1,

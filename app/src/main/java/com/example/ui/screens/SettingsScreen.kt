@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.content.Context
+import com.aistudio.companion.kzpmrw.BuildConfig
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -257,7 +258,7 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        text = "Sistem Kasir POS Offline v2.0\nDatabase: SQLite Room v4 (santoya_ro_database)\n100% Berjalan Lokal dengan Performa Tinggi.",
+                        text = "Sistem Kasir POS Offline v${BuildConfig.VERSION_NAME}\nDatabase: SQLite Room v4 (santoya_ro_database)\n100% Berjalan Lokal dengan Performa Tinggi.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

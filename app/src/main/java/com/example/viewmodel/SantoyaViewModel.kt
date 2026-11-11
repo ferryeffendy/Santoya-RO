@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -99,13 +100,30 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     val allKasbonTransaksi: StateFlow<List<TransaksiDetail>> = repository.allKasbonTransaksiWithDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // --- Transaksi Form State ---
+    // --- Transaksi & Screen Tab State ---
     private val _transaksiTab = MutableStateFlow(0) // 0 = Catat, 1 = Riwayat
     val transaksiTab: StateFlow<Int> = _transaksiTab.asStateFlow()
 
     fun setTransaksiTab(tab: Int) {
         _transaksiTab.value = tab
     }
+
+    private val _pelangganTab = MutableStateFlow(0) // 0 = Semua, 1 = Kasbon, 2 = Ranking, 3 = Pasif, 4 = Jadwal
+    val pelangganTab: StateFlow<Int> = _pelangganTab.asStateFlow()
+
+    fun setPelangganTab(tab: Int) {
+        _pelangganTab.value = tab
+    }
+
+    private val _laporanPeriode = MutableStateFlow(LaporanPeriode.BULAN_INI)
+    val laporanPeriode: StateFlow<LaporanPeriode> = _laporanPeriode.asStateFlow()
+
+    fun setLaporanPeriode(periode: LaporanPeriode) {
+        _laporanPeriode.value = periode
+    }
+
+    fun getTotalPendapatanByDateRange(start: Long, end: Long) =
+        repository.getTotalPendapatanByDateRange(start, end)
 
     private val _txTanggal = MutableStateFlow(System.currentTimeMillis())
     val txTanggal: StateFlow<Long> = _txTanggal.asStateFlow()
@@ -125,32 +143,51 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     private val _txHargaSatuan = MutableStateFlow(6000.0)
     val txHargaSatuan: StateFlow<Double> = _txHargaSatuan.asStateFlow()
 
-    private val _txMetodeBayar = MutableStateFlow("Cash") // Cash, COD, Transfer
+    private val _txMetodeBayar = MutableStateFlow("Cash") // Cash, Transfer, Bayar Sebagian
     val txMetodeBayar: StateFlow<String> = _txMetodeBayar.asStateFlow()
 
     private val _txStatus = MutableStateFlow("Lunas") // Lunas, Kasbon
     val txStatus: StateFlow<String> = _txStatus.asStateFlow()
 
+    private val _txUangMuka = MutableStateFlow(0L)
+    val txUangMuka: StateFlow<Long> = _txUangMuka.asStateFlow()
+
     fun setTxTanggal(time: Long) { _txTanggal.value = time }
     fun setTxPelangganId(id: Int?) {
         _txPelangganId.value = id
+        val defaultPrice = allProduk.value.find { it.id == _txProdukId.value }?.harga
+            ?: allProduk.value.firstOrNull()?.harga
+            ?: 6000.0
         if (id != null) {
             val cust = allPelanggan.value.find { it.id == id }
             if (cust != null) {
-                if (cust.harga_khusus != null && cust.harga_khusus > 0.0) {
-                    _txHargaSatuan.value = cust.harga_khusus
+                _txHargaSatuan.value = if (cust.harga_khusus != null && cust.harga_khusus > 0.0) {
+                    cust.harga_khusus
+                } else {
+                    defaultPrice
                 }
-                if (cust.id_kurir_langganan != null) {
-                    _txKurirId.value = cust.id_kurir_langganan
-                }
+                _txKurirId.value = cust.id_kurir_langganan
             }
+        } else {
+            _txHargaSatuan.value = defaultPrice
+            _txKurirId.value = null
         }
     }
     fun onPelangganSelected(id: Int?) = setTxPelangganId(id)
     fun setTxProdukId(id: Int?, defaultPrice: Double? = null) {
         _txProdukId.value = id
-        if (defaultPrice != null) {
+        val activeCust = _txPelangganId.value?.let { custId ->
+            allPelanggan.value.find { it.id == custId }
+        }
+        if (activeCust?.harga_khusus != null && activeCust.harga_khusus > 0.0) {
+            _txHargaSatuan.value = activeCust.harga_khusus
+        } else if (defaultPrice != null) {
             _txHargaSatuan.value = defaultPrice
+        } else {
+            val prodPrice = allProduk.value.find { it.id == id }?.harga
+            if (prodPrice != null) {
+                _txHargaSatuan.value = prodPrice
+            }
         }
     }
     fun setTxKurirId(id: Int?) { _txKurirId.value = id }
@@ -158,10 +195,15 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun incrementTxJumlah() { _txJumlah.update { it + 1 } }
     fun decrementTxJumlah() { _txJumlah.update { (it - 1).coerceAtLeast(1) } }
     fun setTxHargaSatuan(harga: Double) { _txHargaSatuan.value = harga.coerceAtLeast(0.0) }
+    fun setTxUangMuka(nominal: Long) { _txUangMuka.value = nominal.coerceAtLeast(0L) }
+
     fun setTxMetodeBayar(metode: String) {
         _txMetodeBayar.value = metode
-        if (metode.isNotBlank()) {
+        if (metode.equals("Bayar Sebagian", ignoreCase = true)) {
+            _txStatus.value = "Kasbon"
+        } else if (metode.isNotBlank()) {
             _txStatus.value = "Lunas"
+            _txUangMuka.value = 0L
         }
     }
 
@@ -169,8 +211,12 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         _txStatus.value = status
         if (status.equals("Kasbon", ignoreCase = true)) {
             _txMetodeBayar.value = ""
-        } else if (status.equals("Lunas", ignoreCase = true) && _txMetodeBayar.value.isBlank()) {
-            _txMetodeBayar.value = "Cash"
+            _txUangMuka.value = 0L
+        } else if (status.equals("Lunas", ignoreCase = true)) {
+            if (_txMetodeBayar.value.isBlank() || _txMetodeBayar.value.equals("Bayar Sebagian", ignoreCase = true)) {
+                _txMetodeBayar.value = "Cash"
+            }
+            _txUangMuka.value = 0L
         }
     }
 
@@ -198,7 +244,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     // --- Submit Transaksi ---
-    fun submitTransaksi(onSuccess: (Long) -> Unit) {
+    fun submitTransaksi(onSuccess: (TransaksiDetail?) -> Unit) {
         val pelangganId = _txPelangganId.value
         val produkId = _txProdukId.value
         if (pelangganId == null) {
@@ -210,11 +256,32 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        val statusVal = _txStatus.value
-        val metodeVal = if (statusVal.equals("Kasbon", ignoreCase = true)) {
-            "-"
-        } else {
-            _txMetodeBayar.value.ifBlank { "Cash" }
+        val totalBelanjaLong = (_txJumlah.value * _txHargaSatuan.value).toLong()
+        val isBayarSebagian = _txMetodeBayar.value.equals("Bayar Sebagian", ignoreCase = true)
+        val dpInput = _txUangMuka.value
+
+        if (isBayarSebagian) {
+            if (dpInput <= 0L) {
+                showSnackbar("Nominal Uang Muka tidak boleh Rp 0!")
+                return
+            }
+            if (dpInput > totalBelanjaLong) {
+                showSnackbar("Nominal Uang Muka tidak boleh melebihi Total Belanja (${FormatUtils.formatRupiah(totalBelanjaLong.toDouble())})!")
+                return
+            }
+        }
+
+        val statusVal = if (isBayarSebagian) "Kasbon" else _txStatus.value
+        val metodeVal = when {
+            isBayarSebagian -> "Bayar Sebagian"
+            statusVal.equals("Kasbon", ignoreCase = true) -> "-"
+            else -> _txMetodeBayar.value.ifBlank { "Cash" }
+        }
+        val uangMukaVal = if (isBayarSebagian) dpInput else 0L
+        val sisaKasbonVal = when {
+            isBayarSebagian -> (totalBelanjaLong - dpInput).coerceAtLeast(0L)
+            statusVal.equals("Kasbon", ignoreCase = true) -> totalBelanjaLong.coerceAtLeast(0L)
+            else -> 0L
         }
 
         viewModelScope.launch {
@@ -226,29 +293,94 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 jumlah = _txJumlah.value,
                 hargaSatuan = _txHargaSatuan.value,
                 metodeBayar = metodeVal,
-                status = statusVal
+                status = statusVal,
+                uangMuka = uangMukaVal,
+                sisaKasbon = sisaKasbonVal
             )
-            showSnackbar("Transaksi #${newId} berhasil dicatat!")
-            // Reset to 1 galon & reset date & default Lunas/Cash
+            val savedDetail = repository.getTransaksiDetailById(newId.toInt())
+            showSnackbar("Transaksi penjualan berhasil dicatat!")
+            // Reset all transaction form states cleanly for the next customer
+            val defaultPrice = allProduk.value.find { it.id == _txProdukId.value }?.harga
+                ?: allProduk.value.firstOrNull()?.harga
+                ?: 6000.0
+            _txPelangganId.value = null
+            _txKurirId.value = null
+            _txHargaSatuan.value = defaultPrice
             _txJumlah.value = 1
             _txTanggal.value = System.currentTimeMillis()
             _txStatus.value = "Lunas"
             _txMetodeBayar.value = "Cash"
-            onSuccess(newId)
+            _txUangMuka.value = 0L
+            onSuccess(savedDetail)
+        }
+    }
+
+    fun onSaveTransaksi(
+        idPelanggan: Int,
+        idProduk: Int,
+        jumlah: Int,
+        hargaSatuan: Double,
+        metodeBayar: String,
+        uangMuka: Long = 0L,
+        idKurir: Int? = null,
+        onSuccess: (TransaksiDetail?) -> Unit = {}
+    ) {
+        setTxPelangganId(idPelanggan)
+        setTxProdukId(idProduk, hargaSatuan)
+        if (idKurir != null) setTxKurirId(idKurir)
+        setTxJumlah(jumlah)
+        setTxHargaSatuan(hargaSatuan)
+        setTxMetodeBayar(metodeBayar)
+        setTxUangMuka(uangMuka)
+        submitTransaksi(onSuccess)
+    }
+
+    fun runSimulasiBayarSebagianViaViewModel() {
+        viewModelScope.launch {
+            val pelangganList = repository.allPelanggan.first { it.isNotEmpty() }
+            val produkList = repository.allProduk.first { it.isNotEmpty() }
+            val existingTransaksi = repository.allTransaksiWithDetail.first()
+
+            val alreadySimulated = existingTransaksi.any {
+                it.transaksi.jumlah == 30 &&
+                    it.transaksi.harga_satuan == 5000.0 &&
+                    it.transaksi.metode_bayar.equals("Bayar Sebagian", ignoreCase = true) &&
+                    it.transaksi.uangMuka == 50000L
+            }
+            if (alreadySimulated) return@launch
+
+            val targetPelanggan = pelangganList.find { it.nama.contains("Pak RT Wahyu", ignoreCase = true) }
+                ?: pelangganList.find { it.sisa_kasbon == 0.0 }
+                ?: pelangganList.first()
+
+            val targetProduk = produkList.find { it.harga == 5000.0 }
+                ?: produkList.first()
+
+            val targetKurir = repository.allKurir.first().firstOrNull()
+
+            onSaveTransaksi(
+                idPelanggan = targetPelanggan.id,
+                idProduk = targetProduk.id,
+                jumlah = 30,
+                hargaSatuan = 5000.0,
+                metodeBayar = "Bayar Sebagian",
+                uangMuka = 50000L,
+                idKurir = targetKurir?.id
+            )
         }
     }
 
     fun markTransaksiLunas(transaksiId: Int) {
         viewModelScope.launch {
             repository.markTransaksiLunas(transaksiId)
-            showSnackbar("Transaksi #${transaksiId} ditandai LUNAS.")
+            showSnackbar("Transaksi berhasil ditandai LUNAS!")
         }
     }
 
     fun deleteTransaksi(transaksi: Transaksi) {
         viewModelScope.launch {
             repository.deleteTransaksi(transaksi)
-            showSnackbar("Transaksi #${transaksi.id} dihapus.")
+            showSnackbar("Transaksi penjualan berhasil dihapus.")
         }
     }
 
@@ -262,6 +394,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         hargaSatuan: Double,
         metodeBayar: String,
         status: String,
+        uangMuka: Long = 0L,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -274,9 +407,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 jumlah = jumlah,
                 hargaSatuan = hargaSatuan,
                 metodeBayar = metodeBayar,
-                status = status
+                status = status,
+                uangMuka = uangMuka
             )
-            showSnackbar("Transaksi #$id berhasil diperbarui!")
+            showSnackbar("Transaksi penjualan berhasil diperbarui!")
             onSuccess()
         }
     }
@@ -303,12 +437,15 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
             _txPelangganId.value = id.toInt()
-            if (hargaKhusus != null && hargaKhusus > 0.0) {
-                _txHargaSatuan.value = hargaKhusus
+            val defaultPrice = allProduk.value.find { it.id == _txProdukId.value }?.harga
+                ?: allProduk.value.firstOrNull()?.harga
+                ?: 6000.0
+            _txHargaSatuan.value = if (hargaKhusus != null && hargaKhusus > 0.0) {
+                hargaKhusus
+            } else {
+                defaultPrice
             }
-            if (idKurirLangganan != null) {
-                _txKurirId.value = idKurirLangganan
-            }
+            _txKurirId.value = idKurirLangganan
             showSnackbar("Pelanggan ${nama.trim()} berhasil ditambahkan!")
         }
     }
@@ -327,11 +464,11 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun bayarKasbon(pelangganId: Int, nominalBayar: Double) {
+    fun bayarKasbon(pelangganId: Int, nominalBayar: Double, metodeBayar: String = "Cash") {
         if (nominalBayar <= 0) return
         viewModelScope.launch {
-            repository.bayarKasbonPelanggan(pelangganId, nominalBayar)
-            showSnackbar("Pelunasan sebesar ${FormatUtils.formatRupiah(nominalBayar)} berhasil dicatat.")
+            repository.bayarKasbonPelanggan(pelangganId, nominalBayar, metodeBayar)
+            showSnackbar("Pelunasan sebesar ${FormatUtils.formatRupiah(nominalBayar)} ($metodeBayar) berhasil dicatat.")
         }
     }
 
@@ -415,20 +552,26 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun getFilteredPelangganUiModels(query: String, list: List<PelangganUiModel>): List<PelangganUiModel> {
         if (query.isBlank()) return list
         val q = query.lowercase().trim()
+        val qDigits = q.filter { it.isDigit() }
         return list.filter {
+            val hpDigits = it.pelanggan.no_hp.filter { c -> c.isDigit() }
             it.pelanggan.nama.lowercase().contains(q) ||
-            it.pelanggan.alamat.lowercase().contains(q) ||
-            it.pelanggan.no_hp.contains(q)
+                it.pelanggan.alamat.lowercase().contains(q) ||
+                it.pelanggan.no_hp.lowercase().contains(q) ||
+                (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
         }
     }
 
     fun getFilteredPelanggan(query: String, list: List<Pelanggan>): List<Pelanggan> {
         if (query.isBlank()) return list
         val q = query.lowercase().trim()
+        val qDigits = q.filter { it.isDigit() }
         return list.filter {
+            val hpDigits = it.no_hp.filter { c -> c.isDigit() }
             it.nama.lowercase().contains(q) ||
-            it.alamat.lowercase().contains(q) ||
-            it.no_hp.contains(q)
+                it.alamat.lowercase().contains(q) ||
+                it.no_hp.lowercase().contains(q) ||
+                (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
         }
     }
 
@@ -452,7 +595,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 it.transaksi.id_pelanggan == p.id &&
                     it.transaksi.status.equals("Kasbon", ignoreCase = true)
             }
-            val unpaidTotal = unpaid.sumOf { it.transaksi.total_harga }
+            val unpaidTotal = unpaid.sumOf { it.transaksi.remainingKasbonAmount() }
             val effectiveKasbon = if (unpaidTotal > 0) unpaidTotal else p.sisa_kasbon
             
             // Store dates in a wrapper or just use them during sort if we keep p as Pelanggan
@@ -463,7 +606,16 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             .filter {
                 if (query.isBlank()) true else {
                     val q = query.lowercase().trim()
-                    it.nama.lowercase().contains(q) || it.alamat.lowercase().contains(q) || it.no_hp.contains(q)
+                    val qDigits = q.filter { c -> c.isDigit() }
+                    val hpDigits = it.no_hp.filter { c -> c.isDigit() }
+                    val rawKasbonStr = it.sisa_kasbon.toLong().toString()
+                    val formattedKasbon = FormatUtils.formatRupiah(it.sisa_kasbon).lowercase()
+                    it.nama.lowercase().contains(q) ||
+                        it.alamat.lowercase().contains(q) ||
+                        it.no_hp.lowercase().contains(q) ||
+                        (qDigits.isNotEmpty() && hpDigits.contains(qDigits)) ||
+                        formattedKasbon.contains(q) ||
+                        (qDigits.isNotEmpty() && rawKasbonStr.contains(qDigits))
                 }
             }
 
@@ -485,7 +637,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         }
         return pelangganList.map { p ->
             Pair(p, map[p.id] ?: 0)
-        }.sortedByDescending { it.second }
+        }.filter { it.second > 0 }.sortedByDescending { it.second }
     }
 
     fun getPasifPelanggan(
@@ -523,9 +675,23 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         transaksiList: List<com.example.data.entity.TransaksiDetail>
     ): List<PelangganUiModel> {
         return pelangganList.map { p ->
+            val unpaidTotal = transaksiList.asSequence()
+                .filter {
+                    it.transaksi.id_pelanggan == p.id &&
+                        it.transaksi.status.equals("Kasbon", ignoreCase = true)
+                }
+                .sumOf { it.transaksi.remainingKasbonAmount() }
+            val effectiveKasbon = if (unpaidTotal > 0) unpaidTotal else p.sisa_kasbon
+            val syncedPelanggan = if (effectiveKasbon != p.sisa_kasbon) {
+                p.copy(sisa_kasbon = effectiveKasbon)
+            } else {
+                p
+            }
+            val prediction = com.example.util.FormatUtils.calculateCrmPrediction(p.id, transaksiList)
             PelangganUiModel(
-                pelanggan = p,
-                estimatedIntervalDays = com.example.util.FormatUtils.calculateEstimatedIntervalDays(p.id, transaksiList)
+                pelanggan = syncedPelanggan,
+                estimatedIntervalDays = prediction.averageIntervalDays,
+                crmPrediction = prediction
             )
         }
     }
@@ -533,5 +699,9 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
 
 data class PelangganUiModel(
     val pelanggan: Pelanggan,
-    val estimatedIntervalDays: Int?
+    val estimatedIntervalDays: Int?,
+    val crmPrediction: com.example.util.CrmOrderPrediction = com.example.util.CrmOrderPrediction(
+        status = com.example.util.CrmOrderStatus.INSUFFICIENT_DATA
+    )
 )
+

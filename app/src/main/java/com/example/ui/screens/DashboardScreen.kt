@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.MoneyOff
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Settings
@@ -33,6 +36,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +51,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,21 +59,29 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pelanggan
+import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.pressClickEffect
+import com.example.util.CrmOrderStatus
 import com.example.util.FormatUtils
 import com.example.util.SantoyaReceiptHelper
 import com.example.viewmodel.ActiveReceiptDialog
+import com.example.viewmodel.LaporanPeriode
+import com.example.viewmodel.PelangganUiModel
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
 import kotlin.math.roundToInt
@@ -79,6 +92,8 @@ fun DashboardScreen(
     viewModel: SantoyaViewModel,
     transaksiList: List<TransaksiDetail> = emptyList(),
     pelangganList: List<Pelanggan> = emptyList(),
+    pengeluaranList: List<Pengeluaran> = emptyList(),
+    pelangganUiModels: List<PelangganUiModel> = emptyList(),
     onNavigateToTransaksi: () -> Unit = { viewModel.navigateTo(SantoyaScreen.TRANSAKSI) },
     onNavigateToPelanggan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PELANGGAN) },
     onNavigateToProduk: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
@@ -90,50 +105,105 @@ fun DashboardScreen(
 ) {
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPelangganFromVm by viewModel.allPelanggan.collectAsStateWithLifecycle()
+    val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
 
     val effectiveTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
     val effectivePelangganList = if (pelangganList.isNotEmpty()) pelangganList else allPelangganFromVm
+    val effectivePengeluaranList = if (pengeluaranList.isNotEmpty()) pengeluaranList else allPengeluaranFromVm
 
     val todayStart = FormatUtils.getStartOfDay()
     val todayEnd = FormatUtils.getEndOfDay()
     val monthStart = FormatUtils.getStartOfMonth()
 
-    val todayTransactions = effectiveTransaksiList.filter {
-        it.transaksi.tanggal in todayStart..todayEnd
+    val todayTransactions = remember(effectiveTransaksiList, todayStart, todayEnd) {
+        effectiveTransaksiList.filter {
+            it.transaksi.tanggal in todayStart..todayEnd
+        }
     }
 
-    val monthTransactions = effectiveTransaksiList.filter {
-        it.transaksi.tanggal in monthStart..todayEnd
+    val todayPengeluaran = remember(effectivePengeluaranList, todayStart, todayEnd) {
+        effectivePengeluaranList.filter {
+            it.tanggal in todayStart..todayEnd
+        }
     }
 
-    // 1. Pendapatan Tunai Hari Ini
-    val pendapatanLunasHariIni = todayTransactions
-        .filter { it.transaksi.status.equals("Lunas", ignoreCase = true) }
-        .sumOf { it.transaksi.total_harga }
+    val monthTransactions = remember(effectiveTransaksiList, monthStart, todayEnd) {
+        effectiveTransaksiList.filter {
+            it.transaksi.tanggal in monthStart..todayEnd
+        }
+    }
 
-    // 2. Laba Bersih Hari Ini (Pendapatan - Komisi Kurir)
-    val totalKomisiHariIni = todayTransactions.sumOf { it.transaksi.total_komisi }
-    val labaBersihHariIni = pendapatanLunasHariIni - totalKomisiHariIni
-
-    // 3. Total Piutang / Kasbon
-    val totalPiutangAktif = effectivePelangganList.sumOf { p ->
-        val unpaidTotal = effectiveTransaksiList
-            .filter {
-                it.transaksi.id_pelanggan == p.id &&
-                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
+    // 1. Pendapatan Tunai Hari Ini (termasuk Uang Muka/DP dari transaksi Bayar Sebagian)
+    val pendapatanLunasHariIni = remember(todayTransactions) {
+        todayTransactions.sumOf {
+            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
+                it.transaksi.total_harga
+            } else {
+                it.transaksi.uangMuka.toDouble()
             }
-            .sumOf { it.transaksi.total_harga }
-        if (unpaidTotal > 0) unpaidTotal else p.sisa_kasbon
+        }
+    }
+
+    // 2. Laba Bersih Hari Ini (Pendapatan Tunai - Pengeluaran Operasional - Komisi Kurir Semua Galon Hari Ini)
+    val totalKomisiHariIni = remember(todayTransactions) {
+        todayTransactions.sumOf { it.transaksi.total_komisi }
+    }
+    val totalPengeluaranHariIni = remember(todayPengeluaran) {
+        todayPengeluaran.sumOf { it.nominal }
+    }
+    val labaBersihHariIni = pendapatanLunasHariIni - totalPengeluaranHariIni - totalKomisiHariIni
+
+    // 3. Total Piutang / Kasbon Tersinkronisasi
+    val effectiveKasbonByCustomer = remember(effectivePelangganList, effectiveTransaksiList) {
+        val unpaidByCustomer = effectiveTransaksiList
+            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+            .groupBy { it.transaksi.id_pelanggan }
+        effectivePelangganList.associate { p ->
+            val unpaidNotes = unpaidByCustomer[p.id] ?: emptyList()
+            val unpaidSum = unpaidNotes.sumOf { it.transaksi.remainingKasbonAmount() }
+            val effectiveKasbon = if (unpaidNotes.isNotEmpty()) unpaidSum else p.sisa_kasbon
+            p.id to effectiveKasbon
+        }
+    }
+    val totalPiutangAktif = remember(effectiveKasbonByCustomer) {
+        effectiveKasbonByCustomer.values.sum()
     }
 
     // 4. Total Galon Hari Ini
-    val totalGalonHariIni = todayTransactions.sumOf { it.transaksi.jumlah }
+    val totalGalonHariIni = remember(todayTransactions) {
+        todayTransactions.sumOf { it.transaksi.jumlah }
+    }
 
     // 5. Estimasi Galon Bulan Ini (Proyeksi: Total Galon Bulan Ini / Tgl Hari Ini * Total Hari Bulan Ini)
-    val totalGalonBulanIni = monthTransactions.sumOf { it.transaksi.jumlah }
+    val totalGalonBulanIni = remember(monthTransactions) {
+        monthTransactions.sumOf { it.transaksi.jumlah }
+    }
     val currentDayOfMonth = FormatUtils.getCurrentDayOfMonth().coerceAtLeast(1)
     val totalDaysInMonth = FormatUtils.getDaysInCurrentMonth()
     val estimasiGalonBulanIni = ((totalGalonBulanIni.toDouble() / currentDayOfMonth.toDouble()) * totalDaysInMonth).roundToInt()
+
+    // 6. CRM Jadwal Order Pelanggan (Due Soon / Overdue)
+    val crmJadwalCustomers = remember(pelangganUiModels, effectivePelangganList, effectiveTransaksiList) {
+        val uiModels = if (pelangganUiModels.isNotEmpty()) {
+            pelangganUiModels
+        } else {
+            viewModel.getPelangganUiModels(effectivePelangganList, effectiveTransaksiList)
+        }
+        uiModels.filter {
+            it.crmPrediction.status == CrmOrderStatus.OVERDUE ||
+                it.crmPrediction.status == CrmOrderStatus.DUE_SOON
+        }
+    }
+
+    // 7. Daftar Transaksi Terbaru (Utamakan Hari Ini, Fallback ke 4 Transaksi Terakhir Lintas Hari)
+    val recentTransactionsToShow = remember(todayTransactions, effectiveTransaksiList) {
+        if (todayTransactions.isNotEmpty()) {
+            todayTransactions.take(4)
+        } else {
+            effectiveTransaksiList.take(4)
+        }
+    }
+    val isShowingTodayTransactions = todayTransactions.isNotEmpty()
 
     Scaffold(
         modifier = modifier.testTag("dashboard_screen"),
@@ -143,20 +213,12 @@ fun DashboardScreen(
                 TopAppBar(
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.size(42.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.WaterDrop,
-                                        contentDescription = "Logo Santoya",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            }
+                            Image(
+                                painter = painterResource(id = R.drawable.logo_santoya),
+                                contentDescription = "Logo Santoya",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.size(38.dp)
+                            )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
@@ -216,7 +278,7 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. World-Class Fintech Executive Hero Card
             item {
@@ -266,9 +328,14 @@ fun DashboardScreen(
                             .padding(20.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Top Section: Primary Revenue Hero
+                            // Top Section: Primary Revenue Hero (Clickable -> Laporan Hari Ini)
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .pressClickEffect(onClick = {
+                                        viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                                        onNavigateToLaporan()
+                                    }),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Top
                             ) {
@@ -320,28 +387,34 @@ fun DashboardScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                // Laba Bersih Hari Ini
+                                // Laba Bersih Hari Ini (Clickable -> Laporan Hari Ini)
+                                val isPositiveProfit = labaBersihHariIni >= 0.0
                                 Surface(
-                                    modifier = Modifier.weight(1f),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .pressClickEffect(onClick = {
+                                            viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                                            onNavigateToLaporan()
+                                        }),
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color.White.copy(alpha = 0.10f),
                                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Surface(
                                                 shape = CircleShape,
-                                                color = Color(0xFF10B981).copy(alpha = 0.25f),
+                                                color = if (isPositiveProfit) Color(0xFF10B981).copy(alpha = 0.25f) else Color(0xFFF43F5E).copy(alpha = 0.25f),
                                                 modifier = Modifier.size(24.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                                         contentDescription = null,
-                                                        tint = Color(0xFF6EE7B7),
+                                                        tint = if (isPositiveProfit) Color(0xFF6EE7B7) else Color(0xFFFDA4AF),
                                                         modifier = Modifier.size(14.dp)
                                                     )
                                                 }
@@ -361,12 +434,12 @@ fun DashboardScreen(
                                             text = FormatUtils.formatRupiah(labaBersihHariIni),
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Black,
-                                            color = Color(0xFF6EE7B7),
+                                            color = if (isPositiveProfit) Color(0xFF6EE7B7) else Color(0xFFFDA4AF),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Pendapatan - Komisi Kurir",
+                                            text = "Tunai - Biaya & Komisi",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 10.sp,
                                             color = Color.White.copy(alpha = 0.55f),
@@ -376,17 +449,20 @@ fun DashboardScreen(
                                     }
                                 }
 
-                                // Total Piutang / Kasbon
+                                // Total Piutang / Kasbon (Clickable -> Pelanggan Tab Kasbon)
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .pressClickEffect(onClick = onNavigateToPelanggan),
+                                        .pressClickEffect(onClick = {
+                                            viewModel.setPelangganTab(1)
+                                            onNavigateToPelanggan()
+                                        }),
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color.White.copy(alpha = 0.10f),
                                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
                                 ) {
                                     Column(
-                                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -424,7 +500,7 @@ fun DashboardScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Akumulasi Kasbon Aktif",
+                                            text = "Lihat Daftar Kasbon →",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontSize = 10.sp,
                                             color = Color.White.copy(alpha = 0.55f),
@@ -449,9 +525,14 @@ fun DashboardScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    // Total Galon Hari Ini
+                                    // Total Galon Hari Ini (Clickable -> Transaksi)
                                     Row(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setTransaksiTab(0)
+                                                onNavigateToTransaksi()
+                                            }),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Surface(
@@ -506,9 +587,14 @@ fun DashboardScreen(
                                             .background(Color.White.copy(alpha = 0.16f))
                                     )
 
-                                    // Estimasi Galon Bulan Ini
+                                    // Estimasi Galon Bulan Ini (Clickable -> Laporan Bulan Ini)
                                     Row(
-                                        modifier = Modifier.weight(1.15f),
+                                        modifier = Modifier
+                                            .weight(1.15f)
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setLaporanPeriode(LaporanPeriode.BULAN_INI)
+                                                onNavigateToLaporan()
+                                            }),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Surface(
@@ -560,7 +646,82 @@ fun DashboardScreen(
                     }
                 }
             }
-            
+
+            // 2. Smart CRM Order Alert Banner (Jika ada pelanggan yang masuk jadwal order / terlambat)
+            if (crmJadwalCustomers.isNotEmpty()) {
+                item {
+                    val overdueCount = crmJadwalCustomers.count { it.crmPrediction.status == CrmOrderStatus.OVERDUE }
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFF59E0B).copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.45f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .pressClickEffect(onClick = {
+                                viewModel.setPelangganTab(4) // Tab Jadwal
+                                onNavigateToPelanggan()
+                            })
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.24f),
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.NotificationsActive,
+                                            contentDescription = null,
+                                            tint = Color(0xFFB45309),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${crmJadwalCustomers.size} Pelanggan Waktunya Order",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF92400E),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = if (overdueCount > 0) {
+                                            "$overdueCount melewati jadwal rutin • Ketuk untuk hubungi via WA"
+                                        } else {
+                                            "Jadwal isi ulang galon hari ini • Ketuk untuk lihat"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFB45309),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "Lihat Jadwal",
+                                tint = Color(0xFFB45309),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
             // 3. Menu Navigasi Utama (Tactile Bento Cards)
             item {
                 Text(
@@ -582,7 +743,10 @@ fun DashboardScreen(
                             icon = Icons.Default.ShoppingCart,
                             accentColor = MaterialTheme.colorScheme.primary,
                             testTag = "nav_transaksi_button",
-                            onClick = onNavigateToTransaksi
+                            onClick = {
+                                viewModel.setTransaksiTab(0)
+                                onNavigateToTransaksi()
+                            }
                         )
                         MenuCard(
                             modifier = Modifier.weight(1f),
@@ -591,7 +755,10 @@ fun DashboardScreen(
                             icon = Icons.Default.People,
                             accentColor = MaterialTheme.colorScheme.secondary,
                             testTag = "nav_pelanggan_button",
-                            onClick = onNavigateToPelanggan
+                            onClick = {
+                                viewModel.setPelangganTab(0)
+                                onNavigateToPelanggan()
+                            }
                         )
                     }
                     Row(
@@ -620,20 +787,24 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. Aktivitas Transaksi Terakhir Hari Ini
-            if (todayTransactions.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Transaksi Terbaru Hari Ini",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+            // 4. Aktivitas Transaksi Terbaru
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isShowingTodayTransactions) {
+                            "Transaksi Terbaru Hari Ini"
+                        } else {
+                            "Transaksi Terakhir"
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (effectiveTransaksiList.isNotEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
@@ -663,9 +834,74 @@ fun DashboardScreen(
                         }
                     }
                 }
+            }
 
-                items(todayTransactions.take(4), key = { it.transaksi.id }) { detail ->
+            if (recentTransactionsToShow.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Belum ada transaksi tercatat",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Mulai catat penjualan galon pertama Anda untuk memantau omzet dan laba bersih.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Button(
+                                onClick = {
+                                    viewModel.setTransaksiTab(0)
+                                    onNavigateToTransaksi()
+                                },
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Catat Penjualan Sekarang",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                items(recentTransactionsToShow, key = { it.transaksi.id }) { detail ->
                     val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
+                    val metodeDisplay = if (isKasbon) {
+                        "Belum Dibayar"
+                    } else {
+                        val m = detail.transaksi.metode_bayar.trim()
+                        if (m.isBlank() || m == "-") "Cash" else m
+                    }
+                    val subInfoParts = mutableListOf("${detail.transaksi.jumlah} Galon", metodeDisplay)
+                    if (detail.kurir != null) {
+                        subInfoParts.add(detail.kurir.nama)
+                    }
+                    if (!isShowingTodayTransactions) {
+                        subInfoParts.add(FormatUtils.formatDateShort(detail.transaksi.tanggal))
+                    }
+
                     Card(
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -688,7 +924,8 @@ fun DashboardScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Surface(
@@ -700,34 +937,39 @@ fun DashboardScreen(
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isKasbon) Color(0xFFB45309) else Color(0xFF047857),
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                            maxLines = 1
                                         )
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${detail.transaksi.jumlah} Galon • ${detail.transaksi.metode_bayar}",
+                                    text = subInfoParts.joinToString(" • "),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isKasbon) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = FormatUtils.formatRupiah(detail.transaksi.total_harga),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 IconButton(
                                     onClick = {
-                                        val custKasbon = effectivePelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon ?: 0.0
+                                        val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
+                                            ?: effectivePelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
+                                            ?: 0.0
                                         val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
                                         viewModel.showReceiptDialog(
                                             ActiveReceiptDialog(
-                                                title = "Struk Nota #${detail.transaksi.id}",
+                                                title = "Struk Transaksi Penjualan",
                                                 receiptText = text,
                                                 customerPhone = detail.pelanggan?.no_hp,
                                                 data = detail

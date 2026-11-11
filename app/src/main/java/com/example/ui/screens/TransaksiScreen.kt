@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -63,6 +64,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,10 +72,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +95,13 @@ import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.SantoyaViewModel
 import java.util.Calendar
 
+private fun isSameDay(timestamp1: Long, timestamp2: Long): Boolean {
+    val cal1 = Calendar.getInstance().apply { timeInMillis = timestamp1 }
+    val cal2 = Calendar.getInstance().apply { timeInMillis = timestamp2 }
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+        cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransaksiScreen(
@@ -100,6 +113,18 @@ fun TransaksiScreen(
     modifier: Modifier = Modifier
 ) {
     val selectedTab by viewModel.transaksiTab.collectAsState()
+
+    val effectiveKasbonByCustomer = remember(pelangganList, transaksiList) {
+        val unpaidByCustomer = transaksiList
+            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+            .groupBy { it.transaksi.id_pelanggan }
+        pelangganList.associate { p ->
+            val unpaidNotes = unpaidByCustomer[p.id] ?: emptyList()
+            val unpaidSum = unpaidNotes.sumOf { it.transaksi.remainingKasbonAmount() }
+            val effectiveKasbon = if (unpaidNotes.isNotEmpty()) unpaidSum else p.sisa_kasbon
+            p.id to effectiveKasbon
+        }
+    }
 
     Column(modifier = modifier.fillMaxSize().imePadding()) {
         PrimaryTabRow(
@@ -139,7 +164,8 @@ fun TransaksiScreen(
                 viewModel = viewModel,
                 pelangganList = pelangganList,
                 produkList = produkList,
-                kurirList = kurirList
+                kurirList = kurirList,
+                effectiveKasbonByCustomer = effectiveKasbonByCustomer
             )
         } else {
             RiwayatTransaksiTab(
@@ -147,7 +173,8 @@ fun TransaksiScreen(
                 transaksiList = transaksiList,
                 pelangganList = pelangganList,
                 kurirList = kurirList,
-                produkList = produkList
+                produkList = produkList,
+                effectiveKasbonByCustomer = effectiveKasbonByCustomer
             )
         }
     }
@@ -159,9 +186,12 @@ fun CatatPenjualanTab(
     viewModel: SantoyaViewModel,
     pelangganList: List<Pelanggan>,
     produkList: List<Produk>,
-    kurirList: List<Kurir>
+    kurirList: List<Kurir>,
+    effectiveKasbonByCustomer: Map<Int, Double> = emptyMap()
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val tanggal by viewModel.txTanggal.collectAsState()
     val selectedPelangganId by viewModel.txPelangganId.collectAsState()
     val selectedProdukId by viewModel.txProdukId.collectAsState()
@@ -170,27 +200,42 @@ fun CatatPenjualanTab(
     val hargaSatuan by viewModel.txHargaSatuan.collectAsState()
     val metodeBayar by viewModel.txMetodeBayar.collectAsState()
     val status by viewModel.txStatus.collectAsState()
+    val uangMuka by viewModel.txUangMuka.collectAsState()
+    val formScrollState = rememberScrollState()
 
     var showAddCustomerDialog by remember { mutableStateOf(false) }
+    var showEditJumlahDialog by remember { mutableStateOf(false) }
 
     val selectedPelanggan = pelangganList.find { it.id == selectedPelangganId }
     val selectedKurir = kurirList.find { it.id == selectedKurirId }
 
-    val initialCustomerName = remember(selectedPelangganId) {
+    val initialCustomerName = remember(selectedPelangganId, pelangganList) {
         pelangganList.find { it.id == selectedPelangganId }?.nama ?: ""
     }
     var searchQuery by remember { mutableStateOf(initialCustomerName) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(selectedPelangganId, pelangganList) {
+        val matchedName = pelangganList.find { it.id == selectedPelangganId }?.nama
+        if (matchedName != null) {
+            searchQuery = matchedName
+        } else if (selectedPelangganId == null && pelangganList.any { it.nama.equals(searchQuery.trim(), ignoreCase = true) }) {
+            searchQuery = ""
+        }
+    }
 
     val filteredPelanggan = remember(searchQuery, pelangganList, selectedPelanggan) {
         if (searchQuery.isBlank() || (selectedPelanggan != null && searchQuery.trim() == selectedPelanggan.nama.trim())) {
             pelangganList
         } else {
             val q = searchQuery.trim().lowercase()
+            val qDigits = q.filter { it.isDigit() }
             pelangganList.filter {
+                val hpDigits = it.no_hp.filter { c -> c.isDigit() }
                 it.nama.lowercase().contains(q) ||
                     it.alamat.lowercase().contains(q) ||
-                    it.no_hp.lowercase().contains(q)
+                    it.no_hp.lowercase().contains(q) ||
+                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
             }
         }
     }
@@ -201,6 +246,7 @@ fun CatatPenjualanTab(
     }
 
     val totalHarga = jumlah * hargaSatuan
+    val isToday = remember(tanggal) { isSameDay(tanggal, System.currentTimeMillis()) }
 
     val calendar = Calendar.getInstance().apply { timeInMillis = tanggal }
     val datePickerDialog = remember(context, tanggal) {
@@ -224,18 +270,18 @@ fun CatatPenjualanTab(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 118.dp),
+                .verticalScroll(formScrollState)
+                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 140.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // 1. Baris Tanggal Transaksi
+            // 1. Baris Tanggal Transaksi (Default Hari Ini + Dukungan Backdate Nota Kurir)
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surface,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(40.dp)
+                    .height(42.dp)
                     .pressClickEffect { datePickerDialog.show() }
             ) {
                 Row(
@@ -245,7 +291,10 @@ fun CatatPenjualanTab(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.CalendarToday,
                             contentDescription = null,
@@ -254,7 +303,11 @@ fun CatatPenjualanTab(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Tgl: ${FormatUtils.formatDate(tanggal)}",
+                            text = if (isToday) {
+                                "Hari Ini • ${FormatUtils.formatDate(tanggal)}"
+                            } else {
+                                "Tgl Nota: ${FormatUtils.formatDate(tanggal)}"
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -262,18 +315,41 @@ fun CatatPenjualanTab(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "Ubah Tgl",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                            maxLines = 1
-                        )
+                        if (!isToday) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color(0xFFF59E0B).copy(alpha = 0.16f),
+                                modifier = Modifier.clickable {
+                                    viewModel.setTxTanggal(System.currentTimeMillis())
+                                }
+                            ) {
+                                Text(
+                                    text = "Hari Ini",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFB45309),
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Text(
+                                text = "Ubah Tgl",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
@@ -320,7 +396,10 @@ fun CatatPenjualanTab(
                         )
                     },
                     trailingIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
                             if (searchQuery.isNotBlank() || selectedPelangganId != null) {
                                 IconButton(
                                     onClick = {
@@ -328,30 +407,43 @@ fun CatatPenjualanTab(
                                         isDropdownExpanded = true
                                         viewModel.onPelangganSelected(null)
                                     },
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
                                         Icons.Default.Clear,
                                         contentDescription = "Hapus Pilihan",
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
                             IconButton(
-                                onClick = { showAddCustomerDialog = true },
-                                modifier = Modifier.size(28.dp)
+                                onClick = {
+                                    isDropdownExpanded = false
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    showAddCustomerDialog = true
+                                },
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
                                     Icons.Default.PersonAdd,
                                     contentDescription = "Tambah Pelanggan Baru",
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(17.dp)
+                                    modifier = Modifier.size(19.dp)
                                 )
                             }
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = isDropdownExpanded)
                         }
                     },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            isDropdownExpanded = false
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                    ),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -385,6 +477,7 @@ fun CatatPenjualanTab(
                     } else {
                         filteredPelanggan.take(30).forEach { cust ->
                             val isSelected = cust.id == selectedPelangganId
+                            val custEffectiveKasbon = effectiveKasbonByCustomer[cust.id] ?: cust.sisa_kasbon
                             DropdownMenuItem(
                                 text = {
                                     Row(
@@ -403,7 +496,7 @@ fun CatatPenjualanTab(
                                             val subDetails = mutableListOf<String>()
                                             if (cust.alamat.isNotBlank()) subDetails.add(cust.alamat)
                                             if (cust.no_hp.isNotBlank()) subDetails.add(cust.no_hp)
-                                            if (cust.sisa_kasbon > 0) subDetails.add("Kasbon: ${FormatUtils.formatRupiah(cust.sisa_kasbon)}")
+                                            if (custEffectiveKasbon > 0) subDetails.add("Kasbon: ${FormatUtils.formatRupiah(custEffectiveKasbon)}")
                                             if (cust.harga_khusus != null && cust.harga_khusus > 0) subDetails.add("Khusus: ${FormatUtils.formatRupiah(cust.harga_khusus)}")
                                             if (cust.id_kurir_langganan != null) {
                                                 val kName = kurirList.find { it.id == cust.id_kurir_langganan }?.nama
@@ -413,7 +506,7 @@ fun CatatPenjualanTab(
                                                 Text(
                                                     subDetails.joinToString(" • "),
                                                     style = MaterialTheme.typography.bodySmall,
-                                                    color = if (cust.sisa_kasbon > 0) Color(0xFFF59E0B) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = if (custEffectiveKasbon > 0) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -433,6 +526,8 @@ fun CatatPenjualanTab(
                                     searchQuery = cust.nama
                                     isDropdownExpanded = false
                                     viewModel.onPelangganSelected(cust.id)
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
                                 }
                             )
                         }
@@ -442,6 +537,7 @@ fun CatatPenjualanTab(
 
             // 3. Banner Info Profil Otomatis & Kasbon Ramping
             if (selectedPelanggan != null) {
+                val selectedEffectiveKasbon = effectiveKasbonByCustomer[selectedPelanggan.id] ?: selectedPelanggan.sisa_kasbon
                 if (selectedPelanggan.harga_khusus != null || selectedPelanggan.id_kurir_langganan != null) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -483,7 +579,7 @@ fun CatatPenjualanTab(
                     }
                 }
 
-                if (selectedPelanggan.sisa_kasbon > 0) {
+                if (selectedEffectiveKasbon > 0) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = Color(0xFFF59E0B).copy(alpha = 0.16f),
@@ -505,7 +601,7 @@ fun CatatPenjualanTab(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Sisa kasbon: ${FormatUtils.formatRupiah(selectedPelanggan.sisa_kasbon)}",
+                                text = "Sisa kasbon aktif: ${FormatUtils.formatRupiah(selectedEffectiveKasbon)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFB45309),
@@ -517,7 +613,7 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 4. Katalog Produk (Grid 2 Kolom dengan micro-interaction)
+            // 4. Katalog Produk (Grid 2 Kolom dengan susunan vertikal agar nama produk tidak terpotong)
             val chunkedProduk = produkList.chunked(2)
             chunkedProduk.forEach { pair ->
                 Row(
@@ -529,8 +625,12 @@ fun CatatPenjualanTab(
                         Surface(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(46.dp)
-                                .pressClickEffect { viewModel.setTxProdukId(prod.id, prod.harga) },
+                                .height(56.dp)
+                                .pressClickEffect {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    viewModel.setTxProdukId(prod.id, prod.harga)
+                                },
                             shape = RoundedCornerShape(12.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
                             border = BorderStroke(
@@ -538,12 +638,11 @@ fun CatatPenjualanTab(
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
                             )
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .padding(horizontal = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
                                     text = prod.nama_produk,
@@ -551,15 +650,15 @@ fun CatatPenjualanTab(
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
                                     text = FormatUtils.formatRupiah(prod.harga),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.ExtraBold,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -570,93 +669,157 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 5. Baris Horizontal: Harga Satuan & Counter Galon
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = if (hargaSatuan > 0) hargaSatuan.toLong().toString() else "",
-                    onValueChange = { input ->
-                        val num = input.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
-                        viewModel.setTxHargaSatuan(num)
-                    },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    label = {
-                        Text(
-                            "Harga Satuan (Rp) *",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    prefix = {
-                        Text(
-                            "Rp ",
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .weight(1.3f)
-                        .testTag("input_harga_satuan")
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier
-                        .weight(1.2f)
-                        .height(56.dp)
+            // 5. Baris Horizontal: Harga Satuan & Counter Galon + Quick-Qty Chips
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
+                    OutlinedTextField(
+                        value = if (hargaSatuan > 0) hargaSatuan.toLong().toString() else "",
+                        onValueChange = { input ->
+                            val num = input.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+                            viewModel.setTxHargaSatuan(num)
+                        },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                        label = {
+                            Text(
+                                "Harga Satuan (Rp) *",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        prefix = {
+                            Text(
+                                "Rp ",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .weight(1.3f)
+                            .testTag("input_harga_satuan")
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .height(60.dp)
+                            .padding(top = 4.dp)
                     ) {
-                        OutlinedButton(
-                            onClick = { viewModel.decrementTxJumlah() },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp),
+                        Column(
                             modifier = Modifier
-                                .size(36.dp)
-                                .testTag("btn_minus_galon")
+                                .fillMaxSize()
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                            verticalArrangement = Arrangement.SpaceBetween,
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(Icons.Default.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
-                        }
+                            Text(
+                                text = "Jumlah Galon (Ketuk Angka)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        viewModel.decrementTxJumlah()
+                                    },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("btn_minus_galon")
+                                ) {
+                                    Icon(Icons.Default.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
+                                }
 
-                        Text(
-                            text = "$jumlah",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Black,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .width(38.dp)
-                                .animateContentSize(),
-                            maxLines = 1
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            focusManager.clearFocus()
+                                            keyboardController?.hide()
+                                            showEditJumlahDialog = true
+                                        }
+                                        .testTag("btn_ketik_jumlah_galon")
+                                ) {
+                                    Text(
+                                        text = "$jumlah",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.animateContentSize(),
+                                        maxLines = 1
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                        viewModel.incrementTxJumlah()
+                                    },
+                                    shape = CircleShape,
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("btn_plus_galon")
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Quick-Quantity Chips untuk input cepat 1 ketukan (Eceran & Grosir/Warung)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    listOf(1, 2, 3, 5, 10, 15, 20).forEach { presetQty ->
+                        val isQtySelected = jumlah == presetQty
+                        FilterChip(
+                            selected = isQtySelected,
+                            onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                viewModel.setTxJumlah(presetQty)
+                            },
+                            label = {
+                                Text(
+                                    text = "$presetQty Galon",
+                                    maxLines = 1,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isQtySelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            modifier = Modifier.height(30.dp)
                         )
-
-                        OutlinedButton(
-                            onClick = { viewModel.incrementTxJumlah() },
-                            shape = CircleShape,
-                            contentPadding = PaddingValues(0.dp),
-                            modifier = Modifier
-                                .size(36.dp)
-                                .testTag("btn_plus_galon")
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
-                        }
                     }
                 }
             }
@@ -678,7 +841,11 @@ fun CatatPenjualanTab(
                 ) {
                     FilterChip(
                         selected = selectedKurirId == null,
-                        onClick = { viewModel.setTxKurirId(null) },
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.setTxKurirId(null)
+                        },
                         label = {
                             Text(
                                 "Ambil Sendiri",
@@ -692,7 +859,11 @@ fun CatatPenjualanTab(
                     kurirList.forEach { k ->
                         FilterChip(
                             selected = selectedKurirId == k.id,
-                            onClick = { viewModel.setTxKurirId(k.id) },
+                            onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                viewModel.setTxKurirId(k.id)
+                            },
                             label = {
                                 Text(
                                     k.nama,
@@ -708,101 +879,245 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 7. Pilihan Pembayaran & Status
+            // 7. Pilihan Status Nota & Metode Pembayaran (Termasuk Bayar Sebagian / Uang Muka)
             val isKasbon = status.equals("Kasbon", ignoreCase = true)
             val isLunas = status.equals("Lunas", ignoreCase = true)
+            val isBayarSebagian = metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
+            val isKasbonPenuh = isKasbon && !isBayarSebagian
+            val totalBelanjaLong = totalHarga.toLong()
+            val sisaKasbonPreview = (totalBelanjaLong - uangMuka).coerceAtLeast(0L)
+            val isDpExceedingTotal = isBayarSebagian && uangMuka > totalBelanjaLong
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            LaunchedEffect(isBayarSebagian) {
+                if (isBayarSebagian) {
+                    formScrollState.animateScrollTo(formScrollState.maxValue)
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Status Nota & Metode Pembayaran",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "Metode Pembayaran",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        listOf("Cash", "Transfer").forEach { m ->
-                            val isSelected = !isKasbon && metodeBayar.equals(m, ignoreCase = true)
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.setTxMetodeBayar(m) },
-                                label = {
-                                    Text(
-                                        m,
-                                        maxLines = 1,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(34.dp)
+                    FilterChip(
+                        selected = isLunas && !isBayarSebagian,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.setTxStatus("Lunas")
+                        },
+                        label = {
+                            Text(
+                                text = "Lunas",
+                                maxLines = 1,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isLunas && !isBayarSebagian) FontWeight.Bold else FontWeight.Medium
                             )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                    )
+                    FilterChip(
+                        selected = isKasbonPenuh,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.setTxStatus("Kasbon")
+                        },
+                        label = {
+                            Text(
+                                text = "Kasbon (Belum Bayar)",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isKasbonPenuh) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
+                        ),
+                        modifier = Modifier
+                            .weight(1.25f)
+                            .height(36.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Cash", "Transfer", "Bayar Sebagian").forEach { m ->
+                        val isChipBayarSebagian = m.equals("Bayar Sebagian", ignoreCase = true)
+                        val isSelected = if (isChipBayarSebagian) {
+                            isBayarSebagian
+                        } else {
+                            !isKasbon && metodeBayar.equals(m, ignoreCase = true)
                         }
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                                viewModel.setTxMetodeBayar(m)
+                            },
+                            label = {
+                                Text(
+                                    text = m,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            },
+                            colors = if (isChipBayarSebagian) {
+                                FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFF59E0B).copy(alpha = 0.22f),
+                                    selectedLabelColor = Color(0xFFB45309)
+                                )
+                            } else {
+                                FilterChipDefaults.filterChipColors()
+                            },
+                            modifier = Modifier
+                                .weight(if (isChipBayarSebagian) 1.35f else 1f)
+                                .height(36.dp)
+                                .testTag("chip_metode_${m.lowercase().replace(" ", "_")}")
+                        )
                     }
                 }
 
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Status Nota",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                if (isBayarSebagian) {
+                    var isDpFieldFocused by remember { mutableStateOf(false) }
+                    LaunchedEffect(isDpFieldFocused) {
+                        if (isDpFieldFocused) {
+                            formScrollState.animateScrollTo(formScrollState.maxValue)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = if (uangMuka > 0L) uangMuka.toString() else "",
+                        onValueChange = { input ->
+                            val cleanDigits = input.filter { it.isDigit() }.take(10)
+                            val parsed = cleanDigits.toLongOrNull() ?: 0L
+                            viewModel.setTxUangMuka(parsed)
+                        },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                        label = {
+                            Text(
+                                "Nominal Uang Muka / DP (Rp) *",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                "Masukkan nominal uang muka...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        prefix = {
+                            Text(
+                                "Rp ",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        trailingIcon = {
+                            if (uangMuka > 0L) {
+                                IconButton(
+                                    onClick = { viewModel.setTxUangMuka(0L) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Kosongkan Uang Muka",
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        },
+                        isError = isDpExceedingTotal,
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onFocusChanged { isDpFieldFocused = it.isFocused }
+                            .testTag("input_uang_muka")
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (isDpExceedingTotal) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            Color(0xFFF59E0B).copy(alpha = 0.16f)
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        FilterChip(
-                            selected = isLunas,
-                            onClick = { viewModel.setTxStatus("Lunas") },
-                            label = {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    "Lunas",
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isLunas) FontWeight.Bold else FontWeight.Normal
+                                    text = "Sisa Kasbon: ${FormatUtils.formatRupiah(sisaKasbonPreview.toDouble())}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (isDpExceedingTotal) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        Color(0xFFB45309)
+                                    },
+                                    modifier = Modifier.testTag("txt_sisa_kasbon_realtime")
                                 )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(34.dp)
-                        )
-                        FilterChip(
-                            selected = isKasbon,
-                            onClick = { viewModel.setTxStatus("Kasbon") },
-                            label = {
+                                if (uangMuka > 0L && !isDpExceedingTotal) {
+                                    Text(
+                                        text = "DP: ${FormatUtils.formatRupiah(uangMuka.toDouble())}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF047857)
+                                    )
+                                }
+                            }
+                            if (isDpExceedingTotal) {
                                 Text(
-                                    "Kasbon",
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (isKasbon) FontWeight.Bold else FontWeight.Normal
+                                    text = "Uang Muka tidak boleh melebihi Total Belanja (${FormatUtils.formatRupiah(totalHarga)})!",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.error
                                 )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.errorContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onErrorContainer
-                            ),
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(34.dp)
-                        )
+                            }
+                        }
                     }
                 }
             }
@@ -827,19 +1142,21 @@ fun CatatPenjualanTab(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = "Total (${jumlah} Galon): ",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
                             )
                             Text(
                                 text = FormatUtils.formatRupiah(totalHarga),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         if (selectedKurir != null) {
@@ -855,15 +1172,22 @@ fun CatatPenjualanTab(
                         }
                     }
 
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    val isBottomKasbon = status.equals("Kasbon", ignoreCase = true) || metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFF59E0B).copy(alpha = 0.18f) else Color(0xFF10B981).copy(alpha = 0.18f)
+                        color = if (isBottomKasbon) Color(0xFFF59E0B).copy(alpha = 0.18f) else Color(0xFF10B981).copy(alpha = 0.18f)
                     ) {
                         Text(
-                            text = status.uppercase(),
+                            text = when {
+                                metodeBayar.equals("Bayar Sebagian", ignoreCase = true) -> "KASBON (DP)"
+                                isBottomKasbon -> "DICATAT KASBON"
+                                else -> "LUNAS"
+                            },
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (status.equals("Kasbon", ignoreCase = true)) Color(0xFFB45309) else Color(0xFF047857),
+                            color = if (isBottomKasbon) Color(0xFFB45309) else Color(0xFF047857),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
@@ -877,14 +1201,20 @@ fun CatatPenjualanTab(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            viewModel.submitTransaksi { newId ->
-                                val savedDetail = viewModel.allTransaksi.value.find { it.transaksi.id == newId.toInt() }
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            val prevKasbon = selectedPelangganId?.let { effectiveKasbonByCustomer[it] } ?: 0.0
+                            viewModel.submitTransaksi { savedDetail ->
                                 if (savedDetail != null) {
-                                    val custKasbon = pelangganList.find { it.id == savedDetail.transaksi.id_pelanggan }?.sisa_kasbon ?: 0.0
-                                    val text = SantoyaReceiptHelper.generateSaleReceipt(savedDetail, custKasbon)
+                                    val newKasbonTotal = if (savedDetail.transaksi.status.equals("Kasbon", ignoreCase = true)) {
+                                        prevKasbon + savedDetail.transaksi.remainingKasbonAmount()
+                                    } else {
+                                        prevKasbon
+                                    }
+                                    val text = SantoyaReceiptHelper.generateSaleReceipt(savedDetail, newKasbonTotal)
                                     viewModel.showReceiptDialog(
                                         ActiveReceiptDialog(
-                                            title = "Struk Nota #${savedDetail.transaksi.id}",
+                                            title = "Struk Transaksi Penjualan",
                                             receiptText = text,
                                             customerPhone = savedDetail.pelanggan?.no_hp,
                                             data = savedDetail
@@ -914,7 +1244,9 @@ fun CatatPenjualanTab(
 
                     Button(
                         onClick = {
-                            viewModel.submitTransaksi {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.submitTransaksi { _ ->
                                 searchQuery = ""
                                 isDropdownExpanded = false
                                 viewModel.onPelangganSelected(null)
@@ -941,6 +1273,75 @@ fun CatatPenjualanTab(
                 }
             }
         }
+    }
+
+    if (showEditJumlahDialog) {
+        var jumlahInput by remember(jumlah) { mutableStateOf(jumlah.toString()) }
+        AlertDialog(
+            onDismissRequest = { showEditJumlahDialog = false },
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Text(
+                    text = "Ketik Jumlah Galon",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = jumlahInput,
+                        onValueChange = { text ->
+                            jumlahInput = text.filter { it.isDigit() }.take(4)
+                        },
+                        textStyle = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            textAlign = TextAlign.Center
+                        ),
+                        label = {
+                            Text(
+                                "Jumlah Galon *",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(
+                        text = "Masukkan jumlah pembelian galon (minimal 1 galon).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val parsed = jumlahInput.toIntOrNull() ?: 1
+                        viewModel.setTxJumlah(parsed.coerceAtLeast(1))
+                        showEditJumlahDialog = false
+                    },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "Terapkan",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditJumlahDialog = false }) {
+                    Text(
+                        "Batal",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
     }
 
     if (showAddCustomerDialog) {
@@ -1095,6 +1496,8 @@ fun CatatPenjualanTab(
                             )
                             searchQuery = namaBaru.trim()
                             isDropdownExpanded = false
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
                             showAddCustomerDialog = false
                         }
                     },
@@ -1120,52 +1523,164 @@ fun CatatPenjualanTab(
     }
 }
 
+private enum class RiwayatFilterOption(val label: String) {
+    SEMUA("Semua"),
+    HARI_INI("Hari Ini"),
+    LUNAS("Lunas"),
+    KASBON("Kasbon")
+}
+
 @Composable
 fun RiwayatTransaksiTab(
     viewModel: SantoyaViewModel,
     transaksiList: List<TransaksiDetail>,
     pelangganList: List<Pelanggan>,
     kurirList: List<Kurir> = emptyList(),
-    produkList: List<Produk> = emptyList()
+    produkList: List<Produk> = emptyList(),
+    effectiveKasbonByCustomer: Map<Int, Double> = emptyMap()
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var searchQuery by remember { mutableStateOf("") }
+    var selectedFilter by remember { mutableStateOf(RiwayatFilterOption.SEMUA) }
+    var showAllHistory by remember { mutableStateOf(false) }
     var editingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
+    var deletingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
+    var markingLunasTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
 
-    val filtered = remember(searchQuery, transaksiList) {
+    val nowMillis = remember(transaksiList) { System.currentTimeMillis() }
+
+    val countHariIni = remember(transaksiList, nowMillis) {
+        transaksiList.count { isSameDay(it.transaksi.tanggal, nowMillis) }
+    }
+    val countLunas = remember(transaksiList) {
+        transaksiList.count { it.transaksi.status.equals("Lunas", ignoreCase = true) }
+    }
+    val countKasbon = remember(transaksiList) {
+        transaksiList.count { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+    }
+
+    val filtered = remember(searchQuery, selectedFilter, transaksiList, nowMillis) {
+        val byStatusOrDate = when (selectedFilter) {
+            RiwayatFilterOption.SEMUA -> transaksiList
+            RiwayatFilterOption.HARI_INI -> transaksiList.filter { isSameDay(it.transaksi.tanggal, nowMillis) }
+            RiwayatFilterOption.LUNAS -> transaksiList.filter { it.transaksi.status.equals("Lunas", ignoreCase = true) }
+            RiwayatFilterOption.KASBON -> transaksiList.filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+        }
         if (searchQuery.isBlank()) {
-            transaksiList
+            byStatusOrDate
         } else {
             val q = searchQuery.lowercase().trim()
-            transaksiList.filter {
-                (it.pelanggan?.nama?.lowercase()?.contains(q) == true) ||
-                    (it.produk?.nama_produk?.lowercase()?.contains(q) == true) ||
-                    (it.transaksi.status.lowercase().contains(q)) ||
-                    (it.transaksi.id.toString() == q)
+            val qDigits = q.filter { it.isDigit() }
+            byStatusOrDate.filter { detail ->
+                val isKasbonTx = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
+                val formattedTotal = FormatUtils.formatRupiah(detail.transaksi.total_harga).lowercase()
+                val rawTotalStr = detail.transaksi.total_harga.toLong().toString()
+                val formattedDateFull = FormatUtils.formatDate(detail.transaksi.tanggal).lowercase()
+                val formattedDateShort = FormatUtils.formatDateShort(detail.transaksi.tanggal).lowercase()
+                val galonLabel = "${detail.transaksi.jumlah} galon"
+                val kurirLabel = detail.kurir?.nama?.lowercase() ?: "ambil sendiri"
+                val metodeLabel = if (isKasbonTx) "belum dibayar" else detail.transaksi.metode_bayar.lowercase()
+                val hpDigits = detail.pelanggan?.no_hp?.filter { it.isDigit() } ?: ""
+
+                (detail.pelanggan?.nama?.lowercase()?.contains(q) == true) ||
+                    (detail.pelanggan?.alamat?.lowercase()?.contains(q) == true) ||
+                    (detail.pelanggan?.no_hp?.lowercase()?.contains(q) == true) ||
+                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits)) ||
+                    kurirLabel.contains(q) ||
+                    (detail.produk?.nama_produk?.lowercase()?.contains(q) == true) ||
+                    metodeLabel.contains(q) ||
+                    detail.transaksi.status.lowercase().contains(q) ||
+                    formattedTotal.contains(q) ||
+                    (qDigits.isNotEmpty() && rawTotalStr.contains(qDigits)) ||
+                    galonLabel.contains(q) ||
+                    detail.transaksi.jumlah.toString() == q ||
+                    formattedDateFull.contains(q) ||
+                    formattedDateShort.contains(q)
             }
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 14.dp),
-        contentPadding = PaddingValues(top = 10.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
+    val totalGalonFiltered = remember(filtered) {
+        filtered.sumOf { it.transaksi.jumlah }
+    }
+    val totalLunasFiltered = remember(filtered) {
+        filtered.sumOf {
+            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
+                it.transaksi.total_harga
+            } else {
+                it.transaksi.uangMuka.toDouble()
+            }
+        }
+    }
+    val totalKasbonFiltered = remember(filtered) {
+        filtered.filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+            .sumOf { it.transaksi.remainingKasbonAmount() }
+    }
+    val totalNominalFiltered = totalLunasFiltered + totalKasbonFiltered
+
+    val displayedHistory = remember(filtered, showAllHistory) {
+        if (showAllHistory) filtered else filtered.take(30)
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Sticky Search Bar & Filter Chips di bagian atas Riwayat Transaksi
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { searchQuery = it },
+                onValueChange = {
+                    searchQuery = it
+                    showAllHistory = false
+                },
                 textStyle = MaterialTheme.typography.bodyLarge,
                 placeholder = {
                     Text(
-                        "Cari nota, pelanggan, atau status...",
+                        "Cari nama, nominal, galon, tanggal, kurir...",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 },
-                leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(
+                            onClick = {
+                                searchQuery = ""
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Bersihkan Pencarian",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                },
                 singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                    }
+                ),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -1175,26 +1690,232 @@ fun RiwayatTransaksiTab(
                     .fillMaxWidth()
                     .testTag("input_search_transaksi")
             )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RiwayatFilterOption.entries.forEach { option ->
+                    val isSelected = selectedFilter == option
+                    val count = when (option) {
+                        RiwayatFilterOption.SEMUA -> transaksiList.size
+                        RiwayatFilterOption.HARI_INI -> countHariIni
+                        RiwayatFilterOption.LUNAS -> countLunas
+                        RiwayatFilterOption.KASBON -> countKasbon
+                    }
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            selectedFilter = option
+                            showAllHistory = false
+                        },
+                        label = {
+                            Text(
+                                text = "${option.label} ($count)",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = when (option) {
+                                RiwayatFilterOption.KASBON -> Color(0xFFF59E0B).copy(alpha = 0.2f)
+                                RiwayatFilterOption.LUNAS -> Color(0xFF10B981).copy(alpha = 0.2f)
+                                else -> MaterialTheme.colorScheme.primaryContainer
+                            },
+                            selectedLabelColor = when (option) {
+                                RiwayatFilterOption.KASBON -> Color(0xFFB45309)
+                                RiwayatFilterOption.LUNAS -> Color(0xFF047857)
+                                else -> MaterialTheme.colorScheme.onPrimaryContainer
+                            }
+                        ),
+                        modifier = Modifier.height(34.dp)
+                    )
+                }
+            }
         }
 
-        if (filtered.isEmpty()) {
-            item {
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(24.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            "Tidak ada riwayat transaksi yang cocok.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // 3. Mini Summary Banner (Rekap Hasil Filter / Pencarian Aktif)
+            if (filtered.isNotEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${filtered.size} Transaksi • $totalGalonFiltered Galon",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = FormatUtils.formatRupiah(totalNominalFiltered),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.14f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Lunas",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF047857)
+                                        )
+                                        Text(
+                                            text = FormatUtils.formatRupiah(totalLunasFiltered),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF047857),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFF59E0B).copy(alpha = 0.14f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Kasbon",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFFB45309)
+                                        )
+                                        Text(
+                                            text = FormatUtils.formatRupiah(totalKasbonFiltered),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFB45309),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            items(filtered, key = { it.transaksi.id }) { detail ->
+
+            if (filtered.isEmpty()) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(28.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.size(52.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Receipt,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = if (searchQuery.isNotBlank()) "Transaksi Tidak Ditemukan" else "Belum Ada Riwayat Transaksi",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (searchQuery.isNotBlank()) {
+                                    "Tidak ada nota yang cocok dengan kata kunci \"$searchQuery\"."
+                                } else {
+                                    "Belum ada transaksi penjualan pada filter ${selectedFilter.label}."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                            if (searchQuery.isNotBlank() || selectedFilter != RiwayatFilterOption.SEMUA) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedButton(
+                                    onClick = {
+                                        searchQuery = ""
+                                        selectedFilter = RiwayatFilterOption.SEMUA
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
+                                    },
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Reset Pencarian & Filter",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+            items(displayedHistory, key = { it.transaksi.id }) { detail ->
                 val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
                 Card(
                     shape = RoundedCornerShape(14.dp),
@@ -1234,7 +1955,8 @@ fun RiwayatTransaksiTab(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.Top
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -1264,17 +1986,29 @@ fun RiwayatTransaksiTab(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.width(10.dp))
+
                             Column(horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = FormatUtils.formatRupiah(detail.transaksi.total_harga),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1
                                 )
                                 Text(
-                                    text = detail.transaksi.metode_bayar,
+                                    text = when {
+                                        isKasbon && detail.transaksi.uangMuka > 0L -> {
+                                            "DP: ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount())}"
+                                        }
+                                        isKasbon -> "Belum Dibayar"
+                                        else -> detail.transaksi.metode_bayar.ifBlank { "Cash" }
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isKasbon) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -1283,70 +2017,238 @@ fun RiwayatTransaksiTab(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = { editingTransaksi = detail },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    val custKasbon = pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon ?: 0.0
-                                    val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                    viewModel.showReceiptDialog(
-                                        ActiveReceiptDialog(
-                                            title = "Struk Nota #${detail.transaksi.id}",
-                                            receiptText = text,
-                                            customerPhone = detail.pelanggan?.no_hp,
-                                            data = detail
+                            if (isKasbon) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFF10B981).copy(alpha = 0.16f),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                                    modifier = Modifier.clickable {
+                                        markingLunasTransaksi = detail
+                                    }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Tandai Lunas",
+                                            tint = Color(0xFF047857),
+                                            modifier = Modifier.size(14.dp)
                                         )
-                                    )
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Print, contentDescription = "Cetak", modifier = Modifier.size(17.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Lunasi Nota",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF047857)
+                                        )
+                                    }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.width(1.dp))
                             }
 
-                            IconButton(
-                                onClick = {
-                                    val custKasbon = pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon ?: 0.0
-                                    val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                    SantoyaReceiptHelper.shareReceiptText(
-                                        context = viewModel.getApplication(),
-                                        text = text,
-                                        phoneNumber = detail.pelanggan?.no_hp
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                IconButton(
+                                    onClick = { editingTransaksi = detail },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Edit",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Share, contentDescription = "Bagikan", modifier = Modifier.size(17.dp))
-                            }
+                                }
 
-                            IconButton(
-                                onClick = { viewModel.deleteTransaksi(detail.transaksi) },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Hapus",
-                                    tint = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(17.dp)
-                                )
+                                IconButton(
+                                    onClick = {
+                                        val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
+                                            ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
+                                            ?: 0.0
+                                        val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
+                                        viewModel.showReceiptDialog(
+                                            ActiveReceiptDialog(
+                                                title = "Struk Transaksi Penjualan",
+                                                receiptText = text,
+                                                customerPhone = detail.pelanggan?.no_hp,
+                                                data = detail
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Print, contentDescription = "Cetak", modifier = Modifier.size(18.dp))
+                                }
+
+                                IconButton(
+                                    onClick = {
+                                        val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
+                                            ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
+                                            ?: 0.0
+                                        val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
+                                        SantoyaReceiptHelper.shareReceiptText(
+                                            context = viewModel.getApplication(),
+                                            text = text,
+                                            phoneNumber = detail.pelanggan?.no_hp
+                                        )
+                                    },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Share, contentDescription = "Bagikan", modifier = Modifier.size(18.dp))
+                                }
+
+                                IconButton(
+                                    onClick = { deletingTransaksi = detail },
+                                    modifier = Modifier.size(34.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Hapus",
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
+
+            if (filtered.size > 30) {
+                item {
+                    OutlinedButton(
+                        onClick = { showAllHistory = !showAllHistory },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (showAllHistory) {
+                                "Tampilkan Lebih Sedikit (30 Terbaru)"
+                            } else {
+                                "Tampilkan Semua Riwayat (${filtered.size} Transaksi)"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
         }
+        }
+    }
+
+    if (markingLunasTransaksi != null) {
+        val target = markingLunasTransaksi!!
+        AlertDialog(
+            onDismissRequest = { markingLunasTransaksi = null },
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Text(
+                    text = "Lunasi Nota Kasbon?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Tandai sisa kasbon ${target.pelanggan?.nama ?: "Pelanggan Umum"} sebesar ${FormatUtils.formatRupiah(target.transaksi.remainingKasbonAmount())} (${target.transaksi.jumlah} Galon) sebagai LUNAS?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.markTransaksiLunas(target.transaksi.id)
+                        markingLunasTransaksi = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF059669)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "Ya, Tandai Lunas",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { markingLunasTransaksi = null },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "Batal",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
+    }
+
+    if (deletingTransaksi != null) {
+        val target = deletingTransaksi!!
+        AlertDialog(
+            onDismissRequest = { deletingTransaksi = null },
+            shape = RoundedCornerShape(18.dp),
+            title = {
+                Text(
+                    text = "Hapus Transaksi?",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "Apakah Anda yakin ingin menghapus transaksi ${target.pelanggan?.nama ?: "Pelanggan Umum"} sebesar ${FormatUtils.formatRupiah(target.transaksi.total_harga)}? Sisa kasbon pelanggan akan disesuaikan secara otomatis.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteTransaksi(target.transaksi)
+                        deletingTransaksi = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "Ya, Hapus",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { deletingTransaksi = null },
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        "Batal",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        )
     }
 
     if (editingTransaksi != null) {
@@ -1355,15 +2257,24 @@ fun RiwayatTransaksiTab(
         var editHarga by remember(detail) { mutableStateOf(detail.transaksi.harga_satuan.toInt().toString()) }
         var editMetode by remember(detail) { mutableStateOf(detail.transaksi.metode_bayar) }
         var editStatus by remember(detail) { mutableStateOf(detail.transaksi.status) }
+        var editUangMuka by remember(detail) { mutableStateOf(if (detail.transaksi.uangMuka > 0L) detail.transaksi.uangMuka.toString() else "") }
         var editKurirId by remember(detail) { mutableStateOf(detail.transaksi.id_kurir) }
         var editProdukId by remember(detail) { mutableStateOf(detail.transaksi.id_produk) }
+
+        val parsedJumlah = editJumlah.toIntOrNull() ?: 0
+        val parsedHarga = editHarga.toDoubleOrNull() ?: 0.0
+        val previewTotalHarga = parsedJumlah * parsedHarga
+        val isEditBayarSebagian = editMetode.equals("Bayar Sebagian", ignoreCase = true)
+        val parsedEditDp = editUangMuka.toLongOrNull() ?: 0L
+        val isValidEdit = parsedJumlah > 0 && parsedHarga > 0.0 &&
+            (!isEditBayarSebagian || (parsedEditDp > 0L && parsedEditDp <= previewTotalHarga.toLong()))
 
         AlertDialog(
             onDismissRequest = { editingTransaksi = null },
             shape = RoundedCornerShape(18.dp),
             title = {
                 Text(
-                    text = "Edit Transaksi #${detail.transaksi.id}",
+                    text = "Edit Transaksi Penjualan",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -1419,11 +2330,12 @@ fun RiwayatTransaksiTab(
                         textStyle = MaterialTheme.typography.bodyLarge,
                         label = {
                             Text(
-                                "Jumlah Galon",
+                                "Jumlah Galon *",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
+                        isError = parsedJumlah <= 0,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
@@ -1436,16 +2348,43 @@ fun RiwayatTransaksiTab(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
                         label = {
                             Text(
-                                "Harga Satuan (Rp)",
+                                "Harga Satuan (Rp) *",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
+                        isError = parsedHarga <= 0.0,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     )
+
+                    // Live Preview Total Harga Baru
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Total Harga Baru:",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = FormatUtils.formatRupiah(previewTotalHarga),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
 
                     Text(
                         "Metode Pembayaran:",
@@ -1453,15 +2392,27 @@ fun RiwayatTransaksiTab(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         val isEditKasbon = editStatus.equals("Kasbon", ignoreCase = true)
-                        listOf("Cash", "Transfer").forEach { metode ->
-                            val isSelected = !isEditKasbon && editMetode.equals(metode, ignoreCase = true)
+                        listOf("Cash", "Transfer", "Bayar Sebagian").forEach { metode ->
+                            val isSelected = if (metode.equals("Bayar Sebagian", ignoreCase = true)) {
+                                isEditBayarSebagian
+                            } else {
+                                !isEditKasbon && editMetode.equals(metode, ignoreCase = true)
+                            }
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
                                     editMetode = metode
-                                    editStatus = "Lunas"
+                                    if (metode.equals("Bayar Sebagian", ignoreCase = true)) {
+                                        editStatus = "Kasbon"
+                                    } else {
+                                        editStatus = "Lunas"
+                                        editUangMuka = ""
+                                    }
                                 },
                                 label = {
                                     Text(
@@ -1474,6 +2425,27 @@ fun RiwayatTransaksiTab(
                         }
                     }
 
+                    if (isEditBayarSebagian) {
+                        val editSisaPreview = (previewTotalHarga.toLong() - parsedEditDp).coerceAtLeast(0L)
+                        OutlinedTextField(
+                            value = editUangMuka,
+                            onValueChange = { editUangMuka = it.filter { c -> c.isDigit() } },
+                            textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            label = { Text("Uang Muka / DP (Rp) *") },
+                            isError = parsedEditDp <= 0L || parsedEditDp > previewTotalHarga.toLong(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        Text(
+                            text = "Sisa Kasbon: ${FormatUtils.formatRupiah(editSisaPreview.toDouble())}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFB45309)
+                        )
+                    }
+
                     Text(
                         "Status Pembayaran:",
                         style = MaterialTheme.typography.titleSmall,
@@ -1482,14 +2454,19 @@ fun RiwayatTransaksiTab(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf("Lunas", "Kasbon").forEach { st ->
-                            val isSelected = editStatus.equals(st, ignoreCase = true)
+                            val isSelected = if (st.equals("Lunas", ignoreCase = true)) {
+                                editStatus.equals("Lunas", ignoreCase = true) && !isEditBayarSebagian
+                            } else {
+                                editStatus.equals("Kasbon", ignoreCase = true) && !isEditBayarSebagian
+                            }
                             FilterChip(
                                 selected = isSelected,
                                 onClick = {
                                     editStatus = st
+                                    editUangMuka = ""
                                     if (st.equals("Kasbon", ignoreCase = true)) {
                                         editMetode = ""
-                                    } else if (st.equals("Lunas", ignoreCase = true) && editMetode.isBlank()) {
+                                    } else if (st.equals("Lunas", ignoreCase = true) && (editMetode.isBlank() || isEditBayarSebagian)) {
                                         editMetode = "Cash"
                                     }
                                 },
@@ -1545,21 +2522,29 @@ fun RiwayatTransaksiTab(
             confirmButton = {
                 Button(
                     onClick = {
-                        val jml = editJumlah.toIntOrNull() ?: 1
-                        val hrg = editHarga.toDoubleOrNull() ?: 0.0
-                        viewModel.updateTransaksi(
-                            id = detail.transaksi.id,
-                            tanggal = detail.transaksi.tanggal,
-                            idPelanggan = detail.transaksi.id_pelanggan,
-                            idKurir = editKurirId,
-                            idProduk = editProdukId,
-                            jumlah = jml,
-                            hargaSatuan = hrg,
-                            metodeBayar = editMetode,
-                            status = editStatus,
-                            onSuccess = { editingTransaksi = null }
-                        )
+                        if (isValidEdit) {
+                            val finalStatus = if (isEditBayarSebagian) "Kasbon" else editStatus
+                            val finalMetode = when {
+                                isEditBayarSebagian -> "Bayar Sebagian"
+                                finalStatus.equals("Kasbon", ignoreCase = true) -> "-"
+                                else -> editMetode.ifBlank { "Cash" }
+                            }
+                            viewModel.updateTransaksi(
+                                id = detail.transaksi.id,
+                                tanggal = detail.transaksi.tanggal,
+                                idPelanggan = detail.transaksi.id_pelanggan,
+                                idKurir = editKurirId,
+                                idProduk = editProdukId,
+                                jumlah = parsedJumlah,
+                                hargaSatuan = parsedHarga,
+                                metodeBayar = finalMetode,
+                                status = finalStatus,
+                                uangMuka = if (isEditBayarSebagian) parsedEditDp else 0L,
+                                onSuccess = { editingTransaksi = null }
+                            )
+                        }
                     },
+                    enabled = isValidEdit,
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(

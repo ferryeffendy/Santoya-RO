@@ -59,6 +59,8 @@ object ExportHelper {
                 tObj.put("total_komisi", t.transaksi.total_komisi)
                 tObj.put("metode_bayar", t.transaksi.metode_bayar)
                 tObj.put("status", t.transaksi.status)
+                tObj.put("uangMuka", t.transaksi.uangMuka)
+                tObj.put("sisaKasbon", t.transaksi.sisaKasbon)
                 trxArray.put(tObj)
             }
             pObj.put("riwayat_transaksi", trxArray)
@@ -111,7 +113,7 @@ object ExportHelper {
     ): String {
         val sb = StringBuilder()
         sb.append("=== LAPORAN TRANSAKSI SANTOYA RO ===\n")
-        sb.append("ID,Tanggal,Pelanggan,Alamat,NoHP,Produk,Jumlah,HargaSatuan,TotalHarga,Kurir,TotalKomisi,MetodeBayar,Status\n")
+        sb.append("ID,Tanggal,Pelanggan,Alamat,NoHP,Produk,Jumlah,HargaSatuan,TotalHarga,UangMuka,SisaKasbon,Kurir,TotalKomisi,MetodeBayar,Status\n")
         transaksiList.forEach { t ->
             val trx = t.transaksi
             val tgl = FormatUtils.formatDate(trx.tanggal).replace(",", " ")
@@ -120,8 +122,9 @@ object ExportHelper {
             val custPhone = t.pelanggan?.no_hp ?: "-"
             val prod = (t.produk?.nama_produk ?: "Galon RO").replace(",", ";")
             val kurir = (t.kurir?.nama ?: "-").replace(",", ";")
+            val sisaKasbonVal = trx.remainingKasbonAmount().toLong()
 
-            sb.append("${trx.id},\"$tgl\",\"$custName\",\"$custAddr\",\"$custPhone\",\"$prod\",${trx.jumlah},${trx.harga_satuan},${trx.total_harga},\"$kurir\",${trx.total_komisi},${trx.metode_bayar},${trx.status}\n")
+            sb.append("${trx.id},\"$tgl\",\"$custName\",\"$custAddr\",\"$custPhone\",\"$prod\",${trx.jumlah},${trx.harga_satuan},${trx.total_harga},${trx.uangMuka},$sisaKasbonVal,\"$kurir\",${trx.total_komisi},${trx.metode_bayar},${trx.status}\n")
         }
 
         sb.append("\n=== LAPORAN PENGELUARAN SANTOYA RO ===\n")
@@ -131,6 +134,30 @@ object ExportHelper {
             val item = e.nama_item.replace(",", ";")
             sb.append("${e.id},\"$tgl\",${e.kategori},\"$item\",${e.nominal}\n")
         }
+
+        val totalGalon = transaksiList.sumOf { it.transaksi.jumlah }
+        val pendapatanLunas = transaksiList.sumOf {
+            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
+                it.transaksi.total_harga
+            } else {
+                it.transaksi.uangMuka.toDouble()
+            }
+        }
+        val piutangKasbon = transaksiList
+            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
+            .sumOf { it.transaksi.remainingKasbonAmount() }
+        val totalKomisi = transaksiList.sumOf { it.transaksi.total_komisi }
+        val totalPengeluaran = pengeluaranList.sumOf { it.nominal }
+        val labaBersih = pendapatanLunas - totalKomisi - totalPengeluaran
+
+        sb.append("\n=== RINGKASAN LABA RUGI SANTOYA RO ===\n")
+        sb.append("Komponen,Nilai\n")
+        sb.append("Total Galon Terjual,$totalGalon\n")
+        sb.append("Pendapatan Tunai Masuk (Lunas + DP),$pendapatanLunas\n")
+        sb.append("Piutang Kasbon Aktif,$piutangKasbon\n")
+        sb.append("Total Komisi Kurir,$totalKomisi\n")
+        sb.append("Total Pengeluaran Operasional,$totalPengeluaran\n")
+        sb.append("Laba Bersih (Net Profit),$labaBersih\n")
 
         return sb.toString()
     }
@@ -295,6 +322,11 @@ object ExportHelper {
                                 val totalKomisi = tObj.optDouble("total_komisi", 0.0)
                                 val metode = tObj.optString("metode_bayar", "Cash")
                                 val status = tObj.optString("status", "Lunas")
+                                val uangMuka = tObj.optLong("uangMuka", 0L)
+                                val defaultSisa = if (status.equals("Kasbon", ignoreCase = true)) {
+                                    (totalHarga.toLong() - uangMuka).coerceAtLeast(0L)
+                                } else 0L
+                                val sisaKasbon = tObj.optLong("sisaKasbon", defaultSisa)
 
                                 db.transaksiDao().insert(
                                     Transaksi(
@@ -307,7 +339,9 @@ object ExportHelper {
                                         total_harga = totalHarga,
                                         total_komisi = totalKomisi,
                                         metode_bayar = metode,
-                                        status = status
+                                        status = status,
+                                        uangMuka = uangMuka,
+                                        sisaKasbon = sisaKasbon
                                     )
                                 )
                                 txCount++
@@ -367,6 +401,11 @@ object ExportHelper {
                             val totalKomisi = tObj.optDouble("total_komisi", 0.0)
                             val metode = tObj.optString("metode_bayar", "Cash")
                             val status = tObj.optString("status", "Lunas")
+                            val uangMuka = tObj.optLong("uangMuka", 0L)
+                            val defaultSisa = if (status.equals("Kasbon", ignoreCase = true)) {
+                                (totalHarga.toLong() - uangMuka).coerceAtLeast(0L)
+                            } else 0L
+                            val sisaKasbon = tObj.optLong("sisaKasbon", defaultSisa)
 
                             db.transaksiDao().insert(
                                 Transaksi(
@@ -379,7 +418,9 @@ object ExportHelper {
                                     total_harga = totalHarga,
                                     total_komisi = totalKomisi,
                                     metode_bayar = metode,
-                                    status = status
+                                    status = status,
+                                    uangMuka = uangMuka,
+                                    sisaKasbon = sisaKasbon
                                 )
                             )
                             txCount++

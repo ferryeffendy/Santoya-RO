@@ -19,15 +19,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -41,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -57,9 +61,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.entity.Pengeluaran
@@ -77,18 +85,39 @@ fun PengeluaranScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val vmList by viewModel.allPengeluaran.collectAsState()
     val displayList = if (pengeluaranList.isNotEmpty()) pengeluaranList else vmList
 
+    var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryFilter by remember { mutableStateOf("Semua") }
     var showAddDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<Pengeluaran?>(null) }
 
     val categories = listOf("Semua", "Operasional", "Bahan Baku", "Lainnya")
 
-    val filteredList = remember(selectedCategoryFilter, displayList) {
-        if (selectedCategoryFilter == "Semua") displayList else {
-            displayList.filter { it.kategori.equals(selectedCategoryFilter, ignoreCase = true) }
+    val filteredList = remember(selectedCategoryFilter, searchQuery, displayList) {
+        displayList.filter { item ->
+            val matchCat = selectedCategoryFilter == "Semua" ||
+                item.kategori.equals(selectedCategoryFilter, ignoreCase = true)
+            val q = searchQuery.lowercase().trim()
+            val qDigits = q.filter { it.isDigit() }
+            val matchSearch = if (q.isBlank()) {
+                true
+            } else {
+                val nominalFormatted = FormatUtils.formatRupiah(item.nominal).lowercase()
+                val nominalDigits = item.nominal.toLong().toString()
+                val dateFull = FormatUtils.formatDateTime(item.tanggal).lowercase()
+                val dateShort = FormatUtils.formatDateShort(item.tanggal).lowercase()
+                item.nama_item.lowercase().contains(q) ||
+                    item.kategori.lowercase().contains(q) ||
+                    nominalFormatted.contains(q) ||
+                    (qDigits.isNotEmpty() && nominalDigits.contains(qDigits)) ||
+                    dateFull.contains(q) ||
+                    dateShort.contains(q)
+            }
+            matchCat && matchSearch
         }
     }
 
@@ -114,72 +143,73 @@ fun PengeluaranScreen(
             }
         }
     ) { innerPadding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 84.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(innerPadding)
         ) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text(
-                                text = "Total Kas Keluar ($selectedCategoryFilter)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = FormatUtils.formatRupiah(totalPengeluaran),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "${filteredList.size} Catatan Pengeluaran",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            text = "Cari pengeluaran, kategori, tanggal, atau nominal...",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(
+                                onClick = {
+                                    searchQuery = ""
+                                    focusManager.clearFocus()
+                                },
+                                modifier = Modifier.size(36.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.MoneyOff,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onError,
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Bersihkan pencarian",
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
-                    }
-                }
-            }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Search
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onSearch = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                        }
+                    ),
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("input_search_pengeluaran")
+                )
 
-            item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -197,58 +227,151 @@ fun PengeluaranScreen(
                 }
             }
 
-            if (filteredList.isEmpty()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 84.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 item {
                     Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (searchQuery.isBlank()) {
+                                        "Total Kas Keluar ($selectedCategoryFilter)"
+                                    } else {
+                                        "Total Hasil Pencarian ($selectedCategoryFilter)"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = FormatUtils.formatRupiah(totalPengeluaran),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${filteredList.size} Catatan Pengeluaran",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             Surface(
                                 shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(52.dp)
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(40.dp)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
-                                        imageVector = Icons.Default.Receipt,
+                                        imageVector = Icons.Default.MoneyOff,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(26.dp)
+                                        tint = MaterialTheme.colorScheme.onError,
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Belum Ada Pengeluaran",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Tekan tombol + di pojok kanan bawah untuk mencatat biaya operasional.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
                         }
                     }
                 }
-            } else {
-                items(filteredList, key = { it.id }) { item ->
+
+                if (filteredList.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(28.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(52.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Receipt,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.outline,
+                                            modifier = Modifier.size(26.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = if (searchQuery.isBlank() && selectedCategoryFilter == "Semua") {
+                                        "Belum Ada Pengeluaran"
+                                    } else {
+                                        "Pengeluaran Tidak Ditemukan"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (searchQuery.isBlank() && selectedCategoryFilter == "Semua") {
+                                        "Tekan tombol + di pojok kanan bawah untuk mencatat biaya operasional."
+                                    } else {
+                                        "Tidak ada catatan pengeluaran yang cocok dengan filter atau kata kunci Anda."
+                                    },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
+                                )
+                                if (searchQuery.isNotBlank() || selectedCategoryFilter != "Semua") {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            searchQuery = ""
+                                            selectedCategoryFilter = "Semua"
+                                            focusManager.clearFocus()
+                                        },
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Clear,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Reset Pencarian & Filter")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(filteredList, key = { it.id }) { item ->
                     val kategoriColor = when (item.kategori.lowercase()) {
                         "bahan baku" -> Color(0xFF1976D2)
                         "operasional" -> Color(0xFFE65100)
@@ -346,6 +469,7 @@ fun PengeluaranScreen(
                 }
             }
         }
+    }
     }
 
     if (showAddDialog) {

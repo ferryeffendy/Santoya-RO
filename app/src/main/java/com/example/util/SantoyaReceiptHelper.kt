@@ -28,138 +28,155 @@ object SantoyaReceiptHelper {
     private const val LINE_WIDTH = 32
     private val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
-    // --- Line Formatting Helpers (32 columns) ---
-    private fun center(text: String): String {
-        if (text.length >= LINE_WIDTH) return text.substring(0, LINE_WIDTH)
-        val pad = (LINE_WIDTH - text.length) / 2
-        return " ".repeat(pad) + text
+    // --- Pure ASCII Line Formatting Helpers (32 columns) ---
+    fun centerText(text: String, width: Int = LINE_WIDTH): String {
+        val clean = text.trim()
+        if (clean.length >= width) return clean.substring(0, width)
+        val totalPad = width - clean.length
+        val leftPad = totalPad / 2
+        val rightPad = totalPad - leftPad
+        return " ".repeat(leftPad) + clean + " ".repeat(rightPad)
     }
 
-    private fun twoColumns(left: String, right: String): String {
-        val totalLen = left.length + right.length
-        return if (totalLen >= LINE_WIDTH) {
-            val maxLeft = LINE_WIDTH - right.length - 1
-            val truncatedLeft = if (maxLeft > 0) left.take(maxLeft) else ""
-            val spaces = (LINE_WIDTH - truncatedLeft.length - right.length).coerceAtLeast(1)
-            truncatedLeft + " ".repeat(spaces) + right
-        } else {
-            val spaces = LINE_WIDTH - totalLen
-            left + " ".repeat(spaces) + right
+    fun leftRightText(left: String, right: String, width: Int = LINE_WIDTH): String {
+        val cleanRight = right.trim()
+        val cleanLeft = left.trimEnd()
+        if (cleanRight.length >= width) {
+            return cleanRight.takeLast(width)
         }
+        val maxLeftLen = (width - cleanRight.length - 1).coerceAtLeast(0)
+        val safeLeft = if (cleanLeft.length > maxLeftLen) cleanLeft.take(maxLeftLen) else cleanLeft
+        val spaces = (width - safeLeft.length - cleanRight.length).coerceAtLeast(1)
+        return safeLeft + " ".repeat(spaces) + cleanRight
     }
 
-    private fun divider(char: Char = '-'): String = char.toString().repeat(LINE_WIDTH)
+    private fun divider(char: Char = '-', width: Int = LINE_WIDTH): String =
+        char.toString().repeat(width)
 
     // --- Struk Transaksi Penjualan ---
     fun generateSaleReceipt(detail: TransaksiDetail, customerKasbon: Double): String {
         val sb = StringBuilder()
-        sb.append(center("SANTOYA RO")).append("\n")
-        sb.append(center("DEPOT AIR MINUM RO")).append("\n")
-        sb.append(center("Segar - Murni - Higienis")).append("\n")
-        sb.append(divider('=')).append("\n")
+        // Header
+        sb.append(centerText("SANTOYA RO")).append("\n")
+        sb.append(centerText("DEPOT AIR MINUM RO")).append("\n")
+        sb.append(centerText("Segar - Murni - Higienis")).append("\n")
+        sb.append(divider('-')).append("\n")
 
-        sb.append(twoColumns("No. Nota:", "#${detail.transaksi.id}")).append("\n")
-        sb.append(twoColumns("Tgl:", FormatUtils.formatDate(detail.transaksi.tanggal))).append("\n")
-        sb.append(twoColumns("Pelanggan:", detail.pelanggan?.nama ?: "Umum")).append("\n")
+        // Details
+        val date = FormatUtils.formatDateShort(detail.transaksi.tanggal)
+        sb.append(leftRightText("Tgl:", date)).append("\n")
+        sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Umum")).append("\n")
         if (!detail.pelanggan?.alamat.isNullOrBlank()) {
-            sb.append(twoColumns("Alamat:", detail.pelanggan!!.alamat)).append("\n")
+            sb.append(leftRightText("Alamat:", detail.pelanggan!!.alamat)).append("\n")
         }
         if (detail.kurir != null) {
-            sb.append(twoColumns("Kurir:", detail.kurir.nama)).append("\n")
+            sb.append(leftRightText("Kurir:", detail.kurir.nama)).append("\n")
         }
         sb.append(divider('-')).append("\n")
 
-        val produkNama = detail.produk?.nama_produk ?: "Galon Air RO"
+        // Item
+        val produkNama = (detail.produk?.nama_produk ?: "Galon RO").take(LINE_WIDTH)
         sb.append(produkNama).append("\n")
         val qtyPrice = "${detail.transaksi.jumlah} x ${FormatUtils.formatRupiah(detail.transaksi.harga_satuan)}"
         val subtotal = FormatUtils.formatRupiah(detail.transaksi.total_harga)
-        sb.append(twoColumns(" $qtyPrice", subtotal)).append("\n")
-
+        sb.append(leftRightText(qtyPrice, subtotal)).append("\n")
         sb.append(divider('-')).append("\n")
-        sb.append(twoColumns("TOTAL BELANJA:", FormatUtils.formatRupiah(detail.transaksi.total_harga))).append("\n")
-        sb.append(twoColumns("Metode Bayar:", detail.transaksi.metode_bayar)).append("\n")
-        sb.append(twoColumns("Status Nota:", detail.transaksi.status.uppercase())).append("\n")
 
-        if (customerKasbon > 0) {
-            sb.append(divider('.')).append("\n")
-            sb.append(twoColumns("Sisa Kasbon:", FormatUtils.formatRupiah(customerKasbon))).append("\n")
+        // Total Belanja
+        sb.append(centerText("TOTAL: ${FormatUtils.formatRupiah(detail.transaksi.total_harga).uppercase()}")).append("\n")
+        sb.append(divider('-')).append("\n")
+
+        // Payment Info
+        val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
+        val dpPaid = detail.transaksi.uangMuka
+        val metodeText = when {
+            isKasbon && dpPaid > 0L -> "Bayar Sebagian"
+            isKasbon -> "- (Kasbon)"
+            else -> detail.transaksi.metode_bayar.ifBlank { "Cash" }
+        }
+        sb.append(leftRightText("Metode:", metodeText)).append("\n")
+        sb.append(leftRightText("Status:", detail.transaksi.status.uppercase())).append("\n")
+        if (isKasbon && dpPaid > 0L) {
+            sb.append(leftRightText("Uang Muka:", FormatUtils.formatRupiah(dpPaid.toDouble()))).append("\n")
+            sb.append(leftRightText("Sisa Nota:", FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount()))).append("\n")
         }
 
-        sb.append(divider('=')).append("\n")
-        sb.append(center("Terima Kasih Atas")).append("\n")
-        sb.append(center("Kunjungan Anda!")).append("\n")
-        sb.append(center("Santoya RO Siap Antar")).append("\n")
-        sb.append("\n\n")
+        if (customerKasbon > 0) {
+            sb.append(leftRightText("Sisa Kasbon:", FormatUtils.formatRupiah(customerKasbon))).append("\n")
+        }
+
+        sb.append(divider('-')).append("\n")
+        sb.append(centerText("Terima Kasih")).append("\n")
+        sb.append(centerText("Santoya RO Siap Antar")).append("\n")
+        sb.append("\n\n\n")
         return sb.toString()
     }
 
     // --- Nota Pelunasan Kasbon ---
-    fun generatePelunasanReceipt(
-        pelanggan: Pelanggan,
-        nominalBayar: Double,
-        sisaKasbon: Double
-    ): String {
+    fun generatePelunasanReceipt(pelanggan: Pelanggan, nominalBayar: Double, sisaKasbon: Double): String {
         val sb = StringBuilder()
-        sb.append(center("SANTOYA RO")).append("\n")
-        sb.append(center("BUKTI PELUNASAN KASBON")).append("\n")
-        sb.append(divider('=')).append("\n")
+        sb.append(centerText("SANTOYA RO")).append("\n")
+        sb.append(centerText("BUKTI PELUNASAN KASBON")).append("\n")
+        sb.append(centerText("Segar - Murni - Higienis")).append("\n")
+        sb.append(divider('-')).append("\n")
 
-        sb.append(twoColumns("Tgl:", FormatUtils.formatDate(System.currentTimeMillis()))).append("\n")
-        sb.append(twoColumns("Pelanggan:", pelanggan.nama)).append("\n")
+        sb.append(leftRightText("Tgl:", FormatUtils.formatDateShort(System.currentTimeMillis()))).append("\n")
+        sb.append(leftRightText("Pelanggan:", pelanggan.nama)).append("\n")
         if (pelanggan.alamat.isNotBlank()) {
-            sb.append(twoColumns("Alamat:", pelanggan.alamat)).append("\n")
+            sb.append(leftRightText("Alamat:", pelanggan.alamat)).append("\n")
         }
         sb.append(divider('-')).append("\n")
 
-        sb.append(twoColumns("Nominal Bayar:", FormatUtils.formatRupiah(nominalBayar))).append("\n")
-        sb.append(twoColumns("Status:", if (sisaKasbon <= 0) "LUNAS LENGKAP" else "CICILAN")).append("\n")
-        sb.append(twoColumns("Sisa Kasbon:", FormatUtils.formatRupiah(sisaKasbon))).append("\n")
+        sb.append(leftRightText("Nominal Bayar:", FormatUtils.formatRupiah(nominalBayar))).append("\n")
+        sb.append(leftRightText("Status:", if (sisaKasbon <= 0) "LUNAS" else "CICILAN")).append("\n")
+        sb.append(leftRightText("Sisa Kasbon:", FormatUtils.formatRupiah(sisaKasbon))).append("\n")
+        sb.append(divider('-')).append("\n")
 
-        sb.append(divider('=')).append("\n")
-        sb.append(center("Terima Kasih!")).append("\n")
-        sb.append(center("Pembayaran Telah Diterima")).append("\n")
-        sb.append("\n\n")
+        sb.append(centerText("TOTAL: ${FormatUtils.formatRupiah(nominalBayar).uppercase()}")).append("\n")
+        sb.append(divider('-')).append("\n")
+
+        sb.append(centerText("Terima Kasih")).append("\n")
+        sb.append(centerText("Santoya RO Siap Antar")).append("\n")
+        sb.append("\n\n\n")
         return sb.toString()
     }
 
     // --- Nota Tagihan Kasbon ---
-    fun generateTagihanKasbon(
-        pelanggan: Pelanggan,
-        unpaidList: List<Transaksi>
-    ): String {
+    fun generateTagihanKasbon(pelanggan: Pelanggan, unpaidList: List<Transaksi>): String {
         val sb = StringBuilder()
-        sb.append(center("SANTOYA RO")).append("\n")
-        sb.append(center("RINCIAN TAGIHAN KASBON")).append("\n")
-        sb.append(divider('=')).append("\n")
-
-        sb.append(twoColumns("Pelanggan:", pelanggan.nama)).append("\n")
-        sb.append(twoColumns("No. HP:", pelanggan.no_hp.ifBlank { "-" })).append("\n")
-        sb.append(twoColumns("Tgl Cetak:", FormatUtils.formatDateShort(System.currentTimeMillis()))).append("\n")
+        sb.append(centerText("SANTOYA RO")).append("\n")
+        sb.append(centerText("RINCIAN TAGIHAN KASBON")).append("\n")
+        sb.append(centerText("Segar - Murni - Higienis")).append("\n")
         sb.append(divider('-')).append("\n")
 
-        sb.append("Daftar Belum Lunas:\n")
+        sb.append(leftRightText("Pelanggan:", pelanggan.nama)).append("\n")
+        if (pelanggan.alamat.isNotBlank()) {
+            sb.append(leftRightText("Alamat:", pelanggan.alamat)).append("\n")
+        }
+        sb.append(leftRightText("Tgl Cetak:", FormatUtils.formatDateShort(System.currentTimeMillis()))).append("\n")
+        sb.append(divider('-')).append("\n")
+
         unpaidList.forEachIndexed { i, trx ->
-            val tgl = FormatUtils.formatDateShort(trx.tanggal)
-            val nominal = FormatUtils.formatRupiah(trx.total_harga)
-            sb.append(twoColumns("${i + 1}. $tgl (${trx.jumlah} galon)", nominal)).append("\n")
+            val leftLabel = "${i + 1}. ${FormatUtils.formatDateShort(trx.tanggal)} (${trx.jumlah} gln)"
+            sb.append(leftRightText(leftLabel, FormatUtils.formatRupiah(trx.remainingKasbonAmount()))).append("\n")
         }
 
         sb.append(divider('-')).append("\n")
-        sb.append(twoColumns("TOTAL TAGIHAN:", FormatUtils.formatRupiah(pelanggan.sisa_kasbon))).append("\n")
-        sb.append(divider('=')).append("\n")
-        sb.append(center("Mohon konfirmasi jika")).append("\n")
-        sb.append(center("sudah melakukan transfer.")).append("\n")
-        sb.append(center("Depot Santoya RO")).append("\n")
-        sb.append("\n\n")
+        sb.append(centerText("TOTAL: ${FormatUtils.formatRupiah(pelanggan.sisa_kasbon).uppercase()}")).append("\n")
+        sb.append(divider('-')).append("\n")
+        sb.append(centerText("Terima Kasih")).append("\n")
+        sb.append(centerText("Santoya RO Siap Antar")).append("\n")
+        sb.append("\n\n\n")
         return sb.toString()
     }
 
     // --- Convert Receipt Text to Crisp Bitmap Image ---
     fun renderReceiptBitmap(receiptText: String): Bitmap {
-        val lines = receiptText.lines()
-        val fontSize = 28f
+        val rawLines = receiptText.trimEnd('\n').lines()
+        val fontSize = 26f
         val lineHeight = 38f
-        val padding = 32f
+        val horizontalPadding = 32f
+        val verticalPadding = 36f
 
         val paint = Paint().apply {
             color = Color.BLACK
@@ -168,28 +185,40 @@ object SantoyaReceiptHelper {
             isAntiAlias = true
         }
 
-        val headerPaint = Paint().apply {
-            color = Color.parseColor("#0284C7")
-            textSize = fontSize + 4f
+        val boldPaint = Paint().apply {
+            color = Color.BLACK
+            textSize = fontSize
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             isAntiAlias = true
         }
 
-        val width = 576 // 58mm printer approx width in px
-        val height = ((lines.size * lineHeight) + (padding * 2)).toInt().coerceAtLeast(300)
+        val headerPaint = Paint().apply {
+            color = Color.parseColor("#0284C7")
+            textSize = fontSize
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            isAntiAlias = true
+        }
+
+        val sampleWidth = paint.measureText("M".repeat(LINE_WIDTH))
+        val width = (sampleWidth + (horizontalPadding * 2)).toInt().coerceAtLeast(576)
+        val startX = (width - sampleWidth) / 2f
+        val height = ((rawLines.size * lineHeight) + (verticalPadding * 2) + 20f).toInt().coerceAtLeast(320)
 
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
 
-        // Draw top decorative bar
         val barPaint = Paint().apply { color = Color.parseColor("#0284C7") }
         canvas.drawRect(0f, 0f, width.toFloat(), 12f, barPaint)
 
-        var y = padding + lineHeight
-        lines.forEachIndexed { index, line ->
-            val p = if (index < 2 && line.contains("SANTOYA")) headerPaint else paint
-            canvas.drawText(line, padding, y, p)
+        var y = verticalPadding + lineHeight
+        rawLines.forEachIndexed { index, line ->
+            val activePaint = when {
+                index == 0 && line.contains("SANTOYA") -> headerPaint
+                line.trim().startsWith("TOTAL:") -> boldPaint
+                else -> paint
+            }
+            canvas.drawText(line, startX, y, activePaint)
             y += lineHeight
         }
 
@@ -247,12 +276,11 @@ object SantoyaReceiptHelper {
             context.startActivity(chooser)
         } catch (e: Exception) {
             e.printStackTrace()
-            // Fallback to text share if image generation or sharing fails
             shareReceiptText(context, receiptText, phoneNumber)
         }
     }
 
-    // --- ESC/POS Thermal Bluetooth Printing Helper ---
+    // --- Pure Text Thermal Bluetooth Printing Helper ---
     @SuppressLint("MissingPermission")
     fun printViaBluetooth(
         context: Context,
@@ -289,15 +317,8 @@ object SantoyaReceiptHelper {
                 socket.connect()
                 val out: OutputStream = socket.outputStream
 
-                // Initialize ESC/POS
-                out.write(byteArrayOf(0x1B, 0x40)) // ESC @ (Init)
-                out.write(byteArrayOf(0x1B, 0x61, 0x00)) // Left align
-
-                // Write text bytes
-                out.write(receiptText.toByteArray(charset("GBK")))
-
-                // Feed 3 lines & cut if supported
-                out.write(byteArrayOf(0x1B, 0x64, 0x03)) // ESC d 3
+                // Send pure ASCII text bytes directly (already formatted with 32-char padding & 3 trailing newlines)
+                out.write(receiptText.toByteArray(Charsets.US_ASCII))
                 out.flush()
                 socket.close()
 

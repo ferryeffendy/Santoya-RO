@@ -205,7 +205,9 @@ class MainActivity : ComponentActivity() {
                                 SantoyaScreen.DASHBOARD -> DashboardScreen(
                                     viewModel = viewModel,
                                     transaksiList = transaksiList,
-                                    pelangganList = pelangganList
+                                    pelangganList = pelangganList,
+                                    pengeluaranList = pengeluaranList,
+                                    pelangganUiModels = pelangganUiModels
                                 )
                                 SantoyaScreen.TRANSAKSI -> TransaksiScreen(
                                     viewModel = viewModel,

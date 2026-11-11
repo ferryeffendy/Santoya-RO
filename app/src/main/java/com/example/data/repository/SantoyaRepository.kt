@@ -48,6 +48,7 @@ class SantoyaRepository(private val db: AppDatabase) {
     val allTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllWithDetail()
     val allKasbonTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllKasbonWithDetail()
     fun getTransaksiByDateRange(start: Long, end: Long) = db.transaksiDao().getByDateRangeWithDetail(start, end)
+    fun getTotalPendapatanByDateRange(start: Long, end: Long) = db.transaksiDao().getTotalPendapatanByDateRange(start, end)
     fun getTransaksiByPelanggan(pelangganId: Int) = db.transaksiDao().getByPelangganWithDetail(pelangganId)
     suspend fun getTransaksiDetailById(id: Int) = db.transaksiDao().getDetailById(id)
 
@@ -59,11 +60,25 @@ class SantoyaRepository(private val db: AppDatabase) {
         jumlah: Int,
         hargaSatuan: Double,
         metodeBayar: String,
-        status: String
+        status: String,
+        uangMuka: Long = 0L,
+        sisaKasbon: Long = 0L
     ): Long {
         val totalHarga = jumlah * hargaSatuan
         val kurir = idKurir?.let { db.kurirDao().getById(it) }
         val totalKomisi = if (kurir != null) jumlah * kurir.komisi_per_galon else 0.0
+        val isKasbon = status.equals("Kasbon", ignoreCase = true)
+
+        val finalUangMuka = if (isKasbon) uangMuka.coerceAtLeast(0L) else 0L
+        val finalSisaKasbon = if (isKasbon) {
+            if (sisaKasbon > 0L || finalUangMuka > 0L) {
+                sisaKasbon.coerceAtLeast(0L)
+            } else {
+                totalHarga.toLong().coerceAtLeast(0L)
+            }
+        } else {
+            0L
+        }
 
         val transaksi = Transaksi(
             tanggal = tanggal,
@@ -75,13 +90,15 @@ class SantoyaRepository(private val db: AppDatabase) {
             total_harga = totalHarga,
             total_komisi = totalKomisi,
             metode_bayar = metodeBayar,
-            status = status
+            status = status,
+            uangMuka = finalUangMuka,
+            sisaKasbon = finalSisaKasbon
         )
         val newId = db.transaksiDao().insert(transaksi)
 
-        // If Kasbon, update Pelanggan sisa_kasbon
-        if (status.equals("Kasbon", ignoreCase = true)) {
-            db.pelangganDao().updateKasbon(idPelanggan, totalHarga)
+        // If Kasbon, update Pelanggan sisa_kasbon using finalSisaKasbon (not full totalHarga when DP is paid)
+        if (isKasbon && finalSisaKasbon > 0L) {
+            db.pelangganDao().updateKasbon(idPelanggan, finalSisaKasbon.toDouble())
         }
         return newId
     }
@@ -89,17 +106,18 @@ class SantoyaRepository(private val db: AppDatabase) {
     suspend fun markTransaksiLunas(transaksiId: Int) {
         val detail = db.transaksiDao().getDetailById(transaksiId) ?: return
         if (detail.transaksi.status.equals("Kasbon", ignoreCase = true)) {
+            val remainingDebt = detail.transaksi.remainingKasbonAmount()
             db.transaksiDao().markAsLunas(transaksiId)
-            // Kurangi sisa kasbon pelanggan
-            val delta = -detail.transaksi.total_harga
+            // Kurangi sisa kasbon pelanggan sebesar sisaKasbon aktif pada nota tersebut
+            val delta = -remainingDebt
             db.pelangganDao().updateKasbon(detail.transaksi.id_pelanggan, delta)
         }
     }
 
     suspend fun deleteTransaksi(transaksi: Transaksi) {
-        // If Kasbon, subtract from customer kasbon
+        // If Kasbon, subtract remaining kasbon from customer kasbon
         if (transaksi.status.equals("Kasbon", ignoreCase = true)) {
-            db.pelangganDao().updateKasbon(transaksi.id_pelanggan, -transaksi.total_harga)
+            db.pelangganDao().updateKasbon(transaksi.id_pelanggan, -transaksi.remainingKasbonAmount())
         }
         db.transaksiDao().delete(transaksi)
     }
@@ -113,13 +131,14 @@ class SantoyaRepository(private val db: AppDatabase) {
         jumlah: Int,
         hargaSatuan: Double,
         metodeBayar: String,
-        status: String
+        status: String,
+        uangMuka: Long = 0L
     ) {
         val oldDetail = db.transaksiDao().getDetailById(id)
         if (oldDetail != null) {
             val old = oldDetail.transaksi
             if (old.status.equals("Kasbon", ignoreCase = true)) {
-                db.pelangganDao().updateKasbon(old.id_pelanggan, -old.total_harga)
+                db.pelangganDao().updateKasbon(old.id_pelanggan, -old.remainingKasbonAmount())
             }
         }
 
@@ -127,8 +146,21 @@ class SantoyaRepository(private val db: AppDatabase) {
         val kurir = idKurir?.let { db.kurirDao().getById(it) }
         val totalKomisi = if (kurir != null) jumlah * kurir.komisi_per_galon else 0.0
 
-        val existing = db.transaksiDao().getDetailById(id)?.transaksi
+        val existing = oldDetail?.transaksi
         val productId = idProduk ?: existing?.id_produk ?: 1
+        val isKasbon = status.equals("Kasbon", ignoreCase = true)
+        val isBayarSebagian = metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
+
+        val finalUangMuka = if (isKasbon && isBayarSebagian) {
+            uangMuka.coerceIn(0L, totalHarga.toLong())
+        } else {
+            0L
+        }
+        val finalSisaKasbon = if (isKasbon) {
+            (totalHarga.toLong() - finalUangMuka).coerceAtLeast(0L)
+        } else {
+            0L
+        }
 
         val updated = Transaksi(
             id = id,
@@ -141,30 +173,58 @@ class SantoyaRepository(private val db: AppDatabase) {
             total_harga = totalHarga,
             total_komisi = totalKomisi,
             metode_bayar = metodeBayar,
-            status = status
+            status = status,
+            uangMuka = finalUangMuka,
+            sisaKasbon = finalSisaKasbon
         )
         db.transaksiDao().update(updated)
 
-        if (status.equals("Kasbon", ignoreCase = true)) {
-            db.pelangganDao().updateKasbon(idPelanggan, totalHarga)
+        if (isKasbon && finalSisaKasbon > 0L) {
+            db.pelangganDao().updateKasbon(idPelanggan, finalSisaKasbon.toDouble())
         }
     }
 
-    suspend fun bayarKasbonPelanggan(pelangganId: Int, nominalBayar: Double) {
+    suspend fun bayarKasbonPelanggan(pelangganId: Int, nominalBayar: Double, metodeBayar: String = "Cash") {
         val pelanggan = db.pelangganDao().getById(pelangganId) ?: return
-        val newBalance = (pelanggan.sisa_kasbon - nominalBayar).coerceAtLeast(0.0)
+        val unpaidList = db.transaksiDao().getUnpaidByPelanggan(pelangganId)
+        val currentTotalKasbon = if (unpaidList.isNotEmpty()) {
+            unpaidList.sumOf { it.remainingKasbonAmount() }
+        } else {
+            pelanggan.sisa_kasbon
+        }
+        val newBalance = (currentTotalKasbon - nominalBayar).coerceAtLeast(0.0)
         db.pelangganDao().setKasbon(pelangganId, newBalance)
 
-        // Update unpaid transactions if fully paid or partially paid
-        val unpaidList = db.transaksiDao().getUnpaidByPelanggan(pelangganId)
-        var remainingPayment = nominalBayar
+        // Kurangi sisaKasbon dari nota terlama ke terbaru tanpa merusak total_harga asli nota
+        var remainingPayment = nominalBayar.toLong()
         for (item in unpaidList) {
-            if (remainingPayment >= item.total_harga) {
-                db.transaksiDao().markAsLunas(item.id)
-                remainingPayment -= item.total_harga
+            if (remainingPayment <= 0L) break
+            val itemSisa = item.remainingKasbonAmount().toLong()
+            if (remainingPayment >= itemSisa) {
+                val paidTrx = item.copy(
+                    status = "Lunas",
+                    uangMuka = item.total_harga.toLong(),
+                    sisaKasbon = 0L,
+                    metode_bayar = if (item.metode_bayar.isBlank() || item.metode_bayar == "-") metodeBayar else item.metode_bayar
+                )
+                db.transaksiDao().update(paidTrx)
+                remainingPayment -= itemSisa
             } else {
+                val newSisaKasbon = (itemSisa - remainingPayment).coerceAtLeast(0L)
+                val newUangMuka = (item.total_harga.toLong() - newSisaKasbon).coerceAtLeast(0L)
+                val updatedTrx = item.copy(
+                    uangMuka = newUangMuka,
+                    sisaKasbon = newSisaKasbon,
+                    metode_bayar = if (item.metode_bayar.isBlank() || item.metode_bayar == "-") "Bayar Sebagian" else item.metode_bayar
+                )
+                db.transaksiDao().update(updatedTrx)
+                remainingPayment = 0L
                 break
             }
         }
     }
+
+
 }
+
+

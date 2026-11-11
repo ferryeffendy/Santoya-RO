@@ -44,6 +44,13 @@ data class Transaksi(
     val harga_satuan: Double,
     val total_harga: Double,
     val total_komisi: Double,
-    val metode_bayar: String, // Cash, COD, Transfer
-    val status: String // Lunas, Kasbon
-)
+    val metode_bayar: String, // Cash, Transfer, Bayar Sebagian
+    val status: String, // Lunas, Kasbon
+    val uangMuka: Long = 0L,
+    val sisaKasbon: Long = 0L
+) {
+    fun remainingKasbonAmount(): Double {
+        if (!status.equals("Kasbon", ignoreCase = true)) return 0.0
+        return if (sisaKasbon > 0L) sisaKasbon.toDouble() else total_harga
+    }
+}

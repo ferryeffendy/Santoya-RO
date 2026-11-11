@@ -13,8 +13,8 @@ android {
     applicationId = "com.aistudio.companion.kzpmrw"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = 3
+    versionName = "1.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -110,6 +110,4 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   coreLibraryDesugaring(libs.desugar.jdk.libs)
-  implementation(libs.vico.compose)
-  implementation(libs.vico.core)
 }
