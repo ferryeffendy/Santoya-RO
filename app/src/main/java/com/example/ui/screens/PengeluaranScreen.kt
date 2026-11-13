@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.entity.Pengeluaran
+import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -95,7 +97,7 @@ fun PengeluaranScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var itemToDelete by remember { mutableStateOf<Pengeluaran?>(null) }
 
-    val categories = listOf("Semua", "Operasional", "Bahan Baku", "Lainnya")
+    val categories = listOf("Semua", "Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Operasional", "Lainnya")
 
     val filteredList = remember(selectedCategoryFilter, searchQuery, displayList) {
         displayList.filter { item ->
@@ -131,7 +133,7 @@ fun PengeluaranScreen(
             FloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .padding(16.dp)
                     .testTag("tambah_pengeluaran_fab")
@@ -238,7 +240,8 @@ fun PengeluaranScreen(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f)),
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -250,9 +253,9 @@ fun PengeluaranScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = if (searchQuery.isBlank()) {
-                                        "Total Kas Keluar ($selectedCategoryFilter)"
+                                        "Total Pengeluaran ($selectedCategoryFilter)"
                                     } else {
-                                        "Total Hasil Pencarian ($selectedCategoryFilter)"
+                                        "Hasil Pencarian ($selectedCategoryFilter)"
                                     },
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
@@ -269,7 +272,7 @@ fun PengeluaranScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${filteredList.size} Catatan Pengeluaran",
+                                    text = "${filteredList.size} Catatan",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f),
                                     maxLines = 1,
@@ -293,6 +296,61 @@ fun PengeluaranScreen(
                         }
                     }
                 }
+
+                if (filteredList.isNotEmpty()) {
+                    item {
+                            val categoryBreakdown = remember(filteredList) {
+                                filteredList.groupBy { it.kategori }
+                                    .mapValues { entry -> entry.value.sumOf { it.nominal } }
+                                    .toList()
+                                    .sortedByDescending { it.second }
+                            }
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "Rincian per Kategori",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    categoryBreakdown.forEach { (cat, nominal) ->
+                                        val pct = if (totalPengeluaran > 0) ((nominal / totalPengeluaran) * 100).toInt() else 0
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 2.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "$cat ($pct%)",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Text(
+                                                text = FormatUtils.formatRupiah(nominal),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.error,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                 if (filteredList.isEmpty()) {
                     item {
@@ -340,9 +398,9 @@ fun PengeluaranScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = if (searchQuery.isBlank() && selectedCategoryFilter == "Semua") {
-                                        "Tekan tombol + di pojok kanan bawah untuk mencatat biaya operasional."
+                                        "Ketuk tombol + untuk mencatat pengeluaran."
                                     } else {
-                                        "Tidak ada catatan pengeluaran yang cocok dengan filter atau kata kunci Anda."
+                                        "Tidak ada catatan yang cocok dengan filter."
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -364,7 +422,7 @@ fun PengeluaranScreen(
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Reset Pencarian & Filter")
+                                        Text("Reset Filter")
                                     }
                                 }
                             }
@@ -372,17 +430,19 @@ fun PengeluaranScreen(
                     }
                 } else {
                     items(filteredList, key = { it.id }) { item ->
+                    val santoyaColors = MaterialTheme.santoyaColors
                     val kategoriColor = when (item.kategori.lowercase()) {
-                        "bahan baku" -> Color(0xFF1976D2)
-                        "operasional" -> Color(0xFFE65100)
-                        else -> Color(0xFF616161)
+                        "bahan baku" -> santoyaColors.info
+                        "operasional" -> santoyaColors.warning
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
                     }
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(16.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -478,13 +538,13 @@ fun PengeluaranScreen(
         var nominalStr by remember { mutableStateOf("") }
         var tanggalMillis by remember { mutableStateOf(System.currentTimeMillis()) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
-        val kategoriOptions = listOf("Operasional", "Bahan Baku", "Lainnya")
+        val kategoriOptions = listOf("Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Operasional", "Lainnya")
 
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
             title = {
                 Text(
-                    text = "Catat Pengeluaran Baru",
+                    text = "Catat Pengeluaran",
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -537,7 +597,9 @@ fun PengeluaranScreen(
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
                     ) {
                         kategoriOptions.forEach { kat ->
                             FilterChip(
@@ -558,7 +620,7 @@ fun PengeluaranScreen(
                             nominalStr = it.filter { char -> char.isDigit() }
                             errorMessage = null
                         },
-                        label = { Text("Nominal Pengeluaran (Rp) *") },
+                        label = { Text("Nominal (Rp) *") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -581,12 +643,12 @@ fun PengeluaranScreen(
                     onClick = {
                         val trimmed = namaItem.trim()
                         if (trimmed.isBlank()) {
-                            errorMessage = "Nama keperluan wajib diisi!"
+                            errorMessage = "Nama pengeluaran wajib diisi"
                             return@Button
                         }
                         val nominal = nominalStr.toDoubleOrNull()
                         if (nominal == null || nominal <= 0) {
-                            errorMessage = "Nominal pengeluaran tidak valid!"
+                            errorMessage = "Nominal tidak valid"
                             return@Button
                         }
                         viewModel.addPengeluaran(trimmed, selectedKategori, nominal, tanggalMillis)
@@ -610,7 +672,7 @@ fun PengeluaranScreen(
             onDismissRequest = { itemToDelete = null },
             title = {
                 Text(
-                    text = "Hapus Catatan Pengeluaran",
+                    text = "Hapus Pengeluaran?",
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -631,11 +693,12 @@ fun PengeluaranScreen(
                         itemToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Hapus", color = Color.White)
+                    Text("Hapus")
                 }
             },
             dismissButton = {

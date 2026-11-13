@@ -58,10 +58,10 @@ fun ImportJsonDialog(
             val content = ExportHelper.readTextFromUri(context, uri)
             if (content != null) {
                 jsonInput = content
-                selectedFileName = uri.lastPathSegment ?: "file.json"
-                Toast.makeText(context, "File JSON berhasil dimuat!", Toast.LENGTH_SHORT).show()
+                selectedFileName = uri.lastPathSegment ?: "cadangan_santoya.json"
+                Toast.makeText(context, "File cadangan siap dipulihkan", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Gagal membaca isi file JSON.", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Gagal membaca file cadangan", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -77,7 +77,7 @@ fun ImportJsonDialog(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Impor Data JSON", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("Pulihkan dari File Cadangan", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
         },
         text = {
@@ -85,7 +85,6 @@ fun ImportJsonDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Info Box
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
@@ -100,7 +99,7 @@ fun ImportJsonDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Pilih file .json dari memori HP atau tempel teks JSON data pelanggan dan riwayat transaksi.",
+                            text = "Pilih file cadangan yang pernah disimpan di HP Anda, atau tempel salinan data cadangan di bawah.",
                             fontSize = 11.sp,
                             lineHeight = 16.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -108,7 +107,6 @@ fun ImportJsonDialog(
                     }
                 }
 
-                // File Picker Button
                 FilledTonalButton(
                     onClick = { filePickerLauncher.launch("*/*") },
                     modifier = Modifier
@@ -118,13 +116,13 @@ fun ImportJsonDialog(
                     Icon(imageVector = Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (selectedFileName != null) "File: $selectedFileName" else "Pilih File JSON dari HP",
+                        text = if (selectedFileName != null) "File: $selectedFileName" else "Pilih File Cadangan",
                         fontSize = 13.sp
                     )
                 }
 
                 Text(
-                    text = "Atau Tempel / Masukkan Format JSON:",
+                    text = "Atau tempel isi data cadangan:",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -163,7 +161,7 @@ fun ImportJsonDialog(
                 enabled = jsonInput.isNotBlank(),
                 modifier = Modifier.testTag("btn_confirm_import_json")
             ) {
-                Text("Mulai Impor Data")
+                Text("Pulihkan Data")
             }
         },
         dismissButton = {

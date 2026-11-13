@@ -62,7 +62,71 @@ val OnSurfaceVariantDark = Color(0xFF94A3B8)
 val OutlineDark = Color(0xFF334155)
 val OutlineVariantDark = Color(0xFF1E293B)
 
-// Semantic Fintech Accents
+// Semantic Fintech Status Tokens — Light Mode
+val SuccessLight = Color(0xFF047857)
+val OnSuccessLight = Color(0xFFFFFFFF)
+val SuccessContainerLight = Color(0xFFD1FAE5)
+val OnSuccessContainerLight = Color(0xFF064E3B)
+
+val WarningLight = Color(0xFFB45309)
+val OnWarningLight = Color(0xFFFFFFFF)
+val WarningContainerLight = Color(0xFFFEF3C7)
+val OnWarningContainerLight = Color(0xFF78350F)
+
+val InfoLight = Color(0xFF0284C7)
+val OnInfoLight = Color(0xFFFFFFFF)
+val InfoContainerLight = Color(0xFFE0F2FE)
+val OnInfoContainerLight = Color(0xFF075985)
+
+// Semantic Fintech Status Tokens — Dark Mode
+val SuccessDark = Color(0xFF34D399)
+val OnSuccessDark = Color(0xFF022C22)
+val SuccessContainerDark = Color(0xFF064E3B)
+val OnSuccessContainerDark = Color(0xFFA7F3D0)
+
+val WarningDark = Color(0xFFFBBF24)
+val OnWarningDark = Color(0xFF451A03)
+val WarningContainerDark = Color(0xFF78350F)
+val OnWarningContainerDark = Color(0xFFFEF3C7)
+
+val InfoDark = Color(0xFF38BDF8)
+val OnInfoDark = Color(0xFF082F49)
+val InfoContainerDark = Color(0xFF0C4A6E)
+val OnInfoContainerDark = Color(0xFFBAE6FD)
+
+// Unified Podium & Ranking Medals (Accessible in Light & Dark)
+val RankGold = Color(0xFFF59E0B)
+val RankGoldContainer = Color(0xFFFEF3C7)
+val OnRankGold = Color(0xFF451A03)
+
+val RankSilver = Color(0xFF64748B)
+val RankSilverContainer = Color(0xFFE2E8F0)
+val OnRankSilver = Color(0xFF0F172A)
+
+val RankBronze = Color(0xFFB45309)
+val RankBronzeContainer = Color(0xFFFDE68A)
+val OnRankBronze = Color(0xFF451A03)
+
+// Unified Brand Hero Card Gradient Tokens (Always dark luxury glassmorphic cards)
+val HeroGradientStart = Color(0xFF061A3A)
+val HeroGradientMid = Color(0xFF0041A8)
+val HeroGradientEnd = Color(0xFF0B7A75)
+
+val HeroDeficitStart = Color(0xFF280B14)
+val HeroDeficitMid = Color(0xFF471220)
+val HeroDeficitEnd = Color(0xFF611626)
+
+val HeroGlowCyan = Color(0xFF38BDF8)
+val HeroGlowCyanSoft = Color(0xFF7DD3FC)
+val HeroGlowEmerald = Color(0xFF10B981)
+val HeroGlowEmeraldSoft = Color(0xFF6EE7B7)
+val HeroGlowAmber = Color(0xFFF59E0B)
+val HeroGlowAmberSoft = Color(0xFFFDE68A)
+val HeroGlowRose = Color(0xFFF43F5E)
+val HeroGlowRoseSoft = Color(0xFFFDA4AF)
+val HeroGlassBase = Color(0xFF041226)
+
+// Legacy / Convenience Accents
 val AccentCyan = Color(0xFF06B6D4)
 val AccentEmerald = Color(0xFF10B981)
 val AccentAmber = Color(0xFFF59E0B)

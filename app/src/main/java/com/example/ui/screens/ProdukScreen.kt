@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,6 +61,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.Produk
+import com.example.ui.components.SantoyaSectionBanner
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -87,7 +89,7 @@ fun ProdukScreen(
             FloatingActionButton(
                 onClick = { showAddDialog = true },
                 containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .padding(16.dp)
                     .testTag("fab_add_produk")
@@ -107,64 +109,14 @@ fun ProdukScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(40.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Sell,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Katalog Produk & Harga",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "Daftar produk depot air minum RO & aksesoris",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Text(
-                                text = "${displayList.size} Produk",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                maxLines = 1
-                            )
-                        }
-                    }
-                }
+                SantoyaSectionBanner(
+                    icon = Icons.Default.Sell,
+                    title = "Produk & Harga",
+                    subtitle = "Daftar produk & harga galon",
+                    badgeText = "${displayList.size} Produk",
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    onAccentColor = MaterialTheme.colorScheme.onPrimary
+                )
             }
 
             if (displayList.isEmpty()) {
@@ -200,7 +152,7 @@ fun ProdukScreen(
                             }
                             Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "Belum Ada Data Produk",
+                                text = "Belum Ada Produk",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
@@ -208,7 +160,7 @@ fun ProdukScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Tekan tombol + di pojok kanan bawah untuk menambah produk baru.",
+                                text = "Ketuk tombol + untuk menambah produk baru.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 2,
@@ -220,8 +172,9 @@ fun ProdukScreen(
             } else {
                 items(displayList, key = { it.id }) { produk ->
                     Card(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -312,7 +265,7 @@ fun ProdukScreen(
             onDismissRequest = { showAddDialog = false },
             title = {
                 Text(
-                    text = "Tambah Produk Baru",
+                    text = "Tambah Produk",
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -361,7 +314,7 @@ fun ProdukScreen(
                         val trimmedNama = nama.trim()
                         val hVal = harga.toDoubleOrNull() ?: 0.0
                         if (trimmedNama.isBlank()) {
-                            errorMessage = "Nama produk tidak boleh kosong"
+                            errorMessage = "Nama produk wajib diisi"
                             return@Button
                         }
                         if (hVal <= 0.0) {
@@ -442,7 +395,7 @@ fun ProdukScreen(
                         val trimmedNama = nama.trim()
                         val hVal = harga.toDoubleOrNull() ?: target.harga
                         if (trimmedNama.isBlank()) {
-                            errorMessage = "Nama produk tidak boleh kosong"
+                            errorMessage = "Nama produk wajib diisi"
                             return@Button
                         }
                         if (hVal <= 0.0) {
@@ -479,7 +432,7 @@ fun ProdukScreen(
             },
             title = {
                 Text(
-                    text = "Konfirmasi Hapus Produk",
+                    text = "Hapus Produk?",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -487,7 +440,7 @@ fun ProdukScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Apakah Anda yakin ingin menghapus produk ini dari katalog?",
+                        text = "\"${target.nama_produk}\" akan dihapus dari katalog.",
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -516,7 +469,7 @@ fun ProdukScreen(
                     }
 
                     Text(
-                        text = "Catatan: Riwayat transaksi penjualan sebelumnya yang pernah menggunakan produk ini tetap aman tersimpan di laporan pembukuan.",
+                        text = "Riwayat transaksi yang sudah tercatat tetap tersimpan di laporan.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -529,18 +482,18 @@ fun ProdukScreen(
                         produkToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = null,
-                        tint = Color.White,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Ya, Hapus Produk", color = Color.White)
+                    Text("Hapus")
                 }
             },
             dismissButton = {

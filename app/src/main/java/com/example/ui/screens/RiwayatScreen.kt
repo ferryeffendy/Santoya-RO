@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +68,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
+import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
 import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.SantoyaScreen
@@ -84,13 +87,16 @@ data class TransaksiItemUi(
 @Composable
 fun RiwayatScreen(
     viewModel: SantoyaViewModel,
-    transaksiList: List<TransaksiDetail> = emptyList(),
+    transaksiList: List<TransaksiDetail>? = null,
     onBack: () -> Unit = { viewModel.navigateTo(SantoyaScreen.TRANSAKSI) },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
-    val effectiveTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
+    val scopedTransactionsFromVm by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
+    val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
+    val effectiveTransaksiList = remember(rawTransaksiList) {
+        rawTransaksiList.filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     var showPrinterDialog by remember { mutableStateOf(false) }
@@ -110,7 +116,7 @@ fun RiwayatScreen(
         if (devices.isEmpty()) {
             Toast.makeText(
                 context,
-                "Tidak ada printer Bluetooth terhubung. Pasangkan printer di pengaturan HP.",
+                "Belum ada printer Bluetooth terpasang. Pasangkan printer di pengaturan perangkat.",
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -240,7 +246,7 @@ fun RiwayatScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = if (searchQuery.isBlank()) "Belum ada riwayat transaksi" else "Transaksi tidak ditemukan",
+                            text = if (searchQuery.isBlank()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
@@ -248,7 +254,7 @@ fun RiwayatScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (searchQuery.isBlank()) "Transaksi baru akan muncul di sini." else "Gunakan kata kunci pencarian yang lain.",
+                            text = if (searchQuery.isBlank()) "Penjualan yang tercatat akan muncul di sini." else "Coba gunakan kata kunci pencarian lain.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -264,7 +270,7 @@ fun RiwayatScreen(
                         val trx = item.transaksi
                         val custName = item.pelanggan?.nama ?: "Pelanggan Umum"
                         val prodName = item.produk?.nama_produk ?: "Galon Air RO"
-                        val kurirName = item.kurir?.nama ?: "Ambil Sendiri"
+                        val kurirName = item.kurir?.nama?.takeIf { it.isNotBlank() } ?: "Tanpa Kurir"
                         val receiptText = remember(item) {
                             SantoyaReceiptHelper.generateSaleReceipt(
                                 detail = item,
@@ -293,7 +299,7 @@ fun RiwayatScreen(
                             },
                             onTandaiLunas = {
                                 viewModel.markTransaksiLunas(trx.id)
-                                Toast.makeText(context, "Transaksi #TRX-${trx.id} ditandai Lunas!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Transaksi #TRX-${trx.id} ditandai Lunas", Toast.LENGTH_SHORT).show()
                             },
                             onDelete = {
                                 transaksiToDelete = trx
@@ -309,10 +315,10 @@ fun RiwayatScreen(
         val trx = transaksiToDelete!!
         AlertDialog(
             onDismissRequest = { transaksiToDelete = null },
-            title = { Text("Hapus Transaksi", fontWeight = FontWeight.Bold) },
+            title = { Text("Hapus Transaksi?", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    text = "Hapus data transaksi #TRX-${trx.id} sebesar ${FormatUtils.formatRupiah(trx.total_harga)}?",
+                    text = "Transaksi #TRX-${trx.id} sebesar ${FormatUtils.formatRupiah(trx.total_harga)} akan dihapus.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             },
@@ -321,7 +327,7 @@ fun RiwayatScreen(
                     onClick = {
                         viewModel.deleteTransaksi(trx)
                         transaksiToDelete = null
-                        Toast.makeText(context, "Transaksi berhasil dihapus!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Transaksi dihapus", Toast.LENGTH_SHORT).show()
                     }
                 ) {
                     Text("Hapus", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
@@ -418,12 +424,14 @@ fun RiwayatTransaksiCard(
     modifier: Modifier = Modifier
 ) {
     val isLunas = status.equals("Lunas", ignoreCase = true)
+    val santoyaColors = MaterialTheme.santoyaColors
 
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -440,15 +448,15 @@ fun RiwayatTransaksiCard(
                             .size(32.dp)
                             .clip(CircleShape)
                             .background(
-                                if (isLunas) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.errorContainer
+                                if (isLunas) santoyaColors.successContainer
+                                else santoyaColors.warningContainer
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = if (isLunas) Icons.Default.CheckCircle else Icons.Default.HourglassBottom,
                             contentDescription = null,
-                            tint = if (isLunas) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            tint = if (isLunas) santoyaColors.success else santoyaColors.warning,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -532,14 +540,13 @@ fun RiwayatTransaksiCard(
                     )
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = if (isLunas) Color(0xFF10B981).copy(alpha = 0.15f)
-                        else Color(0xFFEF4444).copy(alpha = 0.15f)
+                        color = if (isLunas) santoyaColors.successContainer else santoyaColors.warningContainer
                     ) {
                         Text(
                             text = status.uppercase(),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
-                            color = if (isLunas) Color(0xFF047857) else Color(0xFFDC2626),
+                            color = if (isLunas) santoyaColors.onSuccessContainer else santoyaColors.onWarningContainer,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -564,7 +571,7 @@ fun RiwayatTransaksiCard(
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Tandai Sudah Lunas", style = MaterialTheme.typography.labelMedium)
+                    Text("Tandai Lunas", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }

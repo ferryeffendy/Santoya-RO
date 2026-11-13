@@ -36,8 +36,23 @@ interface TransaksiDao {
     @Query("SELECT * FROM transaksi WHERE id = :id LIMIT 1")
     suspend fun getDetailById(id: Int): TransaksiDetail?
 
-    @Query("SELECT * FROM transaksi WHERE id_pelanggan = :pelangganId AND LOWER(status) = 'kasbon' ORDER BY tanggal ASC")
+    @Query("SELECT * FROM transaksi WHERE id_pelanggan = :pelangganId AND LOWER(status) = 'kasbon' ORDER BY tanggal ASC, id ASC")
     suspend fun getUnpaidByPelanggan(pelangganId: Int): List<Transaksi>
+
+    @Query("SELECT * FROM transaksi WHERE LOWER(status) = 'kasbon' ORDER BY tanggal ASC, id ASC")
+    suspend fun getAllUnpaidOnce(): List<Transaksi>
+
+    @Query("SELECT * FROM transaksi ORDER BY tanggal DESC")
+    suspend fun getAllOnce(): List<Transaksi>
+
+    @Query("SELECT * FROM transaksi WHERE syncId = :syncId LIMIT 1")
+    suspend fun getBySyncId(syncId: String): Transaksi?
+
+    @Query("SELECT * FROM transaksi WHERE id_produk = :produkId")
+    suspend fun getByProdukIdOnce(produkId: Int): List<Transaksi>
+
+    @Query("SELECT * FROM transaksi WHERE id_kurir = :kurirId")
+    suspend fun getByKurirIdOnce(kurirId: Int): List<Transaksi>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(transaksi: Transaksi): Long
@@ -48,13 +63,19 @@ interface TransaksiDao {
     @Delete
     suspend fun delete(transaksi: Transaksi)
 
-    @Query("UPDATE transaksi SET status = 'Lunas', sisaKasbon = 0 WHERE id = :id")
-    suspend fun markAsLunas(id: Int)
+    @Query("DELETE FROM transaksi WHERE syncId = :syncId")
+    suspend fun deleteBySyncId(syncId: String)
 
-    @Query("UPDATE transaksi SET id_produk = NULL WHERE id_produk = :produkId")
-    suspend fun clearProdukFromTransaksi(produkId: Int)
+    @Query("UPDATE transaksi SET status = 'Lunas', sisaKasbon = 0, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun markAsLunas(id: Int, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("SELECT tanggal, SUM(total_harga) as total FROM transaksi WHERE tanggal >= :startTime GROUP BY tanggal ORDER BY tanggal ASC")
+    @Query("UPDATE transaksi SET id_produk = NULL, updatedAt = :updatedAt WHERE id_produk = :produkId")
+    suspend fun clearProdukFromTransaksi(produkId: Int, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE transaksi SET id_kurir = NULL, updatedAt = :updatedAt WHERE id_kurir = :kurirId")
+    suspend fun clearKurirFromTransaksi(kurirId: Int, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT tanggal, SUM(total_harga) as total FROM transaksi WHERE tanggal >= :startTime AND LOWER(status) != 'dihapus' GROUP BY tanggal ORDER BY tanggal ASC")
     fun getDailyRevenueLast30Days(startTime: Long): Flow<List<DailyRevenue>>
 
     @Query(
@@ -66,10 +87,13 @@ interface TransaksiDao {
             END
         ), 0.0)
         FROM transaksi
-        WHERE tanggal >= :startTime AND tanggal <= :endTime
+        WHERE tanggal >= :startTime AND tanggal <= :endTime AND LOWER(status) != 'dihapus'
         """
     )
     fun getTotalPendapatanByDateRange(startTime: Long, endTime: Long): Flow<Double>
+
+    @Query("DELETE FROM transaksi")
+    suspend fun deleteAll()
 }
 
 data class DailyRevenue(

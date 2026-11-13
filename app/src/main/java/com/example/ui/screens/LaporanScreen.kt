@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.TableView
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,8 +77,19 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.theme.HeroDeficitEnd
+import com.example.ui.theme.HeroDeficitMid
+import com.example.ui.theme.HeroDeficitStart
+import com.example.ui.theme.HeroGlowAmberSoft
+import com.example.ui.theme.HeroGlowEmeraldSoft
+import com.example.ui.theme.HeroGlowRoseSoft
+import com.example.ui.theme.HeroGradientEnd
+import com.example.ui.theme.HeroGradientMid
+import com.example.ui.theme.HeroGradientStart
+import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
+import com.example.util.KaryawanScopeHelper
 import com.example.util.PdfExporter
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.SantoyaScreen
@@ -114,7 +127,10 @@ fun LaporanScreen(
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
 
-    val effectiveTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
+    val rawTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
+    val effectiveTransaksiList = remember(rawTransaksiList) {
+        rawTransaksiList.filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
+    }
     val effectivePengeluaranList = if (pengeluaranList.isNotEmpty()) pengeluaranList else allPengeluaranFromVm
 
     val selectedPeriode by viewModel.laporanPeriode.collectAsStateWithLifecycle()
@@ -199,7 +215,9 @@ fun LaporanScreen(
         viewModel.getTotalPendapatanByDateRange(lastMonthRange.first, lastMonthRange.second)
     }.collectAsStateWithLifecycle(initialValue = 0.0)
 
-    val effectiveBulanIniRevenue = if (daoPendapatanBulanIni > 0.0) daoPendapatanBulanIni else pendapatanLunas
+    val bulanIniRev = daoPendapatanBulanIni ?: 0.0
+    val bulanLaluRev = daoPendapatanBulanLalu ?: 0.0
+    val effectiveBulanIniRevenue = if (bulanIniRev > 0.0) bulanIniRev else pendapatanLunas
     val showMonthlyComparison = !isCustomDateRange && selectedPeriode == LaporanPeriode.BULAN_INI
 
     var showAllRanking by remember { mutableStateOf(false) }
@@ -264,8 +282,9 @@ fun LaporanScreen(
     val monthNetProfit = monthStats.monthNetProfit
     val projectedProfit = monthStats.projectedProfit
 
-    val profitColor = Color(0xFF16A34A)
-    val lossColor = MaterialTheme.colorScheme.error
+    val santoyaColors = MaterialTheme.santoyaColors
+    val profitColor = santoyaColors.success
+    val lossColor = santoyaColors.danger
 
     fun openCustomDateRangePicker() {
         val startCal = Calendar.getInstance().apply { timeInMillis = customStartMillis }
@@ -351,7 +370,7 @@ fun LaporanScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Filter Periode Laporan",
+                                        text = "Periode Laporan",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -538,7 +557,7 @@ fun LaporanScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Silakan pilih periode tanggal lain atau catat penjualan baru untuk melihat analisis Laba Bersih & Margin.",
+                                text = "Pilih periode lain atau catat transaksi baru untuk melihat ringkasan laba bersih.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -552,21 +571,21 @@ fun LaporanScreen(
                     val heroGradient = if (isProfit) {
                         Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF0B192C),
-                                Color(0xFF0F2C4C),
-                                Color(0xFF0A4D46)
+                                HeroGradientStart,
+                                HeroGradientMid,
+                                HeroGradientEnd
                             )
                         )
                     } else {
                         Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF280B14),
-                                Color(0xFF471220),
-                                Color(0xFF611626)
+                                HeroDeficitStart,
+                                HeroDeficitMid,
+                                HeroDeficitEnd
                             )
                         )
                     }
-                    val heroAccent = if (isProfit) Color(0xFF34D399) else Color(0xFFFB7185)
+                    val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
                     val formattedMargin = String.format(Locale.US, "%.1f", marginLabaPersen)
                     val formattedLabaBersih = FormatUtils.formatRupiah(labaBersih)
 
@@ -613,7 +632,7 @@ fun LaporanScreen(
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = if (isProfit) "LABA BERSIH (NET PROFIT)" else "DEFISIT / RUGI BERSIH",
+                                            text = if (isProfit) "LABA BERSIH" else "RUGI BERSIH",
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = heroAccent,
@@ -622,7 +641,7 @@ fun LaporanScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Pendapatan Lunas dikurangi Beban & Komisi",
+                                            text = "Pendapatan lunas dikurangi beban & komisi",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White.copy(alpha = 0.75f),
                                             maxLines = 1,
@@ -674,7 +693,7 @@ fun LaporanScreen(
                                     color = Color.White.copy(alpha = 0.1f)
                                 ) {
                                     Text(
-                                        text = if (isProfit) "Bisnis Sehat & Untung" else "Perlu Evaluasi Biaya",
+                                        text = if (isProfit) "Surplus" else "Defisit",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Medium,
                                         color = Color.White.copy(alpha = 0.85f),
@@ -709,7 +728,7 @@ fun LaporanScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "Komposisi Arus Kas Masuk vs Beban",
+                                            text = "Komposisi Arus Kas",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
                                             color = Color.White.copy(alpha = 0.85f)
@@ -737,7 +756,7 @@ fun LaporanScreen(
                                                 modifier = Modifier
                                                     .weight(profitShare.coerceAtLeast(0.03f))
                                                     .height(8.dp)
-                                                    .background(Color(0xFF34D399))
+                                                    .background(HeroGlowEmeraldSoft)
                                             )
                                         }
                                         if (opShare > 0.01f) {
@@ -745,7 +764,7 @@ fun LaporanScreen(
                                                 modifier = Modifier
                                                     .weight(opShare.coerceAtLeast(0.03f))
                                                     .height(8.dp)
-                                                    .background(Color(0xFFFB7185))
+                                                    .background(HeroGlowRoseSoft)
                                             )
                                         }
                                         if (komisiShare > 0.01f) {
@@ -753,7 +772,7 @@ fun LaporanScreen(
                                                 modifier = Modifier
                                                     .weight(komisiShare.coerceAtLeast(0.03f))
                                                     .height(8.dp)
-                                                    .background(Color(0xFFFBBF24))
+                                                    .background(HeroGlowAmberSoft)
                                             )
                                         }
                                     }
@@ -765,15 +784,15 @@ fun LaporanScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         CashflowLegendDot(
-                                            color = Color(0xFF34D399),
+                                            color = HeroGlowEmeraldSoft,
                                             label = "Laba ($profitPct%)"
                                         )
                                         CashflowLegendDot(
-                                            color = Color(0xFFFB7185),
+                                            color = HeroGlowRoseSoft,
                                             label = "Operasional ($opPct%)"
                                         )
                                         CashflowLegendDot(
-                                            color = Color(0xFFFBBF24),
+                                            color = HeroGlowAmberSoft,
                                             label = "Komisi ($komisiPct%)"
                                         )
                                     }
@@ -823,7 +842,7 @@ fun LaporanScreen(
                                     {
                                         MonthlyRevenueComparisonBadge(
                                             bulanIni = effectiveBulanIniRevenue,
-                                            bulanLalu = daoPendapatanBulanLalu,
+                                            bulanLalu = bulanLaluRev,
                                             upColor = profitColor,
                                             downColor = lossColor
                                         )
@@ -845,7 +864,7 @@ fun LaporanScreen(
                                 icon = Icons.Outlined.ShoppingCart,
                                 label = "Total Pengeluaran",
                                 amount = FormatUtils.formatRupiah(totalBebanKeluar),
-                                subtitle = "Rasio Beban vs Pendapatan",
+                                subtitle = "Beban terhadap pendapatan",
                                 accentColor = lossColor,
                                 progress = expenseRatio
                             )
@@ -861,8 +880,8 @@ fun LaporanScreen(
                             Column(modifier = Modifier.padding(14.dp)) {
                                 FinancialBreakdownRow(
                                     icon = Icons.Outlined.ShoppingCart,
-                                    title = "Biaya Operasional Kas",
-                                    subtitle = "${filteredExp.size} catatan pengeluaran depot",
+                                    title = "Biaya Operasional",
+                                    subtitle = "${filteredExp.size} catatan pengeluaran",
                                     nominalText = "- ${FormatUtils.formatRupiah(totalPengeluaran)}",
                                     accentColor = lossColor
                                 )
@@ -874,10 +893,10 @@ fun LaporanScreen(
 
                                 FinancialBreakdownRow(
                                     icon = Icons.Outlined.LocalShipping,
-                                    title = "Total Komisi Kurir",
-                                    subtitle = "Akumulasi komisi pengantaran galon",
+                                    title = "Komisi Kurir",
+                                    subtitle = "Akumulasi komisi pengantaran",
                                     nominalText = "- ${FormatUtils.formatRupiah(totalKomisiKurir)}",
-                                    accentColor = Color(0xFFD97706)
+                                    accentColor = santoyaColors.warning
                                 )
 
                                 if (piutangKasbonPeriode > 0) {
@@ -888,10 +907,10 @@ fun LaporanScreen(
 
                                     FinancialBreakdownRow(
                                         icon = Icons.Outlined.AccountBalanceWallet,
-                                        title = "Piutang Kasbon (Belum Lunas)",
-                                        subtitle = "Belum dihitung ke Laba Bersih sampai lunas",
+                                        title = "Piutang Kasbon",
+                                        subtitle = "Masuk ke laba bersih setelah lunas",
                                         nominalText = FormatUtils.formatRupiah(piutangKasbonPeriode),
-                                        accentColor = Color(0xFFD97706)
+                                        accentColor = santoyaColors.warning
                                     )
                                 }
                             }
@@ -938,14 +957,14 @@ fun LaporanScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Proyeksi Run-Rate Bulan Ini",
+                                        text = "Proyeksi Akhir Bulan",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "Hari ke-$currentDay dari $daysInMonth hari berjalan",
+                                        text = "Hari ke-$currentDay dari $daysInMonth hari",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
@@ -1073,14 +1092,14 @@ fun LaporanScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Distribusi Penjualan Terbanyak",
+                                    text = "Peringkat Penjualan",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Peringkat volume galon per wilayah desa & kurir",
+                                    text = "Volume galon per wilayah & kurir",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
@@ -1175,9 +1194,9 @@ fun LaporanScreen(
                                         ) {
                                             Text(
                                                 text = if (showAllRanking) {
-                                                    "Tampilkan Top 5 Wilayah Saja"
+                                                    "Tampilkan Top 5"
                                                 } else {
-                                                    "Lihat Semua Wilayah (${penjualanDesaList.size} Desa)"
+                                                    "Lihat Semua (${penjualanDesaList.size})"
                                                 },
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold
@@ -1221,9 +1240,9 @@ fun LaporanScreen(
                                         ) {
                                             Text(
                                                 text = if (showAllRanking) {
-                                                    "Tampilkan Top 5 Kurir Saja"
+                                                    "Tampilkan Top 5"
                                                 } else {
-                                                    "Lihat Semua Kurir (${penjualanKurirList.size})"
+                                                    "Lihat Semua (${penjualanKurirList.size})"
                                                 },
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold
@@ -1247,7 +1266,7 @@ fun LaporanScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "Ekspor & Cetak Laporan",
+                            text = "Ekspor Laporan",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1260,13 +1279,13 @@ fun LaporanScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Mode Ringkasan Harian (PDF)",
+                                    text = "Ringkasan Harian (PDF)",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Kelompokkan penjualan Lunas & Kasbon per tanggal saat cetak PDF",
+                                    text = "Kelompokkan total lunas & kasbon per tanggal",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1384,11 +1403,11 @@ fun LaporanScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PictureAsPdf,
-                                    contentDescription = "Export PDF",
+                                    contentDescription = "Ekspor PDF",
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Export PDF", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Ekspor PDF", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
 
                             OutlinedButton(
@@ -1408,11 +1427,11 @@ fun LaporanScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.TableView,
-                                    contentDescription = "Export CSV",
+                                    contentDescription = "Ekspor CSV",
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Export CSV", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Ekspor CSV", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1515,7 +1534,7 @@ fun LaporanScreen(
                                             text = "DP: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color(0xFFD97706),
+                                            color = santoyaColors.warning,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1527,7 +1546,7 @@ fun LaporanScreen(
                                         text = FormatUtils.formatRupiah(trx.total_harga),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isLunas) profitColor else Color(0xFFD97706),
+                                        color = if (isLunas) profitColor else santoyaColors.warning,
                                         maxLines = 1,
                                         softWrap = false
                                     )
@@ -1535,7 +1554,7 @@ fun LaporanScreen(
                                         text = trx.status.uppercase(),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isLunas) profitColor else Color(0xFFD97706),
+                                        color = if (isLunas) profitColor else santoyaColors.warning,
                                         maxLines = 1
                                     )
                                 }
@@ -1554,9 +1573,9 @@ fun LaporanScreen(
                             ) {
                                 Text(
                                     text = if (showAllDetails) {
-                                        "Tampilkan 15 Transaksi Terbaru Saja"
+                                        "Tampilkan 15 Terbaru"
                                     } else {
-                                        "Tampilkan Semua Transaksi (${filteredTx.size} Nota)"
+                                        "Lihat Semua (${filteredTx.size})"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
@@ -1629,9 +1648,9 @@ fun LaporanScreen(
                             ) {
                                 Text(
                                     text = if (showAllDetails) {
-                                        "Tampilkan 15 Pengeluaran Terbaru Saja"
+                                        "Tampilkan 15 Terbaru"
                                     } else {
-                                        "Tampilkan Semua Pengeluaran (${filteredExp.size} Catatan)"
+                                        "Lihat Semua (${filteredExp.size})"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
@@ -1969,10 +1988,11 @@ private fun PenjualanDesaItemRow(
     item: PenjualanDesaItem,
     maxGalon: Int
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
     val rankColor = when (rank) {
-        1 -> Color(0xFFFFB300)
-        2 -> Color(0xFF78909C)
-        3 -> Color(0xFFB07238)
+        1 -> santoyaColors.rankGold
+        2 -> santoyaColors.rankSilver
+        3 -> santoyaColors.rankBronze
         else -> MaterialTheme.colorScheme.primary
     }
     Surface(
@@ -2056,10 +2076,11 @@ private fun PenjualanKurirItemRow(
     item: PenjualanKurirItem,
     maxGalon: Int
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
     val rankColor = when (rank) {
-        1 -> Color(0xFFFFB300)
-        2 -> Color(0xFF78909C)
-        3 -> Color(0xFFB07238)
+        1 -> santoyaColors.rankGold
+        2 -> santoyaColors.rankSilver
+        3 -> santoyaColors.rankBronze
         else -> MaterialTheme.colorScheme.primary
     }
     Surface(

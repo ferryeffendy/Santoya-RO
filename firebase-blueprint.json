@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "Depot": {
+      "title": "Depot",
+      "description": "Workspace depot bersama antara Pemilik dan Karyawan aktif",
+      "type": "object",
+      "properties": {
+        "depotId": { "type": "string", "description": "ID unik depot" },
+        "ownerUid": { "type": "string", "description": "UID Pemilik Depot" },
+        "ownerEmail": { "type": "string", "description": "Email Google Pemilik Depot" },
+        "name": { "type": "string", "description": "Nama depot" },
+        "memberEmails": { "type": "array", "description": "Daftar email karyawan aktif (maksimal 30)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembuatan" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan terakhir" }
+      },
+      "required": ["depotId", "ownerUid", "ownerEmail", "name", "memberEmails", "createdAt", "updatedAt"]
+    },
+    "StaffLink": {
+      "title": "StaffLink",
+      "description": "Tautan keanggotaan karyawan berdasarkan email Google terverifikasi",
+      "type": "object",
+      "properties": {
+        "depotId": { "type": "string", "description": "ID depot tujuan" },
+        "ownerUid": { "type": "string", "description": "UID Pemilik Depot" },
+        "ownerEmail": { "type": "string", "description": "Email Pemilik Depot" },
+        "staffEmail": { "type": "string", "description": "Email Google Karyawan (lowercase)" },
+        "active": { "type": "boolean", "description": "Status akses karyawan" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembuatan" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan terakhir" }
+      },
+      "required": ["depotId", "ownerUid", "ownerEmail", "staffEmail", "active", "createdAt", "updatedAt"]
+    },
+    "Produk": {
+      "title": "Produk",
+      "description": "Data produk galon air minum",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "nama_produk": { "type": "string", "description": "Nama produk galon" },
+        "harga": { "type": "number", "description": "Harga jual standar" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "nama_produk", "harga", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "Kurir": {
+      "title": "Kurir",
+      "description": "Data karyawan pengantar galon",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "nama": { "type": "string", "description": "Nama karyawan" },
+        "komisi_per_galon": { "type": "number", "description": "Komisi tetap per galon" },
+        "email": { "type": "string", "description": "Email Google karyawan" },
+        "akses_aktif": { "type": "boolean", "description": "Status aktif akses karyawan" },
+        "skema_komisi": { "type": "string", "description": "Skema komisi" },
+        "aturan_komisi": { "type": "string", "description": "Aturan komisi" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "nama", "komisi_per_galon", "email", "akses_aktif", "skema_komisi", "aturan_komisi", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "Pelanggan": {
+      "title": "Pelanggan",
+      "description": "Data pelanggan depot air minum Santoya RO",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "nama": { "type": "string", "description": "Nama pelanggan" },
+        "alamat": { "type": "string", "description": "Alamat pelanggan" },
+        "no_hp": { "type": "string", "description": "Nomor WhatsApp/HP pelanggan" },
+        "sisa_kasbon": { "type": "number", "description": "Sisa kasbon/piutang pelanggan" },
+        "harga_khusus": { "type": "number", "description": "Harga khusus per galon jika ada" },
+        "kurirSyncId": { "type": "string", "description": "SyncId kurir langganan jika ada" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "nama", "alamat", "no_hp", "sisa_kasbon", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "Transaksi": {
+      "title": "Transaksi",
+      "description": "Data transaksi penjualan galon air",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "tanggal": { "type": "number", "description": "Waktu transaksi dalam epoch millis" },
+        "pelangganSyncId": { "type": "string", "description": "SyncId pelanggan terkait" },
+        "kurirSyncId": { "type": "string", "description": "SyncId karyawan pengantar jika ada" },
+        "produkSyncId": { "type": "string", "description": "SyncId produk terkait jika ada" },
+        "jumlah": { "type": "number", "description": "Jumlah galon" },
+        "harga_satuan": { "type": "number", "description": "Harga satuan galon" },
+        "total_harga": { "type": "number", "description": "Total tagihan penjualan" },
+        "total_komisi": { "type": "number", "description": "Total komisi pengantaran" },
+        "metode_bayar": { "type": "string", "description": "Metode bayar" },
+        "status": { "type": "string", "description": "Status pembayaran (Lunas/Kasbon)" },
+        "uangMuka": { "type": "number", "description": "Nominal DP" },
+        "sisaKasbon": { "type": "number", "description": "Sisa kasbon belum dibayar" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "tanggal", "pelangganSyncId", "jumlah", "harga_satuan", "total_harga", "total_komisi", "metode_bayar", "status", "uangMuka", "sisaKasbon", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "Pengeluaran": {
+      "title": "Pengeluaran",
+      "description": "Data pengeluaran operasional depot (khusus Pemilik)",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "tanggal": { "type": "number", "description": "Waktu pengeluaran dalam epoch millis" },
+        "nama_item": { "type": "string", "description": "Deskripsi pengeluaran" },
+        "kategori": { "type": "string", "description": "Kategori pengeluaran" },
+        "nominal": { "type": "number", "description": "Nominal rupiah" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "tanggal", "nama_item", "kategori", "nominal", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "KasbonLog": {
+      "title": "KasbonLog",
+      "description": "Riwayat pembayaran kasbon pelanggan",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "pelangganSyncId": { "type": "string", "description": "SyncId pelanggan" },
+        "tanggal": { "type": "number", "description": "Waktu pembayaran kasbon" },
+        "jumlah_bayar": { "type": "number", "description": "Nominal pembayaran kasbon" },
+        "sisa_kasbon_sebelum": { "type": "number", "description": "Sisa kasbon sebelum bayar" },
+        "sisa_kasbon_sesudah": { "type": "number", "description": "Sisa kasbon sesudah bayar" },
+        "metode_bayar": { "type": "string", "description": "Metode pembayaran" },
+        "catatan": { "type": "string", "description": "Keterangan pembayaran" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "pelangganSyncId", "tanggal", "jumlah_bayar", "sisa_kasbon_sebelum", "sisa_kasbon_sesudah", "metode_bayar", "catatan", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    }
+  },
+  "firestore": {
+    "/depots/{depotId}": {
+      "schema": { "$ref": "#/entities/Depot" },
+      "description": "Dokumen induk workspace depot bersama antara Pemilik dan Karyawan"
+    },
+    "/staff_links/{emailKey}": {
+      "schema": { "$ref": "#/entities/StaffLink" },
+      "description": "Pemetaan email Google karyawan terverifikasi ke depotId"
+    },
+    "/depots/{depotId}/produk/{docId}": {
+      "schema": { "$ref": "#/entities/Produk" },
+      "description": "Koleksi katalog produk galon per depot"
+    },
+    "/depots/{depotId}/kurir/{docId}": {
+      "schema": { "$ref": "#/entities/Kurir" },
+      "description": "Koleksi data karyawan & komisi per depot"
+    },
+    "/depots/{depotId}/pelanggan/{docId}": {
+      "schema": { "$ref": "#/entities/Pelanggan" },
+      "description": "Koleksi pelanggan & kasbon per depot"
+    },
+    "/depots/{depotId}/transaksi/{docId}": {
+      "schema": { "$ref": "#/entities/Transaksi" },
+      "description": "Koleksi transaksi penjualan per depot"
+    },
+    "/depots/{depotId}/pengeluaran/{docId}": {
+      "schema": { "$ref": "#/entities/Pengeluaran" },
+      "description": "Koleksi pengeluaran operasional (hanya Pemilik)"
+    },
+    "/depots/{depotId}/kasbon_logs/{docId}": {
+      "schema": { "$ref": "#/entities/KasbonLog" },
+      "description": "Koleksi riwayat pembayaran kasbon per depot"
+    }
+  }
+}

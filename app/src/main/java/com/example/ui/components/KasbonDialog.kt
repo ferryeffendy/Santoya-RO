@@ -88,7 +88,7 @@ fun KasbonPelunasanDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Sisa Kasbon Saat Ini:",
+                                text = "Sisa Kasbon",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -103,7 +103,7 @@ fun KasbonPelunasanDialog(
                 }
 
                 Text(
-                    text = "Pilih / Masukkan Nominal Pembayaran:",
+                    text = "Nominal Pembayaran",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onBackground
@@ -117,7 +117,7 @@ fun KasbonPelunasanDialog(
                     FilterChip(
                         selected = nominalDouble == pelanggan.sisa_kasbon,
                         onClick = { nominalInput = pelanggan.sisa_kasbon.toLong().toString() },
-                        label = { Text("Lunas Penuh", fontSize = 11.sp) },
+                        label = { Text("Bayar Penuh", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f)
                     )
                     FilterChip(
@@ -166,7 +166,7 @@ fun KasbonPelunasanDialog(
                 enabled = nominalDouble > 0,
                 modifier = Modifier.testTag("btn_confirm_bayar_kasbon")
             ) {
-                Text("Proses Pembayaran")
+                Text("Simpan Pembayaran")
             }
         },
         dismissButton = {

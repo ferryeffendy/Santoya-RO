@@ -65,7 +65,7 @@ object SantoyaReceiptHelper {
         // Details
         val date = FormatUtils.formatDateShort(detail.transaksi.tanggal)
         sb.append(leftRightText("Tgl:", date)).append("\n")
-        sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Umum")).append("\n")
+        sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Pelanggan Eceran (Walk-in)")).append("\n")
         if (!detail.pelanggan?.alamat.isNullOrBlank()) {
             sb.append(leftRightText("Alamat:", detail.pelanggan!!.alamat)).append("\n")
         }
@@ -97,12 +97,12 @@ object SantoyaReceiptHelper {
         sb.append(leftRightText("Metode:", metodeText)).append("\n")
         sb.append(leftRightText("Status:", detail.transaksi.status.uppercase())).append("\n")
         if (isKasbon && dpPaid > 0L) {
-            sb.append(leftRightText("Uang Muka:", FormatUtils.formatRupiah(dpPaid.toDouble()))).append("\n")
+            sb.append(leftRightText("Uang Muka (DP):", FormatUtils.formatRupiah(dpPaid.toDouble()))).append("\n")
             sb.append(leftRightText("Sisa Nota:", FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount()))).append("\n")
         }
 
         if (customerKasbon > 0) {
-            sb.append(leftRightText("Sisa Kasbon:", FormatUtils.formatRupiah(customerKasbon))).append("\n")
+            sb.append(leftRightText("Sisa Kasbon Aktif:", FormatUtils.formatRupiah(customerKasbon))).append("\n")
         }
 
         sb.append(divider('-')).append("\n")
@@ -290,17 +290,17 @@ object SantoyaReceiptHelper {
     ) {
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {
-            onStatus("Bluetooth tidak tersedia di perangkat ini.")
+            onStatus("Bluetooth tidak tersedia di perangkat ini")
             return
         }
         if (!adapter.isEnabled) {
-            onStatus("Harap aktifkan Bluetooth terlebih dahulu.")
+            onStatus("Aktifkan Bluetooth terlebih dahulu")
             return
         }
 
         val bondedDevices = adapter.bondedDevices
         if (bondedDevices.isNullOrEmpty()) {
-            onStatus("Tidak ada printer Bluetooth yang terpasang (paired). Pasangkan printer thermal terlebih dahulu.")
+            onStatus("Belum ada printer Bluetooth terhubung. Pasangkan printer di pengaturan perangkat.")
             return
         }
 
@@ -322,9 +322,9 @@ object SantoyaReceiptHelper {
                 out.flush()
                 socket.close()
 
-                onStatus("Berhasil mencetak struk ke ${device.name}!")
+                onStatus("Struk dicetak ke ${device.name ?: "printer"}")
             } catch (e: Exception) {
-                onStatus("Gagal mencetak: ${e.localizedMessage ?: "Koneksi terputus"}. Anda dapat membagikan via WhatsApp.")
+                onStatus("Gagal mencetak: ${e.localizedMessage ?: "Koneksi terputus"}. Gunakan opsi bagikan via WhatsApp.")
             }
         }.start()
     }

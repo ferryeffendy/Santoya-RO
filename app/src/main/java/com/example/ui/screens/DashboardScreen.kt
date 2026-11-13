@@ -1,6 +1,14 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,18 +33,24 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,11 +61,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,15 +88,30 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aistudio.companion.kzpmrw.R
+import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
-import com.example.ui.theme.AccentAmber
-import com.example.ui.theme.AccentEmerald
+import com.example.ui.components.RealtimeSyncStatusPill
+import com.example.ui.theme.HeroGlassBase
+import com.example.ui.theme.HeroGlowAmber
+import com.example.ui.theme.HeroGlowAmberSoft
+import com.example.ui.theme.HeroGlowCyan
+import com.example.ui.theme.HeroGlowCyanSoft
+import com.example.ui.theme.HeroGlowEmerald
+import com.example.ui.theme.HeroGlowEmeraldSoft
+import com.example.ui.theme.HeroGlowRose
+import com.example.ui.theme.HeroGlowRoseSoft
+import com.example.ui.theme.HeroGradientEnd
+import com.example.ui.theme.HeroGradientMid
+import com.example.ui.theme.HeroGradientStart
 import com.example.ui.theme.pressClickEffect
+import com.example.ui.theme.santoyaColors
 import com.example.util.CrmOrderStatus
 import com.example.util.FormatUtils
+import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
+import com.example.util.SyncConnectionStatus
 import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.PelangganUiModel
@@ -90,10 +123,10 @@ import kotlin.math.roundToInt
 @Composable
 fun DashboardScreen(
     viewModel: SantoyaViewModel,
-    transaksiList: List<TransaksiDetail> = emptyList(),
-    pelangganList: List<Pelanggan> = emptyList(),
-    pengeluaranList: List<Pengeluaran> = emptyList(),
-    pelangganUiModels: List<PelangganUiModel> = emptyList(),
+    transaksiList: List<TransaksiDetail>? = null,
+    pelangganList: List<Pelanggan>? = null,
+    pengeluaranList: List<Pengeluaran>? = null,
+    pelangganUiModels: List<PelangganUiModel>? = null,
     onNavigateToTransaksi: () -> Unit = { viewModel.navigateTo(SantoyaScreen.TRANSAKSI) },
     onNavigateToPelanggan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PELANGGAN) },
     onNavigateToProduk: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
@@ -101,15 +134,29 @@ fun DashboardScreen(
     onNavigateToPengeluaran: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PENGELUARAN) },
     onNavigateToLaporan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.LAPORAN) },
     onNavigateToSettings: () -> Unit = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
+    onSignOut: (() -> Unit)? = null,
+    isKaryawan: Boolean = false,
+    activeKaryawan: Kurir? = null,
     modifier: Modifier = Modifier
 ) {
-    val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
-    val allPelangganFromVm by viewModel.allPelanggan.collectAsStateWithLifecycle()
+    val scopedTransactionsFromVm by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
+    val scopedPelangganFromVm by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
+    val scopedPelangganUiModelsFromVm by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
+    val activeKaryawanFromVm by viewModel.activeKaryawan.collectAsStateWithLifecycle()
+    val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
+    var showKaryawanSignOutDialog by remember { mutableStateOf(false) }
 
-    val effectiveTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
-    val effectivePelangganList = if (pelangganList.isNotEmpty()) pelangganList else allPelangganFromVm
-    val effectivePengeluaranList = if (pengeluaranList.isNotEmpty()) pengeluaranList else allPengeluaranFromVm
+    val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
+    val rawPelangganList = pelangganList ?: scopedPelangganFromVm
+    val effectiveTransaksiList = remember(rawTransaksiList) {
+        rawTransaksiList.filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
+    }
+    val effectivePelangganList = remember(rawPelangganList) {
+        rawPelangganList.filter { !KaryawanScopeHelper.isSoftDeletedPelanggan(it) }
+    }
+    val effectivePengeluaranList = pengeluaranList ?: if (isKaryawan) emptyList() else allPengeluaranFromVm
+    val effectiveActiveKaryawan = activeKaryawan ?: activeKaryawanFromVm
 
     val todayStart = FormatUtils.getStartOfDay()
     val todayEnd = FormatUtils.getEndOfDay()
@@ -133,6 +180,13 @@ fun DashboardScreen(
         }
     }
 
+    val karyawanMetrics = remember(effectiveTransaksiList, effectiveActiveKaryawan) {
+        KaryawanScopeHelper.summarizeKaryawanDashboardMetrics(
+            transaksiList = effectiveTransaksiList,
+            activeKurir = effectiveActiveKaryawan
+        )
+    }
+
     // 1. Pendapatan Tunai Hari Ini (termasuk Uang Muka/DP dari transaksi Bayar Sebagian)
     val pendapatanLunasHariIni = remember(todayTransactions) {
         todayTransactions.sumOf {
@@ -144,7 +198,7 @@ fun DashboardScreen(
         }
     }
 
-    // 2. Laba Bersih Hari Ini (Pendapatan Tunai - Pengeluaran Operasional - Komisi Kurir Semua Galon Hari Ini)
+    // 2. Laba Bersih Hari Ini (Pendapatan Tunai - Pengeluaran Operasional - Komisi Kurir)
     val totalKomisiHariIni = remember(todayTransactions) {
         todayTransactions.sumOf { it.transaksi.total_komisi }
     }
@@ -154,16 +208,16 @@ fun DashboardScreen(
     val labaBersihHariIni = pendapatanLunasHariIni - totalPengeluaranHariIni - totalKomisiHariIni
 
     // 3. Total Piutang / Kasbon Tersinkronisasi
-    val effectiveKasbonByCustomer = remember(effectivePelangganList, effectiveTransaksiList) {
-        val unpaidByCustomer = effectiveTransaksiList
-            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-            .groupBy { it.transaksi.id_pelanggan }
-        effectivePelangganList.associate { p ->
-            val unpaidNotes = unpaidByCustomer[p.id] ?: emptyList()
-            val unpaidSum = unpaidNotes.sumOf { it.transaksi.remainingKasbonAmount() }
-            val effectiveKasbon = if (unpaidNotes.isNotEmpty()) unpaidSum else p.sisa_kasbon
-            p.id to effectiveKasbon
-        }
+    val effectiveUiModels = remember(pelangganUiModels, scopedPelangganUiModelsFromVm, effectivePelangganList, effectiveTransaksiList) {
+        pelangganUiModels
+            ?: if (pelangganList == null && transaksiList == null) {
+                scopedPelangganUiModelsFromVm
+            } else {
+                viewModel.getPelangganUiModels(effectivePelangganList, effectiveTransaksiList)
+            }
+    }
+    val effectiveKasbonByCustomer = remember(effectiveUiModels) {
+        effectiveUiModels.associate { it.pelanggan.id to it.pelanggan.sisa_kasbon }
     }
     val totalPiutangAktif = remember(effectiveKasbonByCustomer) {
         effectiveKasbonByCustomer.values.sum()
@@ -183,13 +237,8 @@ fun DashboardScreen(
     val estimasiGalonBulanIni = ((totalGalonBulanIni.toDouble() / currentDayOfMonth.toDouble()) * totalDaysInMonth).roundToInt()
 
     // 6. CRM Jadwal Order Pelanggan (Due Soon / Overdue)
-    val crmJadwalCustomers = remember(pelangganUiModels, effectivePelangganList, effectiveTransaksiList) {
-        val uiModels = if (pelangganUiModels.isNotEmpty()) {
-            pelangganUiModels
-        } else {
-            viewModel.getPelangganUiModels(effectivePelangganList, effectiveTransaksiList)
-        }
-        uiModels.filter {
+    val crmJadwalCustomers = remember(effectiveUiModels) {
+        effectiveUiModels.filter {
             it.crmPrediction.status == CrmOrderStatus.OVERDUE ||
                 it.crmPrediction.status == CrmOrderStatus.DUE_SOON
         }
@@ -230,7 +279,7 @@ fun DashboardScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Enterprise POS • Depot Air Minum",
+                                    text = "Manajemen Depot Air Minum",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -240,24 +289,54 @@ fun DashboardScreen(
                         }
                     },
                     actions = {
-                        IconButton(
-                            onClick = onNavigateToSettings,
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .testTag("dashboard_settings_button")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 4.dp)
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.Settings,
-                                        contentDescription = "Pengaturan",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(19.dp)
-                                    )
+                            RealtimeSyncStatusPill(
+                                syncState = syncState,
+                                modifier = Modifier.testTag("dashboard_sync_pill")
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            if (!isKaryawan) {
+                                IconButton(
+                                    onClick = onNavigateToSettings,
+                                    modifier = Modifier.testTag("dashboard_settings_button")
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = "Pengaturan",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            } else if (onSignOut != null) {
+                                IconButton(
+                                    onClick = { showKaryawanSignOutDialog = true },
+                                    modifier = Modifier.testTag("dashboard_karyawan_sign_out_button")
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Logout,
+                                                contentDescription = "Keluar Akun",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -266,6 +345,7 @@ fun DashboardScreen(
                         containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
+
                 HorizontalDivider(
                     thickness = 1.dp,
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
@@ -280,6 +360,35 @@ fun DashboardScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (syncState.status == SyncConnectionStatus.REVOKED) {
+                item {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Akses akun karyawan sedang dinonaktifkan oleh Pemilik Depot. Hubungi pemilik untuk mengaktifkan kembali sinkronisasi.",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
             // 1. World-Class Fintech Executive Hero Card
             item {
                 Card(
@@ -295,9 +404,9 @@ fun DashboardScreen(
                             .background(
                                 Brush.linearGradient(
                                     colors = listOf(
-                                        Color(0xFF061A3A),
-                                        Color(0xFF0041A8),
-                                        Color(0xFF0B7A75)
+                                        HeroGradientStart,
+                                        HeroGradientMid,
+                                        HeroGradientEnd
                                     ),
                                     start = Offset(0f, 0f),
                                     end = Offset(1000f, 900f)
@@ -307,7 +416,7 @@ fun DashboardScreen(
                                 drawCircle(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0xFF38BDF8).copy(alpha = 0.22f),
+                                            HeroGlowCyan.copy(alpha = 0.22f),
                                             Color.Transparent
                                         ),
                                         center = Offset(size.width * 0.92f, size.height * 0.12f),
@@ -317,7 +426,7 @@ fun DashboardScreen(
                                 drawCircle(
                                     brush = Brush.radialGradient(
                                         colors = listOf(
-                                            Color(0xFF10B981).copy(alpha = 0.18f),
+                                            HeroGlowEmerald.copy(alpha = 0.18f),
                                             Color.Transparent
                                         ),
                                         center = Offset(size.width * 0.1f, size.height * 0.95f),
@@ -328,13 +437,18 @@ fun DashboardScreen(
                             .padding(20.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Top Section: Primary Revenue Hero (Clickable -> Laporan Hari Ini)
+                            // Top Section: Primary Revenue Hero
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .pressClickEffect(onClick = {
-                                        viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
-                                        onNavigateToLaporan()
+                                        if (isKaryawan) {
+                                            viewModel.setTransaksiTab(1)
+                                            onNavigateToTransaksi()
+                                        } else {
+                                            viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                                            onNavigateToLaporan()
+                                        }
                                     }),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Top
@@ -344,12 +458,12 @@ fun DashboardScreen(
                                         Icon(
                                             imageVector = Icons.Outlined.AccountBalanceWallet,
                                             contentDescription = null,
-                                            tint = Color(0xFF7DD3FC),
+                                            tint = HeroGlowCyanSoft,
                                             modifier = Modifier.size(15.dp)
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "PENDAPATAN TUNAI HARI INI",
+                                            text = if (isKaryawan) "SETORAN TUNAI HARI INI" else "PENDAPATAN TUNAI HARI INI",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             letterSpacing = 0.8.sp,
@@ -358,7 +472,9 @@ fun DashboardScreen(
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = FormatUtils.formatRupiah(pendapatanLunasHariIni),
+                                        text = FormatUtils.formatRupiah(
+                                            if (isKaryawan) karyawanMetrics.setoranTunaiHariIni else pendapatanLunasHariIni
+                                        ),
                                         style = MaterialTheme.typography.headlineLarge,
                                         fontWeight = FontWeight.Black,
                                         color = Color.White,
@@ -367,276 +483,552 @@ fun DashboardScreen(
                                     )
                                 }
 
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = Color.White.copy(alpha = 0.12f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text(
-                                        text = FormatUtils.formatDateShort(System.currentTimeMillis()),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White.copy(alpha = 0.9f),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(50),
+                                        color = Color.White.copy(alpha = 0.12f),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                    ) {
+                                        Text(
+                                            text = FormatUtils.formatDateShort(System.currentTimeMillis()),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                        )
+                                    }
+                                    if (isKaryawan && effectiveActiveKaryawan != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = HeroGlowCyan.copy(alpha = 0.22f),
+                                            border = BorderStroke(1.dp, HeroGlowCyanSoft.copy(alpha = 0.35f))
+                                        ) {
+                                            Text(
+                                                text = effectiveActiveKaryawan.nama,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = HeroGlowCyanSoft,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
 
-                            // Middle Section: Nested Glassmorphic Financial Bento (Laba Bersih & Total Piutang)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                // Laba Bersih Hari Ini (Clickable -> Laporan Hari Ini)
-                                val isPositiveProfit = labaBersihHariIni >= 0.0
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .pressClickEffect(onClick = {
-                                            viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
-                                            onNavigateToLaporan()
-                                        }),
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = Color.White.copy(alpha = 0.10f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                            if (!isKaryawan) {
+                                // Middle Section (Pemilik): Nested Glassmorphic Financial Bento (Laba Bersih & Total Piutang)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    // Laba Bersih Hari Ini (Clickable -> Laporan Hari Ini)
+                                    val isPositiveProfit = labaBersihHariIni >= 0.0
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                                                onNavigateToLaporan()
+                                            }),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = Color.White.copy(alpha = 0.10f),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Surface(
-                                                shape = CircleShape,
-                                                color = if (isPositiveProfit) Color(0xFF10B981).copy(alpha = 0.25f) else Color(0xFFF43F5E).copy(alpha = 0.25f),
-                                                modifier = Modifier.size(24.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
-                                                        contentDescription = null,
-                                                        tint = if (isPositiveProfit) Color(0xFF6EE7B7) else Color(0xFFFDA4AF),
-                                                        modifier = Modifier.size(14.dp)
-                                                    )
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = if (isPositiveProfit) HeroGlowEmerald.copy(alpha = 0.25f) else HeroGlowRose.copy(alpha = 0.25f),
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
+                                                            contentDescription = null,
+                                                            tint = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
                                                 }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "LABA BERSIH",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.68f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
                                             }
-                                            Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "LABA BERSIH",
+                                                text = FormatUtils.formatRupiah(labaBersihHariIni),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Tunai - Biaya & Komisi",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White.copy(alpha = 0.68f),
+                                                color = Color.White.copy(alpha = 0.55f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
-                                        Text(
-                                            text = FormatUtils.formatRupiah(labaBersihHariIni),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Black,
-                                            color = if (isPositiveProfit) Color(0xFF6EE7B7) else Color(0xFFFDA4AF),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "Tunai - Biaya & Komisi",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            color = Color.White.copy(alpha = 0.55f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                    }
+
+                                    // Total Piutang / Kasbon (Clickable -> Pelanggan Tab Kasbon)
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setPelangganTab(1)
+                                                onNavigateToPelanggan()
+                                            }),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = Color.White.copy(alpha = 0.10f),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = HeroGlowAmber.copy(alpha = 0.25f),
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.HourglassEmpty,
+                                                            contentDescription = null,
+                                                            tint = HeroGlowAmberSoft,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "TOTAL PIUTANG",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.68f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Text(
+                                                text = FormatUtils.formatRupiah(totalPiutangAktif),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = HeroGlowAmberSoft,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "Lihat kasbon →",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 10.sp,
+                                                color = Color.White.copy(alpha = 0.55f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                 }
 
-                                // Total Piutang / Kasbon (Clickable -> Pelanggan Tab Kasbon)
+                                // Bottom Section (Pemilik): Production Volume & Monthly Projection Glass Bar
                                 Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .pressClickEffect(onClick = {
-                                            viewModel.setPelangganTab(1)
-                                            onNavigateToPelanggan()
-                                        }),
+                                    modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color.White.copy(alpha = 0.10f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                    color = HeroGlassBase.copy(alpha = 0.42f),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
                                 ) {
-                                    Column(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        // Total Galon Hari Ini (Clickable -> Transaksi)
+                                        Row(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .pressClickEffect(onClick = {
+                                                    viewModel.setTransaksiTab(0)
+                                                    onNavigateToTransaksi()
+                                                }),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Surface(
-                                                shape = CircleShape,
-                                                color = Color(0xFFF59E0B).copy(alpha = 0.25f),
-                                                modifier = Modifier.size(24.dp)
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = HeroGlowCyan.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.WaterDrop,
+                                                        contentDescription = null,
+                                                        tint = HeroGlowCyanSoft,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "GALON HARI INI",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    maxLines = 1
+                                                )
+                                                Row(verticalAlignment = Alignment.Bottom) {
+                                                    Text(
+                                                        text = "$totalGalonHariIni",
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = Color.White
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Galon",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        modifier = Modifier.padding(bottom = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+
+                                        // Subtle Vertical Divider
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 8.dp)
+                                                .width(1.dp)
+                                                .height(34.dp)
+                                                .background(Color.White.copy(alpha = 0.16f))
+                                        )
+
+                                        // Estimasi Galon Bulan Ini (Clickable -> Laporan Bulan Ini)
+                                        Row(
+                                            modifier = Modifier
+                                                .weight(1.15f)
+                                                .pressClickEffect(onClick = {
+                                                    viewModel.setLaporanPeriode(LaporanPeriode.BULAN_INI)
+                                                    onNavigateToLaporan()
+                                                }),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = HeroGlowEmeraldSoft.copy(alpha = 0.18f),
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Outlined.AutoGraph,
+                                                        contentDescription = null,
+                                                        tint = HeroGlowEmeraldSoft,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "ESTIMASI BULAN INI",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Row(verticalAlignment = Alignment.Bottom) {
+                                                    Text(
+                                                        text = "$estimasiGalonBulanIni",
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = HeroGlowEmeraldSoft
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Galon",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        modifier = Modifier.padding(bottom = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Middle Section (Karyawan): Rekap Galon & Komisi Hari Ini vs Bulan Ini
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("card_komisi_hari_ini")
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setTransaksiTab(1)
+                                                onNavigateToTransaksi()
+                                            }),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = Color.White.copy(alpha = 0.10f),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = HeroGlowEmerald.copy(alpha = 0.25f),
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.WaterDrop,
+                                                            contentDescription = null,
+                                                            tint = HeroGlowEmeraldSoft,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "KOMISI HARI INI",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Text(
+                                                text = FormatUtils.formatRupiah(karyawanMetrics.komisiHariIni),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = HeroGlowEmeraldSoft,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${karyawanMetrics.galonHariIni} Galon • ${karyawanMetrics.pesananHariIni} Order",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White.copy(alpha = 0.72f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("card_komisi_bulan_ini")
+                                            .pressClickEffect(onClick = {
+                                                viewModel.setTransaksiTab(1)
+                                                onNavigateToTransaksi()
+                                            }),
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = Color.White.copy(alpha = 0.10f),
+                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                                            verticalArrangement = Arrangement.spacedBy(5.dp)
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    shape = CircleShape,
+                                                    color = HeroGlowCyan.copy(alpha = 0.25f),
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        Icon(
+                                                            imageVector = Icons.Outlined.AutoGraph,
+                                                            contentDescription = null,
+                                                            tint = HeroGlowCyanSoft,
+                                                            modifier = Modifier.size(14.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text(
+                                                    text = "KOMISI BULAN INI",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
+                                            Text(
+                                                text = FormatUtils.formatRupiah(karyawanMetrics.komisiBulanIni),
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Black,
+                                                color = HeroGlowCyanSoft,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = "${karyawanMetrics.galonBulanIni} Galon • ${karyawanMetrics.pesananBulanIni} Order",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = Color.White.copy(alpha = 0.72f),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Bottom Section (Karyawan): Piutang Pelanggan Saya & Total Pelanggan Saya
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = HeroGlassBase.copy(alpha = 0.42f),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .weight(1.1f)
+                                                .pressClickEffect(onClick = {
+                                                    viewModel.setPelangganTab(1)
+                                                    onNavigateToPelanggan()
+                                                }),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = HeroGlowAmber.copy(alpha = 0.22f),
+                                                modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Outlined.HourglassEmpty,
                                                         contentDescription = null,
-                                                        tint = Color(0xFFFDE68A),
-                                                        modifier = Modifier.size(14.dp)
+                                                        tint = HeroGlowAmberSoft,
+                                                        modifier = Modifier.size(18.dp)
                                                     )
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "TOTAL PIUTANG",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White.copy(alpha = 0.68f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                        Text(
-                                            text = FormatUtils.formatRupiah(totalPiutangAktif),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Black,
-                                            color = Color(0xFFFDE68A),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "Lihat Daftar Kasbon →",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            color = Color.White.copy(alpha = 0.55f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Bottom Section: Production Volume & Monthly Projection Glass Bar
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                color = Color(0xFF041226).copy(alpha = 0.42f),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    // Total Galon Hari Ini (Clickable -> Transaksi)
-                                    Row(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setTransaksiTab(0)
-                                                onNavigateToTransaksi()
-                                            }),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = Color(0xFF38BDF8).copy(alpha = 0.2f),
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.WaterDrop,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF7DD3FC),
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                text = "GALON HARI INI",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White.copy(alpha = 0.65f),
-                                                maxLines = 1
-                                            )
-                                            Row(verticalAlignment = Alignment.Bottom) {
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
                                                 Text(
-                                                    text = "$totalGalonHariIni",
-                                                    style = MaterialTheme.typography.titleLarge,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = Color.White
-                                                )
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text(
-                                                    text = "Galon",
+                                                    text = "PIUTANG PELANGGAN",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = Color.White.copy(alpha = 0.7f),
-                                                    modifier = Modifier.padding(bottom = 2.dp)
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
-                                            }
-                                        }
-                                    }
-
-                                    // Subtle Vertical Divider
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp)
-                                            .width(1.dp)
-                                            .height(34.dp)
-                                            .background(Color.White.copy(alpha = 0.16f))
-                                    )
-
-                                    // Estimasi Galon Bulan Ini (Clickable -> Laporan Bulan Ini)
-                                    Row(
-                                        modifier = Modifier
-                                            .weight(1.15f)
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setLaporanPeriode(LaporanPeriode.BULAN_INI)
-                                                onNavigateToLaporan()
-                                            }),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = Color(0xFFA7F3D0).copy(alpha = 0.18f),
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = Icons.Outlined.AutoGraph,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFF6EE7B7),
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Column {
-                                            Text(
-                                                text = "ESTIMASI BULAN INI",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White.copy(alpha = 0.65f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            Row(verticalAlignment = Alignment.Bottom) {
                                                 Text(
-                                                    text = "$estimasiGalonBulanIni",
-                                                    style = MaterialTheme.typography.titleLarge,
+                                                    text = FormatUtils.formatRupiah(totalPiutangAktif),
+                                                    style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Black,
-                                                    color = Color(0xFF6EE7B7)
+                                                    color = HeroGlowAmberSoft,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
-                                                Spacer(modifier = Modifier.width(4.dp))
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 8.dp)
+                                                .width(1.dp)
+                                                .height(34.dp)
+                                                .background(Color.White.copy(alpha = 0.16f))
+                                        )
+
+                                        Row(
+                                            modifier = Modifier
+                                                .weight(0.95f)
+                                                .pressClickEffect(onClick = {
+                                                    viewModel.setPelangganTab(0)
+                                                    onNavigateToPelanggan()
+                                                }),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Surface(
+                                                shape = RoundedCornerShape(10.dp),
+                                                color = HeroGlowCyan.copy(alpha = 0.2f),
+                                                modifier = Modifier.size(36.dp)
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.People,
+                                                        contentDescription = null,
+                                                        tint = HeroGlowCyanSoft,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
                                                 Text(
-                                                    text = "Galon",
+                                                    text = "PELANGGAN SAYA",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = Color.White.copy(alpha = 0.7f),
-                                                    modifier = Modifier.padding(bottom = 2.dp)
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
+                                                Row(verticalAlignment = Alignment.Bottom) {
+                                                    Text(
+                                                        text = "${effectivePelangganList.size}",
+                                                        style = MaterialTheme.typography.titleLarge,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = Color.White
+                                                    )
+                                                    Spacer(modifier = Modifier.width(4.dp))
+                                                    Text(
+                                                        text = "Orang",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        modifier = Modifier.padding(bottom = 2.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -651,14 +1043,15 @@ fun DashboardScreen(
             if (crmJadwalCustomers.isNotEmpty()) {
                 item {
                     val overdueCount = crmJadwalCustomers.count { it.crmPrediction.status == CrmOrderStatus.OVERDUE }
+                    val santoyaColors = MaterialTheme.santoyaColors
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = Color(0xFFF59E0B).copy(alpha = 0.14f),
-                        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.45f)),
+                        color = santoyaColors.warningContainer.copy(alpha = 0.55f),
+                        border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.45f)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .pressClickEffect(onClick = {
-                                viewModel.setPelangganTab(4) // Tab Jadwal
+                                viewModel.setPelangganTab(2) // Tab Jadwal
                                 onNavigateToPelanggan()
                             })
                     ) {
@@ -675,14 +1068,14 @@ fun DashboardScreen(
                             ) {
                                 Surface(
                                     shape = CircleShape,
-                                    color = Color(0xFFF59E0B).copy(alpha = 0.24f),
+                                    color = santoyaColors.warning.copy(alpha = 0.18f),
                                     modifier = Modifier.size(34.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.NotificationsActive,
                                             contentDescription = null,
-                                            tint = Color(0xFFB45309),
+                                            tint = santoyaColors.warning,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -690,21 +1083,21 @@ fun DashboardScreen(
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "${crmJadwalCustomers.size} Pelanggan Waktunya Order",
+                                        text = "${crmJadwalCustomers.size} Pelanggan Perlu Pengingat",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF92400E),
+                                        color = santoyaColors.onWarningContainer,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = if (overdueCount > 0) {
-                                            "$overdueCount melewati jadwal rutin • Ketuk untuk hubungi via WA"
+                                            "$overdueCount lewat jadwal • Ketuk untuk kirim pengingat"
                                         } else {
-                                            "Jadwal isi ulang galon hari ini • Ketuk untuk lihat"
+                                            "Jadwal isi ulang hari ini • Ketuk untuk lihat"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = Color(0xFFB45309),
+                                        color = santoyaColors.warning,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -714,7 +1107,7 @@ fun DashboardScreen(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                 contentDescription = "Lihat Jadwal",
-                                tint = Color(0xFFB45309),
+                                tint = santoyaColors.warning,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -725,7 +1118,7 @@ fun DashboardScreen(
             // 3. Menu Navigasi Utama (Tactile Bento Cards)
             item {
                 Text(
-                    text = "Menu Navigasi Santoya",
+                    text = "Menu Utama",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -761,28 +1154,30 @@ fun DashboardScreen(
                             }
                         )
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        MenuCard(
-                            modifier = Modifier.weight(1f),
-                            title = "Pengeluaran",
-                            subtitle = "Catat Kas Keluar",
-                            icon = Icons.Default.MoneyOff,
-                            accentColor = MaterialTheme.colorScheme.error,
-                            testTag = "nav_pengeluaran_button",
-                            onClick = onNavigateToPengeluaran
-                        )
-                        MenuCard(
-                            modifier = Modifier.weight(1f),
-                            title = "Laporan",
-                            subtitle = "Analisis Omzet & Profit",
-                            icon = Icons.Default.Assessment,
-                            accentColor = MaterialTheme.colorScheme.tertiary,
-                            testTag = "nav_laporan_button",
-                            onClick = onNavigateToLaporan
-                        )
+                    if (!isKaryawan) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            MenuCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Pengeluaran",
+                                subtitle = "Catat Kas Keluar",
+                                icon = Icons.Default.MoneyOff,
+                                accentColor = MaterialTheme.colorScheme.error,
+                                testTag = "nav_pengeluaran_button",
+                                onClick = onNavigateToPengeluaran
+                            )
+                            MenuCard(
+                                modifier = Modifier.weight(1f),
+                                title = "Laporan",
+                                subtitle = "Omzet & Laba Bersih",
+                                icon = Icons.Default.Assessment,
+                                accentColor = MaterialTheme.colorScheme.tertiary,
+                                testTag = "nav_laporan_button",
+                                onClick = onNavigateToLaporan
+                            )
+                        }
                     }
                 }
             }
@@ -796,7 +1191,7 @@ fun DashboardScreen(
                 ) {
                     Text(
                         text = if (isShowingTodayTransactions) {
-                            "Transaksi Terbaru Hari Ini"
+                            "Transaksi Hari Ini"
                         } else {
                             "Transaksi Terakhir"
                         },
@@ -852,13 +1247,17 @@ fun DashboardScreen(
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = "Belum ada transaksi tercatat",
+                                text = "Belum ada transaksi",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Mulai catat penjualan galon pertama Anda untuk memantau omzet dan laba bersih.",
+                                text = if (isKaryawan) {
+                                    "Catat penjualan pertama untuk memantau setoran dan komisi."
+                                } else {
+                                    "Catat penjualan pertama untuk memantau omzet dan laba bersih."
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -877,7 +1276,7 @@ fun DashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Catat Penjualan Sekarang",
+                                    text = "Buat Transaksi",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -928,15 +1327,16 @@ fun DashboardScreen(
                                         modifier = Modifier.weight(1f, fill = false)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
+                                    val santoyaColors = MaterialTheme.santoyaColors
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
-                                        color = if (isKasbon) AccentAmber.copy(alpha = 0.16f) else AccentEmerald.copy(alpha = 0.16f)
+                                        color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
                                     ) {
                                         Text(
                                             text = detail.transaksi.status.uppercase(),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isKasbon) Color(0xFFB45309) else Color(0xFF047857),
+                                            color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                             maxLines = 1
                                         )
@@ -946,7 +1346,7 @@ fun DashboardScreen(
                                 Text(
                                     text = subInfoParts.joinToString(" • "),
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (isKasbon) Color(0xFFB45309) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = if (isKasbon) MaterialTheme.santoyaColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -991,6 +1391,33 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+
+    if (showKaryawanSignOutDialog && onSignOut != null) {
+        AlertDialog(
+            onDismissRequest = { showKaryawanSignOutDialog = false },
+            title = { Text("Keluar Akun Karyawan", fontWeight = FontWeight.Bold) },
+            text = { Text("Apakah Anda yakin ingin keluar dari akun Google ini?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showKaryawanSignOutDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    )
+                ) {
+                    Text("Keluar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showKaryawanSignOutDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
     }
 }
 

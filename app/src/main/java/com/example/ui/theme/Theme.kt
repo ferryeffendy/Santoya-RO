@@ -14,12 +14,94 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+
+@Immutable
+data class SantoyaExtendedColors(
+    val success: Color,
+    val onSuccess: Color,
+    val successContainer: Color,
+    val onSuccessContainer: Color,
+    val warning: Color,
+    val onWarning: Color,
+    val warningContainer: Color,
+    val onWarningContainer: Color,
+    val danger: Color,
+    val onDanger: Color,
+    val dangerContainer: Color,
+    val onDangerContainer: Color,
+    val info: Color,
+    val onInfo: Color,
+    val infoContainer: Color,
+    val onInfoContainer: Color,
+    val rankGold: Color,
+    val rankSilver: Color,
+    val rankBronze: Color,
+    val isDark: Boolean
+)
+
+private val LightExtendedColors = SantoyaExtendedColors(
+    success = SuccessLight,
+    onSuccess = OnSuccessLight,
+    successContainer = SuccessContainerLight,
+    onSuccessContainer = OnSuccessContainerLight,
+    warning = WarningLight,
+    onWarning = OnWarningLight,
+    warningContainer = WarningContainerLight,
+    onWarningContainer = OnWarningContainerLight,
+    danger = ErrorLight,
+    onDanger = OnErrorLight,
+    dangerContainer = ErrorContainerLight,
+    onDangerContainer = OnErrorContainerLight,
+    info = InfoLight,
+    onInfo = OnInfoLight,
+    infoContainer = InfoContainerLight,
+    onInfoContainer = OnInfoContainerLight,
+    rankGold = RankGold,
+    rankSilver = RankSilver,
+    rankBronze = RankBronze,
+    isDark = false
+)
+
+private val DarkExtendedColors = SantoyaExtendedColors(
+    success = SuccessDark,
+    onSuccess = OnSuccessDark,
+    successContainer = SuccessContainerDark,
+    onSuccessContainer = OnSuccessContainerDark,
+    warning = WarningDark,
+    onWarning = OnWarningDark,
+    warningContainer = WarningContainerDark,
+    onWarningContainer = OnWarningContainerDark,
+    danger = ErrorDark,
+    onDanger = OnErrorDark,
+    dangerContainer = ErrorContainerDark,
+    onDangerContainer = OnErrorContainerDark,
+    info = InfoDark,
+    onInfo = OnInfoDark,
+    infoContainer = InfoContainerDark,
+    onInfoContainer = OnInfoContainerDark,
+    rankGold = Color(0xFFFBBF24),
+    rankSilver = Color(0xFF94A3B8),
+    rankBronze = Color(0xFFF59E0B),
+    isDark = true
+)
+
+val LocalSantoyaColors = staticCompositionLocalOf { LightExtendedColors }
+
+val MaterialTheme.santoyaColors: SantoyaExtendedColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalSantoyaColors.current
 
 private val DarkColorScheme = darkColorScheme(
     primary = PrimaryDark,
@@ -63,7 +145,7 @@ private val LightColorScheme = lightColorScheme(
     onTertiaryContainer = OnTertiaryContainerLight,
     error = ErrorLight,
     onError = OnErrorLight,
-    errorContainer = ErrorLight.copy(alpha = 0.12f),
+    errorContainer = ErrorContainerLight,
     onErrorContainer = OnErrorContainerLight,
     background = BackgroundLight,
     onBackground = OnBackgroundLight,
@@ -120,10 +202,13 @@ fun MyApplicationTheme(
         darkTheme -> DarkColorScheme
         else -> LightColorScheme
     }
+    val extendedColors = if (darkTheme) DarkExtendedColors else LightExtendedColors
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalSantoyaColors provides extendedColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

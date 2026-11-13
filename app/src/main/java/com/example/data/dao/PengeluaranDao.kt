@@ -14,6 +14,15 @@ interface PengeluaranDao {
     @Query("SELECT * FROM pengeluaran ORDER BY tanggal DESC")
     fun getAll(): Flow<List<Pengeluaran>>
 
+    @Query("SELECT * FROM pengeluaran ORDER BY tanggal DESC")
+    suspend fun getAllOnce(): List<Pengeluaran>
+
+    @Query("SELECT * FROM pengeluaran WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Int): Pengeluaran?
+
+    @Query("SELECT * FROM pengeluaran WHERE syncId = :syncId LIMIT 1")
+    suspend fun getBySyncId(syncId: String): Pengeluaran?
+
     @Query("SELECT * FROM pengeluaran WHERE tanggal >= :startTime AND tanggal <= :endTime ORDER BY tanggal DESC")
     fun getByRange(startTime: Long, endTime: Long): Flow<List<Pengeluaran>>
 
@@ -25,4 +34,10 @@ interface PengeluaranDao {
 
     @Delete
     suspend fun delete(pengeluaran: Pengeluaran)
+
+    @Query("DELETE FROM pengeluaran WHERE syncId = :syncId")
+    suspend fun deleteBySyncId(syncId: String)
+
+    @Query("DELETE FROM pengeluaran")
+    suspend fun deleteAll()
 }

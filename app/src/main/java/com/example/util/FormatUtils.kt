@@ -43,6 +43,31 @@ object FormatUtils {
         return if (diffMillis <= 0) 0 else TimeUnit.MILLISECONDS.toDays(diffMillis)
     }
 
+    fun formatPhoneForWhatsApp(rawPhone: String): String {
+        val digits = rawPhone.filter { it.isDigit() }
+        if (digits.length < 6) return ""
+        return when {
+            digits.startsWith("0") -> "62" + digits.drop(1)
+            digits.startsWith("8") -> "62$digits"
+            else -> digits
+        }
+    }
+
+    fun buildEmployeeWhatsAppMessage(
+        customerName: String,
+        sisaKasbon: Double,
+        unpaidCount: Int,
+        isKasbonReminder: Boolean
+    ): String {
+        val cleanName = customerName.trim().ifBlank { "Bapak/Ibu" }
+        return if (isKasbonReminder && sisaKasbon > 0.0) {
+            val notaText = if (unpaidCount > 0) " ($unpaidCount nota)" else ""
+            "Permisi $cleanName, izin mengingatkan tagihan kasbon galon Santoya RO masih ${formatRupiah(sisaKasbon)}$notaText. Terima kasih."
+        } else {
+            "Permisi $cleanName, mau konfirmasi pengantaran galon Santoya RO hari ini. Apakah perlu isi ulang?"
+        }
+    }
+
     fun getStartOfDay(timestamp: Long = System.currentTimeMillis()): Long {
         val cal = Calendar.getInstance()
         cal.timeInMillis = timestamp
@@ -73,8 +98,9 @@ object FormatUtils {
         return cal.timeInMillis
     }
 
-    fun getStartOfMonth(): Long {
+    fun getStartOfMonth(timestamp: Long = System.currentTimeMillis()): Long {
         val cal = Calendar.getInstance()
+        cal.timeInMillis = timestamp
         cal.set(Calendar.DAY_OF_MONTH, 1)
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
@@ -158,7 +184,7 @@ object FormatUtils {
 
         val badgeText = when (status) {
             CrmOrderStatus.ACTIVE -> "Prediksi: $formattedDate"
-            CrmOrderStatus.DUE_SOON -> "Waktunya Order!"
+            CrmOrderStatus.DUE_SOON -> "Waktunya Order"
             CrmOrderStatus.OVERDUE -> "Terlambat ${-daysUntilExpected} Hari"
             CrmOrderStatus.INSUFFICIENT_DATA -> "Belum Terprediksi"
         }
@@ -179,6 +205,55 @@ object FormatUtils {
     ): Int? {
         return calculateCrmPrediction(customerId, transaksiList).averageIntervalDays
     }
+
+    fun calculateEmployeeInsight(
+        customerId: Int,
+        prediction: CrmOrderPrediction,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): EmployeeCustomerInsight {
+        val customerTxs = transaksiList.filter { it.transaksi.id_pelanggan == customerId }
+        val lastOrderMillis = customerTxs.maxOfOrNull { it.transaksi.tanggal }
+        val daysSinceLastOrder = lastOrderMillis?.let { daysSince(it) }
+        val avgGallons = if (customerTxs.isNotEmpty()) {
+            kotlin.math.round(customerTxs.map { it.transaksi.jumlah }.average()).toInt().coerceAtLeast(1)
+        } else {
+            null
+        }
+
+        val bucket = when (prediction.status) {
+            CrmOrderStatus.OVERDUE -> EmployeeScheduleBucket.TERLAMBAT
+            CrmOrderStatus.DUE_SOON -> {
+                if ((prediction.daysUntilExpected ?: 0) <= 0) {
+                    EmployeeScheduleBucket.HARI_INI
+                } else {
+                    EmployeeScheduleBucket.BESOK
+                }
+            }
+            CrmOrderStatus.ACTIVE -> EmployeeScheduleBucket.JADWAL_NANTI
+            CrmOrderStatus.INSUFFICIENT_DATA -> EmployeeScheduleBucket.BELUM_TERPREDIKSI
+        }
+
+        val badgeLabel = when (bucket) {
+            EmployeeScheduleBucket.TERLAMBAT -> {
+                val overdueDays = -(prediction.daysUntilExpected ?: -1)
+                "Lewat $overdueDays Hari"
+            }
+            EmployeeScheduleBucket.HARI_INI -> "Jadwal Hari Ini"
+            EmployeeScheduleBucket.BESOK -> "Jadwal Besok"
+            EmployeeScheduleBucket.JADWAL_NANTI -> "Jadwal: ${prediction.nextExpectedDateFormatted ?: "-"}"
+            EmployeeScheduleBucket.BELUM_TERPREDIKSI -> {
+                if (customerTxs.isNotEmpty()) "Baru ${customerTxs.size}x Antar" else "Langganan Baru"
+            }
+        }
+
+        return EmployeeCustomerInsight(
+            daysSinceLastOrder = daysSinceLastOrder,
+            lastOrderMillis = lastOrderMillis,
+            avgGallonsPerOrder = avgGallons,
+            scheduleBucket = bucket,
+            badgeLabel = badgeLabel
+        )
+    }
 }
 
 enum class CrmOrderStatus {
@@ -187,6 +262,22 @@ enum class CrmOrderStatus {
     OVERDUE,
     INSUFFICIENT_DATA
 }
+
+enum class EmployeeScheduleBucket {
+    TERLAMBAT,
+    HARI_INI,
+    BESOK,
+    JADWAL_NANTI,
+    BELUM_TERPREDIKSI
+}
+
+data class EmployeeCustomerInsight(
+    val daysSinceLastOrder: Long? = null,
+    val lastOrderMillis: Long? = null,
+    val avgGallonsPerOrder: Int? = null,
+    val scheduleBucket: EmployeeScheduleBucket = EmployeeScheduleBucket.BELUM_TERPREDIKSI,
+    val badgeLabel: String = "Pelanggan Baru"
+)
 
 data class CrmOrderPrediction(
     val status: CrmOrderStatus,

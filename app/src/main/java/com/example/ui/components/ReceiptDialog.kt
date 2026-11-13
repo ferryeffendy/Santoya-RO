@@ -53,6 +53,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.Pelanggan
+import com.example.ui.theme.PrimaryContainerLight
+import com.example.ui.theme.PrimaryLight
+import com.example.ui.theme.SuccessContainerLight
+import com.example.ui.theme.SuccessLight
+import com.example.ui.theme.WarningContainerLight
+import com.example.ui.theme.WarningLight
+import com.example.ui.theme.santoyaColors
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import com.example.util.FormatUtils
@@ -260,7 +267,7 @@ fun ReceiptDialog(
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        text = "Pratinjau Nota Digital & Cetak Thermal",
+                        text = "Pratinjau Nota & Cetak Thermal",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -313,7 +320,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Cetak Printer Thermal (ESC/POS)",
+                        text = "Cetak ke Printer Thermal",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -332,8 +339,8 @@ fun ReceiptDialog(
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = Color(0xFF10B981).copy(alpha = 0.15f),
-                        contentColor = Color(0xFF047857)
+                        containerColor = MaterialTheme.santoyaColors.successContainer,
+                        contentColor = MaterialTheme.santoyaColors.onSuccessContainer
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -342,7 +349,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Kirim Gambar Struk ke WhatsApp",
+                        text = "Kirim Gambar via WhatsApp",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -367,7 +374,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Bagikan Teks Nota",
+                        text = "Bagikan Teks Struk",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -401,14 +408,14 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
         ) {
             Surface(
                 shape = CircleShape,
-                color = Color(0xFFE6F0FF),
+                color = PrimaryContainerLight,
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.WaterDrop,
                         contentDescription = null,
-                        tint = Color(0xFF0052CC),
+                        tint = PrimaryLight,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -571,13 +578,13 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                     )
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = if (isLunas) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFEF4444).copy(alpha = 0.15f)
+                        color = if (isLunas) SuccessContainerLight else WarningContainerLight
                     ) {
                         Text(
                             text = receipt.statusNota,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (isLunas) Color(0xFF047857) else Color(0xFFB91C1C),
+                            color = if (isLunas) SuccessLight else WarningLight,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -593,7 +600,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
             Spacer(modifier = Modifier.height(2.dp))
 
             Text(
-                text = "Terima Kasih Atas Kunjungan Anda",
+                text = "Terima Kasih",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = Color.Gray,

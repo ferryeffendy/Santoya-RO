@@ -1,0 +1,280 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmailKey(emailKey) {
+      return emailKey is string && emailKey.size() >= 3 && emailKey.size() <= 160 && emailKey.matches('^[a-zA-Z0-9_.+\\-@]+$');
+    }
+
+    function hasVerifiedEmail() {
+      return isSignedIn() &&
+             request.auth.token.email_verified == true &&
+             request.auth.token.email is string &&
+             request.auth.token.email.size() <= 160;
+    }
+
+    function isVerifiedEmailInList(emailList) {
+      return hasVerifiedEmail() &&
+             emailList is list &&
+             (request.auth.token.email.lower() in emailList);
+    }
+
+    function isDepotOwner(depotId) {
+      return isSignedIn() &&
+             (
+               depotId == 'depot_' + request.auth.uid ||
+               (
+                 exists(/databases/$(database)/documents/depots/$(depotId)) &&
+                 get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid
+               )
+             );
+    }
+
+    function isDepotMember(depotId) {
+      return isSignedIn() &&
+             (
+               depotId == 'depot_' + request.auth.uid ||
+               (
+                 exists(/databases/$(database)/documents/depots/$(depotId)) &&
+                 (
+                   get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid ||
+                   isVerifiedEmailInList(get(/databases/$(database)/documents/depots/$(depotId)).data.memberEmails)
+                 )
+               )
+             );
+    }
+
+    function hasValidSyncMeta(data, docId) {
+      return data.syncId is string &&
+             data.syncId == docId &&
+             isValidId(data.syncId) &&
+             data.updatedAt is number &&
+             data.updatedAt >= 0 &&
+             data.isDeleted is bool &&
+             data.serverUpdatedAt is timestamp &&
+             data.serverUpdatedAt <= request.time;
+    }
+
+    function isValidDepot(data) {
+      return data.keys().hasAll(['depotId', 'ownerUid', 'ownerEmail', 'name', 'memberEmails', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['depotId', 'ownerUid', 'ownerEmail', 'name', 'memberEmails', 'createdAt', 'updatedAt']) &&
+             isValidId(data.depotId) &&
+             data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+             data.ownerEmail is string && data.ownerEmail.size() <= 160 &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             data.memberEmails is list && data.memberEmails.size() <= 30 &&
+             (data.memberEmails.size() == 0 || (data.memberEmails[0] is string && data.memberEmails[0].size() <= 160));
+    }
+
+    function isValidStaffLink(data) {
+      return data.keys().hasAll(['depotId', 'ownerUid', 'ownerEmail', 'staffEmail', 'active', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['depotId', 'ownerUid', 'ownerEmail', 'staffEmail', 'active', 'createdAt', 'updatedAt']) &&
+             isValidId(data.depotId) &&
+             data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
+             data.ownerEmail is string && data.ownerEmail.size() <= 160 &&
+             isValidEmailKey(data.staffEmail) &&
+             data.active is bool;
+    }
+
+    function isValidProduk(data, docId) {
+      return data.keys().hasAll(['syncId', 'nama_produk', 'harga', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'nama_produk', 'harga', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.nama_produk is string && data.nama_produk.size() >= 1 && data.nama_produk.size() <= 120 &&
+             data.harga is number && data.harga >= 0;
+    }
+
+    function isValidKurir(data, docId) {
+      return data.keys().hasAll(['syncId', 'nama', 'komisi_per_galon', 'email', 'akses_aktif', 'skema_komisi', 'aturan_komisi', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'nama', 'komisi_per_galon', 'email', 'akses_aktif', 'skema_komisi', 'aturan_komisi', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.nama is string && data.nama.size() >= 1 && data.nama.size() <= 120 &&
+             data.komisi_per_galon is number && data.komisi_per_galon >= 0 &&
+             data.email is string && data.email.size() <= 160 &&
+             data.akses_aktif is bool &&
+             data.skema_komisi is string && data.skema_komisi.size() <= 40 &&
+             data.aturan_komisi is string && data.aturan_komisi.size() <= 200;
+    }
+
+    function isValidPelanggan(data, docId) {
+      return data.keys().hasAll(['syncId', 'nama', 'alamat', 'no_hp', 'sisa_kasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'nama', 'alamat', 'no_hp', 'sisa_kasbon', 'harga_khusus', 'kurirSyncId', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.nama is string && data.nama.size() >= 1 && data.nama.size() <= 120 &&
+             data.alamat is string && data.alamat.size() <= 300 &&
+             data.no_hp is string && data.no_hp.size() <= 40 &&
+             data.sisa_kasbon is number && data.sisa_kasbon >= 0 &&
+             (!('harga_khusus' in data) || data.harga_khusus == null || (data.harga_khusus is number && data.harga_khusus >= 0)) &&
+             (!('kurirSyncId' in data) || data.kurirSyncId == null || (data.kurirSyncId is string && data.kurirSyncId.size() <= 128));
+    }
+
+    function isValidTransaksi(data, docId) {
+      return data.keys().hasAll(['syncId', 'tanggal', 'pelangganSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'tanggal', 'pelangganSyncId', 'kurirSyncId', 'produkSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.tanggal is number && data.tanggal >= 0 &&
+             data.pelangganSyncId is string && data.pelangganSyncId.size() >= 1 && data.pelangganSyncId.size() <= 128 &&
+             (!('kurirSyncId' in data) || data.kurirSyncId == null || (data.kurirSyncId is string && data.kurirSyncId.size() <= 128)) &&
+             (!('produkSyncId' in data) || data.produkSyncId == null || (data.produkSyncId is string && data.produkSyncId.size() <= 128)) &&
+             data.jumlah is number && data.jumlah >= 1 &&
+             data.harga_satuan is number && data.harga_satuan >= 0 &&
+             data.total_harga is number && data.total_harga >= 0 &&
+             data.total_komisi is number && data.total_komisi >= 0 &&
+             data.metode_bayar is string && data.metode_bayar.size() <= 40 &&
+             data.status is string && data.status.size() <= 40 &&
+             data.uangMuka is number && data.uangMuka >= 0 &&
+             data.sisaKasbon is number && data.sisaKasbon >= 0;
+    }
+
+    function isValidPengeluaran(data, docId) {
+      return data.keys().hasAll(['syncId', 'tanggal', 'nama_item', 'kategori', 'nominal', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'tanggal', 'nama_item', 'kategori', 'nominal', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.tanggal is number && data.tanggal >= 0 &&
+             data.nama_item is string && data.nama_item.size() >= 1 && data.nama_item.size() <= 200 &&
+             data.kategori is string && data.kategori.size() <= 80 &&
+             data.nominal is number && data.nominal >= 0;
+    }
+
+    function isValidKasbonLog(data, docId) {
+      return data.keys().hasAll(['syncId', 'pelangganSyncId', 'tanggal', 'jumlah_bayar', 'sisa_kasbon_sebelum', 'sisa_kasbon_sesudah', 'metode_bayar', 'catatan', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'pelangganSyncId', 'tanggal', 'jumlah_bayar', 'sisa_kasbon_sebelum', 'sisa_kasbon_sesudah', 'metode_bayar', 'catatan', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.pelangganSyncId is string && data.pelangganSyncId.size() >= 1 && data.pelangganSyncId.size() <= 128 &&
+             data.tanggal is number && data.tanggal >= 0 &&
+             data.jumlah_bayar is number &&
+             data.sisa_kasbon_sebelum is number &&
+             data.sisa_kasbon_sesudah is number &&
+             data.metode_bayar is string && data.metode_bayar.size() <= 40 &&
+             data.catatan is string && data.catatan.size() <= 300;
+    }
+
+    match /staff_links/{emailKey} {
+      allow get: if isSignedIn() &&
+                    isValidEmailKey(emailKey) &&
+                    (
+                      resource == null ||
+                      (hasVerifiedEmail() && request.auth.token.email.lower() == emailKey) ||
+                      existing().ownerUid == request.auth.uid
+                    );
+
+      allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       isValidEmailKey(emailKey) &&
+                       isValidStaffLink(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().staffEmail == emailKey &&
+                       isDepotOwner(incoming().depotId) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+                       isValidEmailKey(emailKey) &&
+                       isValidStaffLink(incoming()) &&
+                       existing().ownerUid == request.auth.uid &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().depotId == existing().depotId &&
+                       incoming().staffEmail == existing().staffEmail &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow delete: if isSignedIn() &&
+                       isValidEmailKey(emailKey) &&
+                       existing().ownerUid == request.auth.uid;
+    }
+
+    match /depots/{depotId} {
+      allow get: if isSignedIn() &&
+                    isValidId(depotId) &&
+                    (
+                      depotId == 'depot_' + request.auth.uid ||
+                      (resource != null && (existing().ownerUid == request.auth.uid || isVerifiedEmailInList(existing().memberEmails)))
+                    );
+
+      allow list: if isSignedIn() &&
+                     (resource.data.ownerUid == request.auth.uid || isVerifiedEmailInList(resource.data.memberEmails));
+
+      allow create: if isSignedIn() &&
+                       isValidId(depotId) &&
+                       isValidDepot(incoming()) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().depotId == depotId &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow update: if isSignedIn() &&
+                       isValidId(depotId) &&
+                       isValidDepot(incoming()) &&
+                       existing().ownerUid == request.auth.uid &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().depotId == existing().depotId &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+
+      allow delete: if isSignedIn() &&
+                       isValidId(depotId) &&
+                       existing().ownerUid == request.auth.uid;
+
+      match /produk/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidProduk(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /kurir/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidKurir(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /pelanggan/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidPelanggan(incoming(), docId) && isDepotMember(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /transaksi/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidTransaksi(incoming(), docId) && isDepotMember(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /kasbon_logs/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidKasbonLog(incoming(), docId) && isDepotMember(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /pengeluaran/{docId} {
+        allow get: if isValidId(docId) && isDepotOwner(depotId);
+        allow list: if isDepotOwner(depotId);
+        allow create, update: if isValidId(docId) && isValidPengeluaran(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+    }
+  }
+}

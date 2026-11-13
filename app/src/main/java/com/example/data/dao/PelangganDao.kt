@@ -14,13 +14,22 @@ interface PelangganDao {
     @Query("SELECT * FROM pelanggan ORDER BY nama ASC")
     fun getAll(): Flow<List<Pelanggan>>
 
+    @Query("SELECT * FROM pelanggan ORDER BY nama ASC")
+    suspend fun getAllOnce(): List<Pelanggan>
+
     @Query("SELECT * FROM pelanggan WHERE id = :id LIMIT 1")
     suspend fun getById(id: Int): Pelanggan?
 
+    @Query("SELECT * FROM pelanggan WHERE syncId = :syncId LIMIT 1")
+    suspend fun getBySyncId(syncId: String): Pelanggan?
+
     @Query("""
         SELECT p.* FROM pelanggan p
-        WHERE COALESCE(p.sisa_kasbon, 0.0) > 0 
-           OR p.id IN (SELECT DISTINCT id_pelanggan FROM transaksi WHERE LOWER(status) = 'kasbon')
+        WHERE COALESCE(p.alamat, '') NOT LIKE '[DIHAPUS:%'
+          AND (
+              COALESCE(p.sisa_kasbon, 0.0) > 0 
+              OR p.id IN (SELECT DISTINCT id_pelanggan FROM transaksi WHERE LOWER(status) = 'kasbon')
+          )
         ORDER BY p.sisa_kasbon DESC, p.nama ASC
     """)
     fun getWithKasbon(): Flow<List<Pelanggan>>
@@ -34,9 +43,21 @@ interface PelangganDao {
     @Delete
     suspend fun delete(pelanggan: Pelanggan)
 
-    @Query("UPDATE pelanggan SET sisa_kasbon = CASE WHEN (COALESCE(sisa_kasbon, 0.0) + :delta) < 0 THEN 0.0 ELSE (COALESCE(sisa_kasbon, 0.0) + :delta) END WHERE id = :id")
-    suspend fun updateKasbon(id: Int, delta: Double)
+    @Query("DELETE FROM pelanggan WHERE syncId = :syncId")
+    suspend fun deleteBySyncId(syncId: String)
 
-    @Query("UPDATE pelanggan SET sisa_kasbon = :newBalance WHERE id = :id")
-    suspend fun setKasbon(id: Int, newBalance: Double)
+    @Query("UPDATE pelanggan SET sisa_kasbon = CASE WHEN (COALESCE(sisa_kasbon, 0.0) + :delta) < 0 THEN 0.0 ELSE (COALESCE(sisa_kasbon, 0.0) + :delta) END, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun updateKasbon(id: Int, delta: Double, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("UPDATE pelanggan SET sisa_kasbon = :newBalance, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setKasbon(id: Int, newBalance: Double, updatedAt: Long = System.currentTimeMillis())
+
+    @Query("SELECT * FROM pelanggan WHERE LOWER(nama) = LOWER(:nama) LIMIT 1")
+    suspend fun getByName(nama: String): Pelanggan?
+
+    @Query("SELECT COUNT(*) FROM pelanggan")
+    suspend fun count(): Int
+
+    @Query("DELETE FROM pelanggan")
+    suspend fun deleteAll()
 }
