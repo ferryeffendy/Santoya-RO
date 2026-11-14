@@ -110,6 +110,7 @@ import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.bringIntoViewOnFocus
@@ -2401,7 +2402,7 @@ fun RiwayatTransaksiTab(
                 item {
                     val hasActiveFilter = searchQuery.isNotBlank() || selectedFilter != RiwayatFilterOption.SEMUA
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_transaksi,
+                        emptyType = SantoyaEmptyType.TRANSAKSI,
                         title = if (searchQuery.isNotBlank()) "Transaksi Tidak Ditemukan" else "Belum Ada Riwayat",
                         subtitle = if (searchQuery.isNotBlank()) {
                             "Nota untuk \"$searchQuery\" tidak ditemukan."

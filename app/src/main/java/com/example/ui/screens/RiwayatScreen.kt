@@ -70,6 +70,7 @@ import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
@@ -240,7 +241,7 @@ fun RiwayatScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_transaksi,
+                        emptyType = SantoyaEmptyType.TRANSAKSI,
                         title = if (searchQuery.isBlank()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
                         subtitle = if (searchQuery.isBlank()) {
                             "Penjualan yang tercatat akan muncul di sini."

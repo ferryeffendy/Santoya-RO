@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
@@ -116,6 +115,7 @@ import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaLoadingSkeleton
@@ -1544,7 +1544,7 @@ private fun KasbonPelangganTab(
             )
         } else if (sortedKasbon.isEmpty()) {
             EmptyListState(
-                illustrationRes = if (searchQuery.isBlank()) R.drawable.img_empty_kasbon else R.drawable.img_empty_pelanggan,
+                emptyType = if (searchQuery.isBlank()) SantoyaEmptyType.KASBON else SantoyaEmptyType.PELANGGAN,
                 icon = Icons.Default.HourglassBottom,
                 title = if (searchQuery.isBlank()) "Tidak ada tagihan kasbon" else "Pelanggan tidak ditemukan",
                 subtitle = if (searchQuery.isBlank()) {
@@ -2766,7 +2766,7 @@ private fun PelunasanKasbonDialog(
 
 @Composable
 private fun EmptyListState(
-    @DrawableRes illustrationRes: Int = R.drawable.img_empty_pelanggan,
+    emptyType: SantoyaEmptyType = SantoyaEmptyType.PELANGGAN,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     title: String,
     subtitle: String,
@@ -2779,9 +2779,14 @@ private fun EmptyListState(
         contentAlignment = Alignment.Center
     ) {
         SantoyaEmptyState(
-            illustrationRes = illustrationRes,
+            emptyType = emptyType,
             title = title,
             subtitle = subtitle,
+            accentColor = if (emptyType == SantoyaEmptyType.KASBON) {
+                MaterialTheme.santoyaColors.success
+            } else {
+                MaterialTheme.colorScheme.primary
+            },
             secondaryActionLabel = if (onResetSearch != null) "Reset Pencarian" else null,
             secondaryActionIcon = if (onResetSearch != null) Icons.Default.Clear else null,
             onSecondaryAction = onResetSearch

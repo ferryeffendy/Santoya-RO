@@ -75,6 +75,7 @@ import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Produk
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
 import com.example.ui.components.bringIntoViewOnFocus
@@ -146,7 +147,7 @@ fun ProdukScreen(
             if (displayList.isEmpty()) {
                 item {
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_depot,
+                        emptyType = SantoyaEmptyType.DEPOT,
                         title = "Belum Ada Produk",
                         subtitle = "Tambahkan daftar galon atau layanan isi ulang agar siap digunakan di kasir.",
                         primaryActionLabel = "Tambah Produk",

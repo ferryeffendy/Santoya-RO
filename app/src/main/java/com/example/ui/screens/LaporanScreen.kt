@@ -64,8 +64,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -88,6 +92,7 @@ import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.HydroReportChartIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
@@ -101,6 +106,8 @@ import com.example.ui.theme.HeroGlowRoseSoft
 import com.example.ui.theme.HeroGradientEnd
 import com.example.ui.theme.HeroGradientMid
 import com.example.ui.theme.HeroGradientStart
+import com.example.ui.theme.SantoyaNavyBorder
+import com.example.ui.theme.SantoyaNavyPanel
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
@@ -551,7 +558,7 @@ fun LaporanScreen(
             if (!hasPeriodActivity) {
                 item {
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_laporan,
+                        emptyType = SantoyaEmptyType.LAPORAN,
                         title = "Belum ada transaksi di periode ini",
                         subtitle = "Belum ada data. Coba pilih periode lain atau catat transaksi baru.",
                         primaryActionLabel = "Catat Transaksi",
@@ -563,9 +570,11 @@ fun LaporanScreen(
                     )
                 }
             } else {
-                // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Solid Brand Navy Style)
+                // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Solid Fresh Hydro Blue Style)
                 item {
                     val heroContainerColor = if (isProfit) HeroGradientStart else HeroDeficitStart
+                    val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else Color(0xFF6E1B26)
+                    val heroBorderColor = if (isProfit) SantoyaNavyBorder else HeroGlowRoseSoft.copy(alpha = 0.45f)
                     val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
                     val formattedMargin = FormatUtils.formatPercent(marginLabaPersen)
 
@@ -573,12 +582,36 @@ fun LaporanScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(22.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        colors = CardDefaults.cardColors(containerColor = heroContainerColor)
+                        colors = CardDefaults.cardColors(containerColor = heroContainerColor),
+                        border = BorderStroke(1.dp, heroBorderColor)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(heroContainerColor)
+                                .drawBehind {
+                                    // Minimalist organic water droplet & leaf vein line art in top-right corner
+                                    val w = size.width
+                                    val h = size.height
+                                    val curve1 = Path().apply {
+                                        moveTo(w * 0.72f, 0f)
+                                        cubicTo(w * 0.76f, h * 0.28f, w * 0.88f, h * 0.36f, w, h * 0.38f)
+                                    }
+                                    drawPath(
+                                        path = curve1,
+                                        color = Color.White.copy(alpha = 0.24f),
+                                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                    val curve2 = Path().apply {
+                                        moveTo(w * 0.82f, 0f)
+                                        quadraticTo(w * 0.86f, h * 0.22f, w, h * 0.26f)
+                                    }
+                                    drawPath(
+                                        path = curve2,
+                                        color = heroAccent.copy(alpha = 0.36f),
+                                        style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                }
                                 .padding(20.dp)
                         ) {
                             // Top Header Row: Label (Weighted so it never collides on small screens)
@@ -620,7 +653,7 @@ fun LaporanScreen(
                                         Text(
                                             text = "Uang masuk dikurangi biaya & komisi",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White.copy(alpha = 0.75f),
+                                            color = Color.White.copy(alpha = 0.82f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -649,8 +682,8 @@ fun LaporanScreen(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(50),
-                                    color = heroAccent.copy(alpha = 0.18f),
-                                    border = BorderStroke(1.dp, heroAccent.copy(alpha = 0.45f))
+                                    color = heroSubPanelColor,
+                                    border = BorderStroke(1.dp, heroAccent.copy(alpha = 0.55f))
                                 ) {
                                     Text(
                                         text = "Margin Laba: $formattedMargin",
@@ -663,13 +696,14 @@ fun LaporanScreen(
 
                                 Surface(
                                     shape = RoundedCornerShape(50),
-                                    color = Color.White.copy(alpha = 0.1f)
+                                    color = heroSubPanelColor,
+                                    border = BorderStroke(1.dp, heroBorderColor)
                                 ) {
                                     Text(
                                         text = if (isProfit) "Surplus" else "Defisit",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color.White.copy(alpha = 0.85f),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                     )
                                 }
@@ -677,7 +711,7 @@ fun LaporanScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Glassmorphic Multi-Segment Cashflow Bar
+                            // Solid Sub-Panel Multi-Segment Cashflow Bar
                             val positiveProfit = labaBersih.coerceAtLeast(0.0)
                             val totalFlowBase = (positiveProfit + totalPengeluaran + totalKomisiKurir).coerceAtLeast(1.0)
                             val profitShare = (positiveProfit / totalFlowBase).toFloat().coerceIn(0f, 1f)
@@ -689,9 +723,9 @@ fun LaporanScreen(
                             val komisiPct = (komisiShare * 100).toInt()
 
                             Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color.White.copy(alpha = 0.09f),
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+                                shape = RoundedCornerShape(16.dp),
+                                color = heroSubPanelColor,
+                                border = BorderStroke(1.dp, heroBorderColor),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {

@@ -86,6 +86,7 @@ import com.example.ui.components.HydroExpenseFlowIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.bringIntoViewOnFocus
@@ -401,7 +402,7 @@ fun PengeluaranScreen(
                         item(span = { GridItemSpan(maxLineSpan) }) {
                             val isUnfilteredEmpty = searchQuery.isBlank() && selectedCategoryFilter == "Semua"
                             SantoyaEmptyState(
-                                illustrationRes = R.drawable.img_empty_laporan,
+                                emptyType = SantoyaEmptyType.LAPORAN,
                                 title = if (isUnfilteredEmpty) "Belum Ada Pengeluaran" else "Pengeluaran Tidak Ditemukan",
                                 subtitle = if (isUnfilteredEmpty) {
                                     "Catat biaya listrik, tutup galon, atau BBM antar agar laba bersih tercatat akurat."

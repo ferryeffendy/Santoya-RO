@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -9,7 +8,6 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -70,10 +68,8 @@ import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -716,11 +712,11 @@ fun SantoyaFormBottomSheet(
 }
 
 /**
- * Unified Empty State Card with custom Santoya RO illustrations and contextual actions.
+ * Unified Empty State Card with borderless Light/Dark-adaptive flat vector illustrations and contextual actions.
  */
 @Composable
 fun SantoyaEmptyState(
-    @DrawableRes illustrationRes: Int,
+    emptyType: SantoyaEmptyType,
     title: String,
     subtitle: String,
     modifier: Modifier = Modifier,
@@ -747,22 +743,12 @@ fun SantoyaEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.16f)),
-                modifier = Modifier.size(
-                    width = if (compact) 152.dp else 188.dp,
-                    height = if (compact) 114.dp else 141.dp
-                )
-            ) {
-                Image(
-                    painter = painterResource(id = illustrationRes),
-                    contentDescription = title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.clip(RoundedCornerShape(18.dp))
-                )
-            }
+            SantoyaEmptyIllustration(
+                type = emptyType,
+                accentColor = accentColor,
+                compact = compact,
+                description = title
+            )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = title,

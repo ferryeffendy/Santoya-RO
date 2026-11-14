@@ -72,6 +72,7 @@ import com.example.data.entity.Kurir
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
 import com.example.ui.components.bringIntoViewOnFocus
@@ -152,7 +153,7 @@ fun KurirScreen(
             if (displayKurirList.isEmpty()) {
                 item {
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_depot,
+                        emptyType = SantoyaEmptyType.DEPOT,
                         title = "Belum Ada Karyawan",
                         subtitle = "Tambahkan akun kurir & tarif komisi per galon agar pengiriman otomatis tercatat.",
                         primaryActionLabel = "Tambah Karyawan",

@@ -91,6 +91,7 @@ import com.example.ui.components.HydroReportChartIcon
 import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
 import com.example.ui.theme.AccentAmber
@@ -105,6 +106,7 @@ import com.example.ui.theme.HeroGlowEmeraldSoft
 import com.example.ui.theme.HeroGlowRose
 import com.example.ui.theme.HeroGlowRoseSoft
 import com.example.ui.theme.SantoyaDewMint
+import com.example.ui.theme.SantoyaHydroDeepText
 import com.example.ui.theme.SantoyaLeafGreen
 import com.example.ui.theme.SantoyaMistBlue
 import com.example.ui.theme.SantoyaNavy
@@ -429,7 +431,7 @@ fun DashboardScreen(
                                 }
                                 drawPath(
                                     path = curve1,
-                                    color = SantoyaWaterBlue.copy(alpha = 0.18f),
+                                    color = Color.White.copy(alpha = 0.24f),
                                     style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
                                 )
                                 val curve2 = Path().apply {
@@ -438,8 +440,8 @@ fun DashboardScreen(
                                 }
                                 drawPath(
                                     path = curve2,
-                                    color = SantoyaLeafGreen.copy(alpha = 0.22f),
-                                    style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+                                    color = HeroGlowEmeraldSoft.copy(alpha = 0.36f),
+                                    style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
                                 )
                             }
                             .padding(20.dp)
@@ -1237,19 +1239,19 @@ fun DashboardScreen(
                             }
                         }
 
-                        // BARIS 3: 1 KARTU PENUH — LAPORAN & ANALITIK
+                        // BARIS 3: 1 KARTU PENUH — LAPORAN & ANALITIK (Kombinasi Biru Air & Hijau Daun Logo)
                         EditorialFullBannerBentoCard(
                             title = "Laporan",
                             subtitle = "Evaluasi omzet, komisi kurir & laba bersih",
                             badgeTag = "Analitik",
                             iconContainerColor = SantoyaMistBlue,
-                            accentColor = SantoyaNavy,
+                            accentColor = SantoyaWaterBlue,
                             testTag = "nav_laporan_button",
                             onClick = onNavigateToLaporan,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             HydroReportChartIcon(
-                                tint = SantoyaNavy,
+                                tint = SantoyaWaterBlue,
                                 leafAccent = SantoyaLeafGreen,
                                 modifier = Modifier.size(23.dp)
                             )
@@ -1339,7 +1341,7 @@ fun DashboardScreen(
             } else if (recentTransactionsToShow.isEmpty()) {
                 item {
                     SantoyaEmptyState(
-                        illustrationRes = R.drawable.img_empty_transaksi,
+                        emptyType = SantoyaEmptyType.TRANSAKSI,
                         title = "Belum ada transaksi",
                         subtitle = if (isKaryawan) {
                             "Belum ada penjualan. Catat orderan pertama hari ini."
@@ -1619,7 +1621,7 @@ private fun EditorialPrimaryWideBentoCard(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Black,
-                        color = SantoyaNavy,
+                        color = SantoyaHydroDeepText,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1627,7 +1629,7 @@ private fun EditorialPrimaryWideBentoCard(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = SantoyaNavy.copy(alpha = 0.75f),
+                        color = SantoyaHydroDeepText.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
