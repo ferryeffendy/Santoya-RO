@@ -65,7 +65,7 @@ object SantoyaReceiptHelper {
         // Details
         val date = FormatUtils.formatDateShort(detail.transaksi.tanggal)
         sb.append(leftRightText("Tgl:", date)).append("\n")
-        sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Pelanggan Eceran (Walk-in)")).append("\n")
+        sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Pelanggan Umum")).append("\n")
         if (!detail.pelanggan?.alamat.isNullOrBlank()) {
             sb.append(leftRightText("Alamat:", detail.pelanggan!!.alamat)).append("\n")
         }
@@ -300,7 +300,7 @@ object SantoyaReceiptHelper {
 
         val bondedDevices = adapter.bondedDevices
         if (bondedDevices.isNullOrEmpty()) {
-            onStatus("Belum ada printer Bluetooth terhubung. Pasangkan printer di pengaturan perangkat.")
+            onStatus("Printer Bluetooth belum tersambung. Sambungkan dulu di Pengaturan HP.")
             return
         }
 
@@ -324,7 +324,7 @@ object SantoyaReceiptHelper {
 
                 onStatus("Struk dicetak ke ${device.name ?: "printer"}")
             } catch (e: Exception) {
-                onStatus("Gagal mencetak: ${e.localizedMessage ?: "Koneksi terputus"}. Gunakan opsi bagikan via WhatsApp.")
+                onStatus("Gagal cetak: ${e.localizedMessage ?: "Koneksi terputus"}. Kirim lewat WhatsApp saja ya.")
             }
         }.start()
     }

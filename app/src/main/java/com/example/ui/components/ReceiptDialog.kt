@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -103,7 +104,7 @@ private fun extractReceiptUi(dialogData: ActiveReceiptDialog): ParsedReceiptUi {
             val totalStr = FormatUtils.formatRupiah(trx.total_harga)
             return ParsedReceiptUi(
                 noNota = "#${trx.id}",
-                tanggal = FormatUtils.formatDate(trx.tanggal),
+                tanggal = FormatUtils.formatDateTimeTable(trx.tanggal),
                 pelanggan = cust?.nama ?: "Umum",
                 alamat = cust?.alamat?.takeIf { it.isNotBlank() },
                 kurir = kurir?.nama?.takeIf { it.isNotBlank() },
@@ -129,7 +130,7 @@ private fun extractReceiptUi(dialogData: ActiveReceiptDialog): ParsedReceiptUi {
             return ParsedReceiptUi(
                 subtitle1 = "BUKTI PELUNASAN KASBON",
                 subtitle2 = "Segar • Murni • Higienis",
-                tanggal = FormatUtils.formatDate(System.currentTimeMillis()),
+                tanggal = FormatUtils.formatDateTimeTable(System.currentTimeMillis()),
                 pelanggan = cust?.nama ?: "Pelanggan",
                 alamat = cust?.alamat?.takeIf { it.isNotBlank() },
                 items = listOf(
@@ -267,7 +268,7 @@ fun ReceiptDialog(
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        text = "Pratinjau Nota & Cetak Thermal",
+                        text = "Pratinjau & Cetak Struk",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -320,7 +321,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Cetak ke Printer Thermal",
+                        text = "Cetak Struk (Bluetooth)",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -349,7 +350,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Kirim Gambar via WhatsApp",
+                        text = "Kirim Gambar ke WhatsApp",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -374,7 +375,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Bagikan Teks Struk",
+                        text = "Kirim Teks Struk",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -641,18 +642,24 @@ private fun ReceiptInfoRow(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.DarkGray
+            color = Color.DarkGray,
+            maxLines = 1
         )
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = Color.Black
+            color = Color.Black,
+            textAlign = TextAlign.End,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
     }
 }

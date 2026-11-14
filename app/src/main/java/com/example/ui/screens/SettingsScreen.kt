@@ -280,7 +280,7 @@ fun SettingsScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "Data kasir & kurir selalu sama di semua HP",
+                                text = "Data otomatis tersinkron di semua HP",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -311,7 +311,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Aman saat sinyal hilang • Tersimpan otomatis di HP",
+                                    text = "Tetap jalan tanpa sinyal • Tersimpan di HP",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -320,7 +320,7 @@ fun SettingsScreen(
 
                             if (syncState.pendingCount > 0) {
                                 Text(
-                                    text = "${syncState.pendingCount} transaksi baru menunggu sinyal internet untuk dikirim",
+                                    text = "${syncState.pendingCount} transaksi menunggu koneksi untuk dikirim",
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.santoyaColors.warning
@@ -335,7 +335,7 @@ fun SettingsScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "Data transaksi dan pelanggan tersinkronisasi secara langsung.",
+                                    text = "Semua perubahan langsung tersimpan ke Cloud.",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -343,7 +343,7 @@ fun SettingsScreen(
 
                             if (lastSyncSummary != null) {
                                 Text(
-                                    text = "Data tersimpan: ${lastSyncSummary?.pelangganCount ?: 0} pelanggan • ${lastSyncSummary?.transaksiCount ?: 0} transaksi",
+                                    text = "Rekap Cloud: ${lastSyncSummary?.pelangganCount ?: 0} pelanggan • ${lastSyncSummary?.transaksiCount ?: 0} transaksi",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -402,7 +402,8 @@ fun SettingsScreen(
                                     text = "Cadangkan",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -430,7 +431,8 @@ fun SettingsScreen(
                                 text = "Ambil Data",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                maxLines = 1
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -598,7 +600,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Unduh Laporan Excel (CSV) untuk pembukuan atau simpan File Cadangan untuk arsip di HP.",
+                        text = "Simpan Laporan Excel (CSV) untuk pembukuan atau File Cadangan untuk arsip HP.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -643,7 +645,7 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Kasir & Distribusi Depot Air Minum",
+                                text = "Aplikasi Kasir Depot Air Minum",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -664,15 +666,15 @@ fun SettingsScreen(
                         )
                         SystemInfoRow(
                             label = "Penyimpanan Data",
-                            value = "Otomatis (HP & Cloud)"
+                            value = "HP & Cloud Otomatis"
                         )
                         SystemInfoRow(
                             label = "Keamanan Data",
-                            value = "Server Asia (Terenkripsi)"
+                            value = "Cloud Terenkripsi"
                         )
                         SystemInfoRow(
                             label = "Status Operasional",
-                            value = "Aktif & Siap Pakai",
+                            value = "Terhubung",
                             valueColor = MaterialTheme.santoyaColors.success,
                             showStatusDot = true
                         )
@@ -698,7 +700,7 @@ fun SettingsScreen(
                 Text("Keluar dari Akun Pemilik?", fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Anda perlu masuk kembali dengan akun Google untuk mengakses data depot dan sinkronisasi antar perangkat.")
+                Text("Anda harus login lagi pakai akun Google untuk membuka data depot.")
             },
             confirmButton = {
                 Button(
@@ -733,7 +735,7 @@ fun SettingsScreen(
                 Text("Ambil Data dari Cloud?", fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Seluruh data pelanggan, produk, karyawan, dan transaksi terbaru dari Cloud akan digabungkan ke HP ini. Lanjutkan?")
+                Text("Data pelanggan, produk, kurir, dan transaksi dari Cloud akan digabungkan ke HP ini. Lanjutkan?")
             },
             confirmButton = {
                 Button(
@@ -786,8 +788,12 @@ private fun SystemInfoRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
+        Spacer(modifier = Modifier.width(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (showStatusDot) {
                 Box(
@@ -801,7 +807,9 @@ private fun SystemInfoRow(
                 text = value,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = valueColor
+                color = valueColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

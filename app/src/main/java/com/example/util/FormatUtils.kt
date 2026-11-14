@@ -10,32 +10,126 @@ import java.util.concurrent.TimeUnit
 object FormatUtils {
 
     private val idLocale = Locale("id", "ID")
+    private val idSymbols = java.text.DecimalFormatSymbols(idLocale).apply {
+        groupingSeparator = '.'
+        decimalSeparator = ','
+    }
 
+    private val integerNumberFormatter = object : ThreadLocal<java.text.DecimalFormat>() {
+        override fun initialValue(): java.text.DecimalFormat =
+            java.text.DecimalFormat("#,##0", idSymbols)
+    }
+
+    private val singleDecimalFormatter = object : ThreadLocal<java.text.DecimalFormat>() {
+        override fun initialValue(): java.text.DecimalFormat =
+            java.text.DecimalFormat("#,##0.0", idSymbols)
+    }
+
+    private val dateUiFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd MMM yyyy", idLocale)
+    }
+
+    private val dateTimeUiFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd MMM yyyy, HH:mm", idLocale)
+    }
+
+    private val dateTableFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd/MM/yyyy", idLocale)
+    }
+
+    private val dateTimeTableFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd/MM/yyyy HH:mm", idLocale)
+    }
+
+    private val timeOnlyFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("HH:mm", idLocale)
+    }
+
+    private val shortDayMonthFormatter = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat =
+            SimpleDateFormat("dd MMM", idLocale)
+    }
+
+    /**
+     * Standard Indonesian Rupiah currency format: "Rp 15.000" or "-Rp 15.000".
+     * Guaranteed deterministic separator (dot for thousands, no decimals).
+     */
     fun formatRupiah(amount: Double): String {
-        val formatter = NumberFormat.getCurrencyInstance(idLocale)
-        formatter.maximumFractionDigits = 0
-        formatter.minimumFractionDigits = 0
-        return formatter.format(amount).replace("Rp", "Rp ").replace('\u00A0', ' ')
+        val isNegative = amount < 0
+        val absVal = kotlin.math.abs(amount)
+        val numStr = integerNumberFormatter.get()!!.format(absVal)
+        return if (isNegative) "-Rp $numStr" else "Rp $numStr"
+    }
+
+    /**
+     * Standard Indonesian number grouping: "1.250"
+     */
+    fun formatNumber(number: Number): String {
+        return integerNumberFormatter.get()!!.format(number)
+    }
+
+    /**
+     * Standard Indonesian percentage with comma decimal separator: "15,5%"
+     */
+    fun formatPercent(percent: Double, decimals: Int = 1): String {
+        val formatted = when {
+            decimals <= 0 -> integerNumberFormatter.get()!!.format(percent)
+            decimals == 1 -> singleDecimalFormatter.get()!!.format(percent)
+            else -> {
+                val pattern = "#,##0." + "0".repeat(decimals)
+                java.text.DecimalFormat(pattern, idSymbols).format(percent)
+            }
+        }
+        return "$formatted%"
+    }
+
+    /**
+     * Standard UI date: "13 Nov 2026"
+     */
+    fun formatDateUi(timestamp: Long): String {
+        return dateUiFormatter.get()!!.format(Date(timestamp))
+    }
+
+    /**
+     * Standard UI date with time: "13 Nov 2026, 14:30"
+     */
+    fun formatDateTimeUi(timestamp: Long): String {
+        return dateTimeUiFormatter.get()!!.format(Date(timestamp))
+    }
+
+    /**
+     * Standard Table / Receipt date: "13/11/2026"
+     */
+    fun formatDateTable(timestamp: Long): String {
+        return dateTableFormatter.get()!!.format(Date(timestamp))
+    }
+
+    /**
+     * Standard Table / Receipt date with time: "13/11/2026 14:30"
+     */
+    fun formatDateTimeTable(timestamp: Long): String {
+        return dateTimeTableFormatter.get()!!.format(Date(timestamp))
     }
 
     fun formatDate(timestamp: Long): String {
-        val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", idLocale)
-        return sdf.format(Date(timestamp))
+        return formatDateTimeUi(timestamp)
     }
 
     fun formatDateTime(timestamp: Long): String {
-        val sdf = SimpleDateFormat("dd MMM yyyy, HH:mm", idLocale)
-        return sdf.format(Date(timestamp))
+        return formatDateTimeUi(timestamp)
     }
 
     fun formatDateShort(timestamp: Long): String {
-        val sdf = SimpleDateFormat("dd/MM/yyyy", idLocale)
-        return sdf.format(Date(timestamp))
+        return formatDateTable(timestamp)
     }
 
     fun formatTimeOnly(timestamp: Long): String {
-        val sdf = SimpleDateFormat("HH:mm", idLocale)
-        return sdf.format(Date(timestamp))
+        return timeOnlyFormatter.get()!!.format(Date(timestamp))
     }
 
     fun daysSince(timestamp: Long): Long {
@@ -62,9 +156,9 @@ object FormatUtils {
         val cleanName = customerName.trim().ifBlank { "Bapak/Ibu" }
         return if (isKasbonReminder && sisaKasbon > 0.0) {
             val notaText = if (unpaidCount > 0) " ($unpaidCount nota)" else ""
-            "Permisi $cleanName, izin mengingatkan tagihan kasbon galon Santoya RO masih ${formatRupiah(sisaKasbon)}$notaText. Terima kasih."
+            "Halo $cleanName, izin mengingatkan kasbon galon Santoya RO masih ${formatRupiah(sisaKasbon)}$notaText ya. Terima kasih."
         } else {
-            "Permisi $cleanName, mau konfirmasi pengantaran galon Santoya RO hari ini. Apakah perlu isi ulang?"
+            "Halo $cleanName, dari Santoya RO. Galonnya mau diantar hari ini?"
         }
     }
 
@@ -129,14 +223,22 @@ object FormatUtils {
         return cal.get(Calendar.DAY_OF_MONTH)
     }
 
-    fun calculateCrmPrediction(
-        customerId: Int,
-        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    /**
+     * O(K log K) CRM prediction operating directly on a single customer's transactions
+     * (where K is the number of transactions for that customer), avoiding O(N) full-table scans.
+     */
+    fun calculateCrmPredictionForCustomer(
+        customerTransaksiList: List<com.example.data.entity.TransaksiDetail>
     ): CrmOrderPrediction {
+        if (customerTransaksiList.size < 2) {
+            return CrmOrderPrediction(
+                status = CrmOrderStatus.INSUFFICIENT_DATA,
+                badgeText = "Belum terjadwal"
+            )
+        }
         val zone = java.time.ZoneId.systemDefault()
-        val distinctDates = transaksiList
+        val distinctDates = customerTransaksiList
             .asSequence()
-            .filter { it.transaksi.id_pelanggan == customerId }
             .map {
                 java.time.Instant.ofEpochMilli(it.transaksi.tanggal)
                     .atZone(zone)
@@ -149,7 +251,7 @@ object FormatUtils {
         if (distinctDates.size < 2) {
             return CrmOrderPrediction(
                 status = CrmOrderStatus.INSUFFICIENT_DATA,
-                badgeText = "Belum Terprediksi"
+                badgeText = "Belum terjadwal"
             )
         }
 
@@ -162,7 +264,7 @@ object FormatUtils {
         if (differences.isEmpty()) {
             return CrmOrderPrediction(
                 status = CrmOrderStatus.INSUFFICIENT_DATA,
-                badgeText = "Belum Terprediksi"
+                badgeText = "Belum terjadwal"
             )
         }
 
@@ -173,8 +275,7 @@ object FormatUtils {
         val daysUntilExpected = java.time.temporal.ChronoUnit.DAYS.between(today, nextExpectedDate).toInt()
 
         val nextExpectedMillis = nextExpectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
-        val shortDateFormatter = SimpleDateFormat("dd MMM", idLocale)
-        val formattedDate = shortDateFormatter.format(Date(nextExpectedMillis))
+        val formattedDate = shortDayMonthFormatter.get()!!.format(Date(nextExpectedMillis))
 
         val status = when {
             daysUntilExpected > 1 -> CrmOrderStatus.ACTIVE
@@ -184,9 +285,9 @@ object FormatUtils {
 
         val badgeText = when (status) {
             CrmOrderStatus.ACTIVE -> "Prediksi: $formattedDate"
-            CrmOrderStatus.DUE_SOON -> "Waktunya Order"
-            CrmOrderStatus.OVERDUE -> "Terlambat ${-daysUntilExpected} Hari"
-            CrmOrderStatus.INSUFFICIENT_DATA -> "Belum Terprediksi"
+            CrmOrderStatus.DUE_SOON -> "Waktunya isi ulang"
+            CrmOrderStatus.OVERDUE -> "Lewat ${-daysUntilExpected} hari"
+            CrmOrderStatus.INSUFFICIENT_DATA -> "Belum terjadwal"
         }
 
         return CrmOrderPrediction(
@@ -199,6 +300,14 @@ object FormatUtils {
         )
     }
 
+    fun calculateCrmPrediction(
+        customerId: Int,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): CrmOrderPrediction {
+        val customerTxs = transaksiList.filter { it.transaksi.id_pelanggan == customerId }
+        return calculateCrmPredictionForCustomer(customerTxs)
+    }
+
     fun calculateEstimatedIntervalDays(
         customerId: Int,
         transaksiList: List<com.example.data.entity.TransaksiDetail>
@@ -206,12 +315,10 @@ object FormatUtils {
         return calculateCrmPrediction(customerId, transaksiList).averageIntervalDays
     }
 
-    fun calculateEmployeeInsight(
-        customerId: Int,
+    fun calculateEmployeeInsightForCustomer(
         prediction: CrmOrderPrediction,
-        transaksiList: List<com.example.data.entity.TransaksiDetail>
+        customerTxs: List<com.example.data.entity.TransaksiDetail>
     ): EmployeeCustomerInsight {
-        val customerTxs = transaksiList.filter { it.transaksi.id_pelanggan == customerId }
         val lastOrderMillis = customerTxs.maxOfOrNull { it.transaksi.tanggal }
         val daysSinceLastOrder = lastOrderMillis?.let { daysSince(it) }
         val avgGallons = if (customerTxs.isNotEmpty()) {
@@ -236,13 +343,13 @@ object FormatUtils {
         val badgeLabel = when (bucket) {
             EmployeeScheduleBucket.TERLAMBAT -> {
                 val overdueDays = -(prediction.daysUntilExpected ?: -1)
-                "Lewat $overdueDays Hari"
+                "Lewat $overdueDays hari"
             }
             EmployeeScheduleBucket.HARI_INI -> "Jadwal Hari Ini"
             EmployeeScheduleBucket.BESOK -> "Jadwal Besok"
             EmployeeScheduleBucket.JADWAL_NANTI -> "Jadwal: ${prediction.nextExpectedDateFormatted ?: "-"}"
             EmployeeScheduleBucket.BELUM_TERPREDIKSI -> {
-                if (customerTxs.isNotEmpty()) "Baru ${customerTxs.size}x Antar" else "Langganan Baru"
+                if (customerTxs.isNotEmpty()) "Baru ${customerTxs.size}x order" else "Langganan Baru"
             }
         }
 
@@ -253,6 +360,15 @@ object FormatUtils {
             scheduleBucket = bucket,
             badgeLabel = badgeLabel
         )
+    }
+
+    fun calculateEmployeeInsight(
+        customerId: Int,
+        prediction: CrmOrderPrediction,
+        transaksiList: List<com.example.data.entity.TransaksiDetail>
+    ): EmployeeCustomerInsight {
+        val customerTxs = transaksiList.filter { it.transaksi.id_pelanggan == customerId }
+        return calculateEmployeeInsightForCustomer(prediction, customerTxs)
     }
 }
 
@@ -285,6 +401,6 @@ data class CrmOrderPrediction(
     val nextExpectedDateMillis: Long? = null,
     val nextExpectedDateFormatted: String? = null,
     val daysUntilExpected: Int? = null,
-    val badgeText: String = "Belum Terprediksi"
+    val badgeText: String = "Belum terjadwal"
 )
 

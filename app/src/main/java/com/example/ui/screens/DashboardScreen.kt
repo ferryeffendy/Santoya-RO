@@ -1,29 +1,25 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,18 +28,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.MoneyOff
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Print
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.HourglassEmpty
@@ -65,7 +55,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,15 +63,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -92,8 +81,20 @@ import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HydroBentoCard
+import com.example.ui.components.HydroCustomerDropIcon
+import com.example.ui.components.HydroExpenseFlowIcon
+import com.example.ui.components.HydroGalonIcon
+import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.HydroReceiptNoteIcon
+import com.example.ui.components.HydroReportChartIcon
 import com.example.ui.components.RealtimeSyncStatusPill
-import com.example.ui.theme.HeroGlassBase
+import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.theme.AccentAmber
+import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.HeroGlowAmber
 import com.example.ui.theme.HeroGlowAmberSoft
 import com.example.ui.theme.HeroGlowCyan
@@ -102,9 +103,13 @@ import com.example.ui.theme.HeroGlowEmerald
 import com.example.ui.theme.HeroGlowEmeraldSoft
 import com.example.ui.theme.HeroGlowRose
 import com.example.ui.theme.HeroGlowRoseSoft
-import com.example.ui.theme.HeroGradientEnd
-import com.example.ui.theme.HeroGradientMid
-import com.example.ui.theme.HeroGradientStart
+import com.example.ui.theme.SantoyaDewMint
+import com.example.ui.theme.SantoyaLeafGreen
+import com.example.ui.theme.SantoyaMistBlue
+import com.example.ui.theme.SantoyaNavy
+import com.example.ui.theme.SantoyaNavyBorder
+import com.example.ui.theme.SantoyaNavyPanel
+import com.example.ui.theme.SantoyaWaterBlue
 import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.CrmOrderStatus
@@ -145,6 +150,7 @@ fun DashboardScreen(
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
     val activeKaryawanFromVm by viewModel.activeKaryawan.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
+    val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
     var showKaryawanSignOutDialog by remember { mutableStateOf(false) }
 
     val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
@@ -257,9 +263,11 @@ fun DashboardScreen(
     Scaffold(
         modifier = modifier.testTag("dashboard_screen"),
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             Column {
                 TopAppBar(
+                    windowInsets = WindowInsets(0, 0, 0, 0),
                     title = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Image(
@@ -279,7 +287,7 @@ fun DashboardScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Manajemen Depot Air Minum",
+                                    text = "Kasir & Antar Galon",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -306,14 +314,15 @@ fun DashboardScreen(
                                     Surface(
                                         shape = CircleShape,
                                         color = MaterialTheme.colorScheme.surfaceVariant,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                         modifier = Modifier.size(38.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Settings,
                                                 contentDescription = "Pengaturan",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp)
+                                                tint = MaterialTheme.colorScheme.onSurface,
+                                                modifier = Modifier.size(19.dp)
                                             )
                                         }
                                     }
@@ -325,7 +334,7 @@ fun DashboardScreen(
                                 ) {
                                     Surface(
                                         shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        color = MaterialTheme.colorScheme.errorContainer,
                                         modifier = Modifier.size(38.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
@@ -348,7 +357,7 @@ fun DashboardScreen(
 
                 HorizontalDivider(
                     thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
             }
         }
@@ -357,14 +366,14 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (syncState.status == SyncConnectionStatus.REVOKED) {
                 item {
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.75f),
+                        color = MaterialTheme.colorScheme.errorContainer,
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -380,7 +389,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Akses akun karyawan sedang dinonaktifkan oleh Pemilik Depot. Hubungi pemilik untuk mengaktifkan kembali sinkronisasi.",
+                                text = "Akses akun Anda sedang dimatikan pemilik. Hubungi pemilik untuk mengaktifkannya lagi.",
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -389,11 +398,14 @@ fun DashboardScreen(
                     }
                 }
             }
-            // 1. World-Class Fintech Executive Hero Card
+
+            // 1. Solid Deep Hydro Navy Hero Card (Zero Gradient, Zero Glassmorphism, Organic Logo Curve)
             item {
                 Card(
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                    shape = RoundedCornerShape(22.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    colors = CardDefaults.cardColors(containerColor = SantoyaNavy),
+                    border = BorderStroke(1.dp, SantoyaNavyBorder),
                     modifier = Modifier
                         .fillMaxWidth()
                         .animateContentSize()
@@ -401,37 +413,28 @@ fun DashboardScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                Brush.linearGradient(
-                                    colors = listOf(
-                                        HeroGradientStart,
-                                        HeroGradientMid,
-                                        HeroGradientEnd
-                                    ),
-                                    start = Offset(0f, 0f),
-                                    end = Offset(1000f, 900f)
-                                )
-                            )
+                            .background(SantoyaNavy)
                             .drawBehind {
-                                drawCircle(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            HeroGlowCyan.copy(alpha = 0.22f),
-                                            Color.Transparent
-                                        ),
-                                        center = Offset(size.width * 0.92f, size.height * 0.12f),
-                                        radius = size.width * 0.55f
-                                    )
+                                // Minimalist organic water droplet & leaf vein line art in top-right corner
+                                val w = size.width
+                                val h = size.height
+                                val curve1 = Path().apply {
+                                    moveTo(w * 0.72f, 0f)
+                                    cubicTo(w * 0.76f, h * 0.28f, w * 0.88f, h * 0.36f, w, h * 0.38f)
+                                }
+                                drawPath(
+                                    path = curve1,
+                                    color = SantoyaWaterBlue.copy(alpha = 0.18f),
+                                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
                                 )
-                                drawCircle(
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(
-                                            HeroGlowEmerald.copy(alpha = 0.18f),
-                                            Color.Transparent
-                                        ),
-                                        center = Offset(size.width * 0.1f, size.height * 0.95f),
-                                        radius = size.width * 0.5f
-                                    )
+                                val curve2 = Path().apply {
+                                    moveTo(w * 0.82f, 0f)
+                                    quadraticTo(w * 0.86f, h * 0.22f, w, h * 0.26f)
+                                }
+                                drawPath(
+                                    path = curve2,
+                                    color = SantoyaLeafGreen.copy(alpha = 0.22f),
+                                    style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
                                 )
                             }
                             .padding(20.dp)
@@ -466,20 +469,18 @@ fun DashboardScreen(
                                             text = if (isKaryawan) "SETORAN TUNAI HARI INI" else "PENDAPATAN TUNAI HARI INI",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
-                                            letterSpacing = 0.8.sp,
-                                            color = Color.White.copy(alpha = 0.72f)
+                                            letterSpacing = 0.7.sp,
+                                            color = Color.White.copy(alpha = 0.78f)
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    Text(
-                                        text = FormatUtils.formatRupiah(
-                                            if (isKaryawan) karyawanMetrics.setoranTunaiHariIni else pendapatanLunasHariIni
-                                        ),
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = if (isKaryawan) karyawanMetrics.setoranTunaiHariIni else pendapatanLunasHariIni,
                                         style = MaterialTheme.typography.headlineLarge,
                                         fontWeight = FontWeight.Black,
                                         color = Color.White,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        minFontSize = 18.sp,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
 
@@ -489,28 +490,28 @@ fun DashboardScreen(
                                 ) {
                                     Surface(
                                         shape = RoundedCornerShape(50),
-                                        color = Color.White.copy(alpha = 0.12f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f))
+                                        color = SantoyaNavyPanel,
+                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
                                         Text(
-                                            text = FormatUtils.formatDateShort(System.currentTimeMillis()),
+                                            text = FormatUtils.formatDateUi(System.currentTimeMillis()),
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.9f),
+                                            color = Color.White,
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                         )
                                     }
                                     if (isKaryawan && effectiveActiveKaryawan != null) {
                                         Surface(
                                             shape = RoundedCornerShape(50),
-                                            color = HeroGlowCyan.copy(alpha = 0.22f),
-                                            border = BorderStroke(1.dp, HeroGlowCyanSoft.copy(alpha = 0.35f))
+                                            color = SantoyaLeafGreen,
+                                            border = BorderStroke(1.dp, HeroGlowEmeraldSoft)
                                         ) {
                                             Text(
                                                 text = effectiveActiveKaryawan.nama,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
-                                                color = HeroGlowCyanSoft,
+                                                color = Color.White,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
@@ -521,12 +522,12 @@ fun DashboardScreen(
                             }
 
                             if (!isKaryawan) {
-                                // Middle Section (Pemilik): Nested Glassmorphic Financial Bento (Laba Bersih & Total Piutang)
+                                // Middle Section (Pemilik): Solid Sub-Panels (Laba Bersih & Total Piutang)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    // Laba Bersih Hari Ini (Clickable -> Laporan Hari Ini)
+                                    // Laba Bersih Hari Ini
                                     val isPositiveProfit = labaBersihHariIni >= 0.0
                                     Surface(
                                         modifier = Modifier
@@ -536,8 +537,8 @@ fun DashboardScreen(
                                                 onNavigateToLaporan()
                                             }),
                                         shape = RoundedCornerShape(16.dp),
-                                        color = Color.White.copy(alpha = 0.10f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                        color = SantoyaNavyPanel,
+                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -546,14 +547,14 @@ fun DashboardScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Surface(
                                                     shape = CircleShape,
-                                                    color = if (isPositiveProfit) HeroGlowEmerald.copy(alpha = 0.25f) else HeroGlowRose.copy(alpha = 0.25f),
+                                                    color = if (isPositiveProfit) SantoyaLeafGreen else HeroGlowRose,
                                                     modifier = Modifier.size(24.dp)
                                                 ) {
                                                     Box(contentAlignment = Alignment.Center) {
                                                         Icon(
                                                             imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                                             contentDescription = null,
-                                                            tint = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
+                                                            tint = Color.White,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -564,31 +565,31 @@ fun DashboardScreen(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.68f),
+                                                    color = Color.White.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            Text(
-                                                text = FormatUtils.formatRupiah(labaBersihHariIni),
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = labaBersihHariIni,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Black,
                                                 color = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                minFontSize = 11.sp,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "Tunai - Biaya & Komisi",
+                                                text = "Kas masuk dikurangi biaya & komisi",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                color = Color.White.copy(alpha = 0.55f),
+                                                color = Color.White.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                     }
 
-                                    // Total Piutang / Kasbon (Clickable -> Pelanggan Tab Kasbon)
+                                    // Total Piutang / Kasbon
                                     Surface(
                                         modifier = Modifier
                                             .weight(1f)
@@ -597,8 +598,8 @@ fun DashboardScreen(
                                                 onNavigateToPelanggan()
                                             }),
                                         shape = RoundedCornerShape(16.dp),
-                                        color = Color.White.copy(alpha = 0.10f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                        color = SantoyaNavyPanel,
+                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -607,14 +608,14 @@ fun DashboardScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Surface(
                                                     shape = CircleShape,
-                                                    color = HeroGlowAmber.copy(alpha = 0.25f),
+                                                    color = HeroGlowAmber,
                                                     modifier = Modifier.size(24.dp)
                                                 ) {
                                                     Box(contentAlignment = Alignment.Center) {
                                                         Icon(
                                                             imageVector = Icons.Outlined.HourglassEmpty,
                                                             contentDescription = null,
-                                                            tint = HeroGlowAmberSoft,
+                                                            tint = Color.White,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -625,24 +626,24 @@ fun DashboardScreen(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.68f),
+                                                    color = Color.White.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            Text(
-                                                text = FormatUtils.formatRupiah(totalPiutangAktif),
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = totalPiutangAktif,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Black,
                                                 color = HeroGlowAmberSoft,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                minFontSize = 11.sp,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "Lihat kasbon →",
+                                                text = "Cek daftar kasbon →",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                color = Color.White.copy(alpha = 0.55f),
+                                                color = Color.White.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -650,12 +651,12 @@ fun DashboardScreen(
                                     }
                                 }
 
-                                // Bottom Section (Pemilik): Production Volume & Monthly Projection Glass Bar
+                                // Bottom Section (Pemilik): Solid Production Volume & Monthly Projection Bar
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = HeroGlassBase.copy(alpha = 0.42f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                                    color = SantoyaNavyPanel,
+                                    border = BorderStroke(1.dp, SantoyaNavyBorder)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -664,7 +665,7 @@ fun DashboardScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        // Total Galon Hari Ini (Clickable -> Transaksi)
+                                        // Total Galon Hari Ini
                                         Row(
                                             modifier = Modifier
                                                 .weight(1f)
@@ -676,57 +677,64 @@ fun DashboardScreen(
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = HeroGlowCyan.copy(alpha = 0.2f),
+                                                color = SantoyaWaterBlue,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Outlined.WaterDrop,
                                                         contentDescription = null,
-                                                        tint = HeroGlowCyanSoft,
+                                                        tint = Color.White,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = "GALON HARI INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.65f),
-                                                    maxLines = 1
+                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                                 Row(verticalAlignment = Alignment.Bottom) {
                                                     Text(
-                                                        text = "$totalGalonHariIni",
+                                                        text = FormatUtils.formatNumber(totalGalonHariIni),
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.Black,
-                                                        color = Color.White
+                                                        color = Color.White,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
                                                         text = "Galon",
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        maxLines = 1,
+                                                        softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
                                                     )
                                                 }
                                             }
                                         }
 
-                                        // Subtle Vertical Divider
+                                        // Solid Vertical Divider
                                         Box(
                                             modifier = Modifier
                                                 .padding(horizontal = 8.dp)
                                                 .width(1.dp)
                                                 .height(34.dp)
-                                                .background(Color.White.copy(alpha = 0.16f))
+                                                .background(SantoyaNavyBorder)
                                         )
 
-                                        // Estimasi Galon Bulan Ini (Clickable -> Laporan Bulan Ini)
+                                        // Estimasi Galon Bulan Ini
                                         Row(
                                             modifier = Modifier
                                                 .weight(1.15f)
@@ -738,42 +746,48 @@ fun DashboardScreen(
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = HeroGlowEmeraldSoft.copy(alpha = 0.18f),
+                                                color = SantoyaLeafGreen,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Outlined.AutoGraph,
                                                         contentDescription = null,
-                                                        tint = HeroGlowEmeraldSoft,
+                                                        tint = Color.White,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = "ESTIMASI BULAN INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    color = Color.White.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Row(verticalAlignment = Alignment.Bottom) {
                                                     Text(
-                                                        text = "$estimasiGalonBulanIni",
+                                                        text = FormatUtils.formatNumber(estimasiGalonBulanIni),
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.Black,
-                                                        color = HeroGlowEmeraldSoft
+                                                        color = HeroGlowEmeraldSoft,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
                                                         text = "Galon",
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        maxLines = 1,
+                                                        softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
                                                     )
                                                 }
@@ -796,8 +810,8 @@ fun DashboardScreen(
                                                 onNavigateToTransaksi()
                                             }),
                                         shape = RoundedCornerShape(16.dp),
-                                        color = Color.White.copy(alpha = 0.10f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                        color = SantoyaNavyPanel,
+                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -806,14 +820,14 @@ fun DashboardScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Surface(
                                                     shape = CircleShape,
-                                                    color = HeroGlowEmerald.copy(alpha = 0.25f),
+                                                    color = HeroGlowEmerald,
                                                     modifier = Modifier.size(24.dp)
                                                 ) {
                                                     Box(contentAlignment = Alignment.Center) {
                                                         Icon(
                                                             imageVector = Icons.Outlined.WaterDrop,
                                                             contentDescription = null,
-                                                            tint = HeroGlowEmeraldSoft,
+                                                            tint = Color.White,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -824,25 +838,25 @@ fun DashboardScreen(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    color = Color.White.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            Text(
-                                                text = FormatUtils.formatRupiah(karyawanMetrics.komisiHariIni),
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = karyawanMetrics.komisiHariIni,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Black,
                                                 color = HeroGlowEmeraldSoft,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                minFontSize = 11.sp,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
                                                 text = "${karyawanMetrics.galonHariIni} Galon • ${karyawanMetrics.pesananHariIni} Order",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.72f),
+                                                color = Color.White.copy(alpha = 0.75f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -858,8 +872,8 @@ fun DashboardScreen(
                                                 onNavigateToTransaksi()
                                             }),
                                         shape = RoundedCornerShape(16.dp),
-                                        color = Color.White.copy(alpha = 0.10f),
-                                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f))
+                                        color = SantoyaNavyPanel,
+                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
                                         Column(
                                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -868,14 +882,14 @@ fun DashboardScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Surface(
                                                     shape = CircleShape,
-                                                    color = HeroGlowCyan.copy(alpha = 0.25f),
+                                                    color = HeroGlowCyan,
                                                     modifier = Modifier.size(24.dp)
                                                 ) {
                                                     Box(contentAlignment = Alignment.Center) {
                                                         Icon(
                                                             imageVector = Icons.Outlined.AutoGraph,
                                                             contentDescription = null,
-                                                            tint = HeroGlowCyanSoft,
+                                                            tint = Color.White,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -886,25 +900,25 @@ fun DashboardScreen(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    color = Color.White.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
-                                            Text(
-                                                text = FormatUtils.formatRupiah(karyawanMetrics.komisiBulanIni),
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = karyawanMetrics.komisiBulanIni,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.Black,
                                                 color = HeroGlowCyanSoft,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                                minFontSize = 11.sp,
+                                                modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
                                                 text = "${karyawanMetrics.galonBulanIni} Galon • ${karyawanMetrics.pesananBulanIni} Order",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.72f),
+                                                color = Color.White.copy(alpha = 0.75f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -916,8 +930,8 @@ fun DashboardScreen(
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(16.dp),
-                                    color = HeroGlassBase.copy(alpha = 0.42f),
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                                    color = SantoyaNavyPanel,
+                                    border = BorderStroke(1.dp, SantoyaNavyBorder)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -937,14 +951,14 @@ fun DashboardScreen(
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = HeroGlowAmber.copy(alpha = 0.22f),
+                                                color = HeroGlowAmber,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Outlined.HourglassEmpty,
                                                         contentDescription = null,
-                                                        tint = HeroGlowAmberSoft,
+                                                        tint = Color.White,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
@@ -956,17 +970,17 @@ fun DashboardScreen(
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    color = Color.White.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
-                                                Text(
-                                                    text = FormatUtils.formatRupiah(totalPiutangAktif),
+                                                SantoyaAdaptiveCurrencyText(
+                                                    amount = totalPiutangAktif,
                                                     style = MaterialTheme.typography.titleMedium,
                                                     fontWeight = FontWeight.Black,
                                                     color = HeroGlowAmberSoft,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
+                                                    minFontSize = 11.sp,
+                                                    modifier = Modifier.fillMaxWidth()
                                                 )
                                             }
                                         }
@@ -976,7 +990,7 @@ fun DashboardScreen(
                                                 .padding(horizontal = 8.dp)
                                                 .width(1.dp)
                                                 .height(34.dp)
-                                                .background(Color.White.copy(alpha = 0.16f))
+                                                .background(SantoyaNavyBorder)
                                         )
 
                                         Row(
@@ -990,26 +1004,26 @@ fun DashboardScreen(
                                         ) {
                                             Surface(
                                                 shape = RoundedCornerShape(10.dp),
-                                                color = HeroGlowCyan.copy(alpha = 0.2f),
+                                                color = HeroGlowCyan,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
                                                         imageVector = Icons.Default.People,
                                                         contentDescription = null,
-                                                        tint = HeroGlowCyanSoft,
+                                                        tint = Color.White,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
+                                            Column(modifier = Modifier.weight(1f)) {
                                                 Text(
                                                     text = "PELANGGAN SAYA",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.65f),
+                                                    color = Color.White.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -1018,14 +1032,20 @@ fun DashboardScreen(
                                                         text = "${effectivePelangganList.size}",
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.Black,
-                                                        color = Color.White
+                                                        color = Color.White,
+                                                        maxLines = 1,
+                                                        softWrap = false,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f, fill = false)
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
                                                         text = "Orang",
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.7f),
+                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        maxLines = 1,
+                                                        softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
                                                     )
                                                 }
@@ -1039,26 +1059,25 @@ fun DashboardScreen(
                 }
             }
 
-            // 2. Smart CRM Order Alert Banner (Jika ada pelanggan yang masuk jadwal order / terlambat)
+            // 2. Smart CRM Order Alert Banner
             if (crmJadwalCustomers.isNotEmpty()) {
                 item {
                     val overdueCount = crmJadwalCustomers.count { it.crmPrediction.status == CrmOrderStatus.OVERDUE }
                     val santoyaColors = MaterialTheme.santoyaColors
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = santoyaColors.warningContainer.copy(alpha = 0.55f),
-                        border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.45f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pressClickEffect(onClick = {
-                                viewModel.setPelangganTab(2) // Tab Jadwal
-                                onNavigateToPelanggan()
-                            })
+                    HydroBentoCard(
+                        accentColor = santoyaColors.warning,
+                        cornerRadius = 18.dp,
+                        tintAlpha = 0.14f,
+                        onClick = {
+                            viewModel.setPelangganTab(2) // Tab Jadwal
+                            onNavigateToPelanggan()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -1066,116 +1085,189 @@ fun DashboardScreen(
                                 modifier = Modifier.weight(1f),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = santoyaColors.warning.copy(alpha = 0.18f),
-                                    modifier = Modifier.size(34.dp)
+                                HydroGradientBadge(
+                                    gradientColors = listOf(AccentAmber, santoyaColors.warning),
+                                    size = 38.dp,
+                                    cornerRadius = 12.dp
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.NotificationsActive,
-                                            contentDescription = null,
-                                            tint = santoyaColors.warning,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.NotificationsActive,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(19.dp)
+                                    )
                                 }
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = "${crmJadwalCustomers.size} Pelanggan Perlu Pengingat",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
-                                        color = santoyaColors.onWarningContainer,
+                                        color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = if (overdueCount > 0) {
-                                            "$overdueCount lewat jadwal • Ketuk untuk kirim pengingat"
+                                            "$overdueCount terlambat • Ketuk untuk kirim pengingat"
                                         } else {
-                                            "Jadwal isi ulang hari ini • Ketuk untuk lihat"
+                                            "Ada jadwal isi ulang galon hari ini"
                                         },
                                         style = MaterialTheme.typography.bodySmall,
                                         color = santoyaColors.warning,
+                                        fontWeight = FontWeight.Medium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Lihat Jadwal",
-                                tint = santoyaColors.warning,
-                                modifier = Modifier.size(16.dp)
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = santoyaColors.warningContainer,
+                                border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.35f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Lihat Jadwal",
+                                    tint = santoyaColors.warning,
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // 3. Menu Navigasi Utama (Tactile Bento Cards)
+            // 3. Menu Navigasi Utama — Bento Editorial Asimetris (1 Kartu Lebar + 2 Kartu Vertikal Asimetris + 1 Kartu Penuh)
             item {
-                Text(
-                    text = "Menu Utama",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Menu Utama",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Akses Cepat Depot",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(modifier = Modifier.height(10.dp))
+
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    // BARIS 1: KARTU LEBAR UTAMA — TRANSAKSI (Mist Water Blue Surface + Water Blue & Leaf Line Art)
+                    EditorialPrimaryWideBentoCard(
+                        title = "Transaksi",
+                        subtitle = "Catat penjualan galon, pengantaran & pembayaran",
+                        badgeTag = "+ Nota Baru",
+                        surfaceTint = SantoyaMistBlue,
+                        accentColor = SantoyaWaterBlue,
+                        testTag = "nav_transaksi_button",
+                        onClick = {
+                            viewModel.setTransaksiTab(0)
+                            onNavigateToTransaksi()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        MenuCard(
-                            modifier = Modifier.weight(1f),
-                            title = "Transaksi",
-                            subtitle = "Penjualan Galon",
-                            icon = Icons.Default.ShoppingCart,
-                            accentColor = MaterialTheme.colorScheme.primary,
-                            testTag = "nav_transaksi_button",
-                            onClick = {
-                                viewModel.setTransaksiTab(0)
-                                onNavigateToTransaksi()
-                            }
+                        HydroGalonIcon(
+                            tint = SantoyaWaterBlue,
+                            leafAccent = SantoyaLeafGreen,
+                            modifier = Modifier.size(26.dp)
                         )
-                        MenuCard(
-                            modifier = Modifier.weight(1f),
+                    }
+
+                    if (!isKaryawan) {
+                        // BARIS 2: 2 KARTU HORIZONTAL BERDAMPINGAN (Ikon di Kiri, Teks di Kanan)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Max),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            EditorialCompactHorizontalBentoCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                title = "Pelanggan",
+                                subtitle = "${effectivePelangganList.size} Profil & Kasbon",
+                                iconContainerColor = SantoyaDewMint,
+                                accentColor = SantoyaLeafGreen,
+                                testTag = "nav_pelanggan_button",
+                                onClick = {
+                                    viewModel.setPelangganTab(0)
+                                    onNavigateToPelanggan()
+                                }
+                            ) {
+                                HydroCustomerDropIcon(
+                                    tint = SantoyaLeafGreen,
+                                    waterAccent = SantoyaWaterBlue,
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
+
+                            EditorialCompactHorizontalBentoCard(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                title = "Pengeluaran",
+                                subtitle = "Catat biaya depot",
+                                iconContainerColor = MaterialTheme.colorScheme.errorContainer,
+                                accentColor = MaterialTheme.colorScheme.error,
+                                testTag = "nav_pengeluaran_button",
+                                onClick = onNavigateToPengeluaran
+                            ) {
+                                HydroExpenseFlowIcon(
+                                    tint = MaterialTheme.colorScheme.error,
+                                    leafAccent = SantoyaWaterBlue,
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
+                        }
+
+                        // BARIS 3: 1 KARTU PENUH — LAPORAN & ANALITIK
+                        EditorialFullBannerBentoCard(
+                            title = "Laporan",
+                            subtitle = "Evaluasi omzet, komisi kurir & laba bersih",
+                            badgeTag = "Analitik",
+                            iconContainerColor = SantoyaMistBlue,
+                            accentColor = SantoyaNavy,
+                            testTag = "nav_laporan_button",
+                            onClick = onNavigateToLaporan,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            HydroReportChartIcon(
+                                tint = SantoyaNavy,
+                                leafAccent = SantoyaLeafGreen,
+                                modifier = Modifier.size(23.dp)
+                            )
+                        }
+                    } else {
+                        // Mode Karyawan: Kartu Pelanggan Penuh di bawah Transaksi
+                        EditorialFullBannerBentoCard(
                             title = "Pelanggan",
-                            subtitle = "Kasbon & Profil",
-                            icon = Icons.Default.People,
-                            accentColor = MaterialTheme.colorScheme.secondary,
+                            subtitle = "${effectivePelangganList.size} Profil pelanggan & catatan kasbon",
+                            badgeTag = "Data Pelanggan",
+                            iconContainerColor = SantoyaDewMint,
+                            accentColor = SantoyaLeafGreen,
                             testTag = "nav_pelanggan_button",
                             onClick = {
                                 viewModel.setPelangganTab(0)
                                 onNavigateToPelanggan()
-                            }
-                        )
-                    }
-                    if (!isKaryawan) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            MenuCard(
-                                modifier = Modifier.weight(1f),
-                                title = "Pengeluaran",
-                                subtitle = "Catat Kas Keluar",
-                                icon = Icons.Default.MoneyOff,
-                                accentColor = MaterialTheme.colorScheme.error,
-                                testTag = "nav_pengeluaran_button",
-                                onClick = onNavigateToPengeluaran
-                            )
-                            MenuCard(
-                                modifier = Modifier.weight(1f),
-                                title = "Laporan",
-                                subtitle = "Omzet & Laba Bersih",
-                                icon = Icons.Default.Assessment,
-                                accentColor = MaterialTheme.colorScheme.tertiary,
-                                testTag = "nav_laporan_button",
-                                onClick = onNavigateToLaporan
+                            HydroCustomerDropIcon(
+                                tint = SantoyaLeafGreen,
+                                waterAccent = SantoyaWaterBlue,
+                                modifier = Modifier.size(23.dp)
                             )
                         }
                     }
@@ -1201,15 +1293,16 @@ fun DashboardScreen(
                     )
                     if (effectiveTransaksiList.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(8.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                             modifier = Modifier.pressClickEffect(onClick = {
                                 viewModel.setTransaksiTab(1)
                                 onNavigateToTransaksi()
                             })
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
@@ -1218,7 +1311,7 @@ fun DashboardScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                                     contentDescription = null,
@@ -1231,64 +1324,37 @@ fun DashboardScreen(
                 }
             }
 
-            if (recentTransactionsToShow.isEmpty()) {
+            if (!isInitialDataLoaded && recentTransactionsToShow.isEmpty()) {
                 item {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 22.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "Belum ada transaksi",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = if (isKaryawan) {
-                                    "Catat penjualan pertama untuk memantau setoran dan komisi."
-                                } else {
-                                    "Catat penjualan pertama untuk memantau omzet dan laba bersih."
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Button(
-                                onClick = {
-                                    viewModel.setTransaksiTab(0)
-                                    onNavigateToTransaksi()
-                                },
-                                shape = RoundedCornerShape(10.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Buat Transaksi",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                    SantoyaLoadingSkeleton(
+                        itemCount = 2,
+                        message = "Memuat aktivitas terbaru..."
+                    )
+                }
+            } else if (recentTransactionsToShow.isEmpty()) {
+                item {
+                    SantoyaEmptyState(
+                        illustrationRes = R.drawable.img_empty_transaksi,
+                        title = "Belum ada transaksi",
+                        subtitle = if (isKaryawan) {
+                            "Belum ada penjualan. Catat orderan pertama hari ini."
+                        } else {
+                            "Belum ada penjualan. Yuk catat transaksi pertama."
+                        },
+                        compact = true,
+                        primaryActionLabel = "Buat Transaksi",
+                        primaryActionIcon = Icons.Default.Add,
+                        onPrimaryAction = {
+                            viewModel.setTransaksiTab(0)
+                            onNavigateToTransaksi()
                         }
-                    }
+                    )
                 }
             } else {
                 items(recentTransactionsToShow, key = { it.transaksi.id }) { detail ->
                     val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
                     val metodeDisplay = if (isKasbon) {
-                        "Belum Dibayar"
+                        "Belum dibayar"
                     } else {
                         val m = detail.transaksi.metode_bayar.trim()
                         if (m.isBlank() || m == "-") "Cash" else m
@@ -1298,69 +1364,135 @@ fun DashboardScreen(
                         subInfoParts.add(detail.kurir.nama)
                     }
                     if (!isShowingTodayTransactions) {
-                        subInfoParts.add(FormatUtils.formatDateShort(detail.transaksi.tanggal))
+                        subInfoParts.add(FormatUtils.formatDateUi(detail.transaksi.tanggal))
                     }
 
-                    Card(
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.5.dp),
+                    val canQuickOrder = detail.pelanggan != null &&
+                        !KaryawanScopeHelper.isSoftDeletedPelanggan(detail.pelanggan)
+                    val santoyaColors = MaterialTheme.santoyaColors
+                    val statusAccent = if (isKasbon) santoyaColors.warning else SantoyaLeafGreen
+
+                    HydroBentoCard(
+                        accentColor = statusAccent,
+                        cornerRadius = 16.dp,
+                        tintAlpha = 0.05f,
+                        showWaterRipple = false,
+                        onClick = if (canQuickOrder) {
+                            {
+                                viewModel.startQuickOrder(
+                                    pelangganId = detail.pelanggan!!.id,
+                                    produkId = detail.transaksi.id_produk,
+                                    jumlah = detail.transaksi.jumlah
+                                )
+                            }
+                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = detail.pelanggan?.nama ?: "Pelanggan Umum",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    val santoyaColors = MaterialTheme.santoyaColors
-                                    Surface(
-                                        shape = RoundedCornerShape(4.dp),
-                                        color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
-                                    ) {
-                                        Text(
-                                            text = detail.transaksi.status.uppercase(),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                            maxLines = 1
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.5.dp)
+                                        .height(36.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(statusAccent)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isKasbon) santoyaColors.warningContainer else SantoyaMistBlue,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isKasbon) santoyaColors.warning.copy(alpha = 0.35f) else SantoyaWaterBlue.copy(alpha = 0.3f)
+                                    ),
+                                    modifier = Modifier.size(38.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        HydroGalonIcon(
+                                            tint = if (isKasbon) santoyaColors.warning else SantoyaWaterBlue,
+                                            leafAccent = if (isKasbon) santoyaColors.warning else SantoyaLeafGreen,
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = subInfoParts.joinToString(" • "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isKasbon) MaterialTheme.santoyaColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = detail.pelanggan?.nama ?: "Pelanggan Umum",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (isKasbon) santoyaColors.warningContainer else SantoyaDewMint
+                                        ) {
+                                            Text(
+                                                text = detail.transaksi.status.uppercase(),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 9.5.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = if (isKasbon) santoyaColors.onWarningContainer else SantoyaLeafGreen,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = subInfoParts.joinToString(" • "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (isKasbon) santoyaColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    if (canQuickOrder) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Replay,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Ketuk untuk Order Lagi (${detail.transaksi.jumlah} galon)",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
                             }
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = FormatUtils.formatRupiah(detail.transaksi.total_harga),
+                                SantoyaAdaptiveCurrencyText(
+                                    amount = detail.transaksi.total_harga,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1
+                                    minFontSize = 11.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.widthIn(max = 118.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
                                 IconButton(
                                     onClick = {
                                         val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
@@ -1376,14 +1508,21 @@ fun DashboardScreen(
                                             )
                                         )
                                     },
-                                    modifier = Modifier.size(32.dp)
+                                    modifier = Modifier.size(44.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Print,
-                                        contentDescription = "Cetak Struk",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(17.dp)
-                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = SantoyaMistBlue,
+                                        border = BorderStroke(1.dp, SantoyaWaterBlue.copy(alpha = 0.25f)),
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            HydroReceiptNoteIcon(
+                                                tint = SantoyaWaterBlue,
+                                                modifier = Modifier.size(17.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1397,7 +1536,7 @@ fun DashboardScreen(
         AlertDialog(
             onDismissRequest = { showKaryawanSignOutDialog = false },
             title = { Text("Keluar Akun Karyawan", fontWeight = FontWeight.Bold) },
-            text = { Text("Apakah Anda yakin ingin keluar dari akun Google ini?") },
+            text = { Text("Keluar dari akun Google ini sekarang?") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1421,55 +1560,153 @@ fun DashboardScreen(
     }
 }
 
+/**
+ * 1. KARTU LEBAR UTAMA (Full-Width Primary Editorial Bento)
+ * Menggunakan permukaan Biru Muda Sejuk (#E8F3FC) solid dengan aksen Biru Air & Hijau Daun.
+ */
 @Composable
-private fun MenuCard(
+private fun EditorialPrimaryWideBentoCard(
     title: String,
     subtitle: String,
-    icon: ImageVector,
+    badgeTag: String,
+    surfaceTint: Color,
     accentColor: Color,
     testTag: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconContent: @Composable () -> Unit
 ) {
-    Card(
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = surfaceTint,
+        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.42f)),
+        shadowElevation = 0.dp,
         modifier = modifier
-            .height(82.dp)
             .testTag(testTag)
-            .pressClickEffect(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp),
-        shape = RoundedCornerShape(16.dp)
+            .pressClickEffect(pressedScale = 0.98f, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .drawBehind {
+                    val w = size.width
+                    val h = size.height
+                    val leafArc = Path().apply {
+                        moveTo(w * 0.80f, h)
+                        quadraticTo(w * 0.88f, h * 0.45f, w, h * 0.25f)
+                    }
+                    drawPath(
+                        path = leafArc,
+                        color = SantoyaLeafGreen.copy(alpha = 0.16f),
+                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                .padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(15.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        iconContent()
+                    }
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = SantoyaNavy,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SantoyaNavy.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = accentColor
+            ) {
+                Text(
+                    text = badgeTag,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 2. KARTU HORIZONTAL 2 KOLOM (Pelanggan & Pengeluaran)
+ * Tata letak sejajar horizontal (ikon di kiri, judul & subjudul di kanan) selaras dengan kartu Laporan.
+ */
+@Composable
+private fun EditorialCompactHorizontalBentoCard(
+    title: String,
+    subtitle: String,
+    iconContainerColor: Color,
+    accentColor: Color,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconContent: @Composable () -> Unit
+) {
+    HydroBentoCard(
+        accentColor = accentColor,
+        cornerRadius = 18.dp,
+        tintAlpha = 0.04f,
+        showWaterRipple = true,
+        onClick = onClick,
+        modifier = modifier.testTag(testTag)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 12.dp, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = accentColor.copy(alpha = 0.14f),
-                modifier = Modifier.size(42.dp)
+                color = iconContainerColor,
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
+                modifier = Modifier.size(40.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(21.dp)
-                    )
+                    iconContent()
                 }
             }
-            Spacer(modifier = Modifier.width(12.dp))
+
+            Spacer(modifier = Modifier.width(10.dp))
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1478,6 +1715,7 @@ private fun MenuCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1487,4 +1725,105 @@ private fun MenuCard(
     }
 }
 
-
+/**
+ * 3. KARTU PENUH EDITORIAL (Full-Width Bottom Banner Bento — Laporan)
+ * Tata letak horizontal bersih dengan ikon Line Art di kiri, deskripsi di tengah, dan lencana/panah di kanan.
+ */
+@Composable
+private fun EditorialFullBannerBentoCard(
+    title: String,
+    subtitle: String,
+    badgeTag: String,
+    iconContainerColor: Color,
+    accentColor: Color,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconContent: @Composable () -> Unit
+) {
+    HydroBentoCard(
+        accentColor = accentColor,
+        cornerRadius = 18.dp,
+        tintAlpha = 0.05f,
+        showWaterRipple = true,
+        onClick = onClick,
+        modifier = modifier.testTag(testTag)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 15.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(13.dp),
+                    color = iconContainerColor,
+                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        iconContent()
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = SantoyaDewMint,
+                            border = BorderStroke(1.dp, SantoyaLeafGreen.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = badgeTag,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SantoyaLeafGreen,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = CircleShape,
+                color = iconContainerColor,
+                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+    }
+}

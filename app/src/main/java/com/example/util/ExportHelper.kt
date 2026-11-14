@@ -182,7 +182,7 @@ object ExportHelper {
         sb.append("ID,Tanggal,Pelanggan,Alamat,NoHP,Produk,Jumlah,HargaSatuan,TotalHarga,UangMuka,SisaKasbon,Kurir,TotalKomisi,MetodeBayar,Status\n")
         activeTransaksiList.forEach { t ->
             val trx = t.transaksi
-            val tgl = FormatUtils.formatDate(trx.tanggal).replace(",", " ")
+            val tgl = FormatUtils.formatDateTimeTable(trx.tanggal)
             val custName = (t.pelanggan?.nama ?: "Umum").replace(",", ";")
             val custAddr = KaryawanScopeHelper.cleanPelangganAlamat(t.pelanggan?.alamat ?: "-").replace(",", ";")
             val custPhone = t.pelanggan?.no_hp ?: "-"
@@ -196,7 +196,7 @@ object ExportHelper {
         sb.append("\n=== LAPORAN PENGELUARAN SANTOYA RO ===\n")
         sb.append("ID,Tanggal,Kategori,NamaItem,Nominal\n")
         pengeluaranList.forEach { e ->
-            val tgl = FormatUtils.formatDate(e.tanggal).replace(",", " ")
+            val tgl = FormatUtils.formatDateTimeTable(e.tanggal)
             val item = e.nama_item.replace(",", ";")
             sb.append("${e.id},\"$tgl\",${e.kategori},\"$item\",${e.nominal}\n")
         }
@@ -1025,7 +1025,7 @@ object ExportHelper {
                 message = "Impor selesai: $pCount pelanggan dan $txCount transaksi"
             )
         } catch (e: Exception) {
-            ImportResult(success = false, message = "Gagal memproses JSON: ${e.localizedMessage ?: "Format tidak dikenali"}")
+            ImportResult(success = false, message = "File cadangan gagal dibaca: format tidak sesuai")
         }
     }
 }

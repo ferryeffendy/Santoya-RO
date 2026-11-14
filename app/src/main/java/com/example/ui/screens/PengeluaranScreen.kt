@@ -1,6 +1,11 @@
 package com.example.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -9,13 +14,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -60,6 +69,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -71,7 +82,14 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pengeluaran
+import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaFormBottomSheet
+import com.example.ui.components.bringIntoViewOnFocus
+import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
@@ -124,24 +142,30 @@ fun PengeluaranScreen(
     }
 
     val totalPengeluaran = filteredList.sumOf { it.nominal }
+    val isImeVisible = rememberIsImeVisible()
 
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("pengeluaran_screen"),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .padding(16.dp)
-                    .testTag("tambah_pengeluaran_fab")
+            AnimatedVisibility(
+                visible = !isImeVisible,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Catat Pengeluaran"
-                )
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.testTag("tambah_pengeluaran_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Catat Pengeluaran"
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -149,11 +173,12 @@ fun PengeluaranScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedTextField(
@@ -161,7 +186,7 @@ fun PengeluaranScreen(
                     onValueChange = { searchQuery = it },
                     placeholder = {
                         Text(
-                            text = "Cari pengeluaran, kategori, tanggal, atau nominal...",
+                            text = "Cari pengeluaran, kategori, atau nominal...",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -181,7 +206,7 @@ fun PengeluaranScreen(
                                     searchQuery = ""
                                     focusManager.clearFocus()
                                 },
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
@@ -231,7 +256,7 @@ fun PengeluaranScreen(
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 84.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 item {
@@ -241,7 +266,7 @@ fun PengeluaranScreen(
                             containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
                         ),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.25f)),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(18.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -263,13 +288,13 @@ fun PengeluaranScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = FormatUtils.formatRupiah(totalPengeluaran),
+                                SantoyaAdaptiveCurrencyText(
+                                    amount = totalPengeluaran,
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    minFontSize = 13.sp,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                                 Text(
                                     text = "${filteredList.size} Catatan",
@@ -279,6 +304,7 @@ fun PengeluaranScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Surface(
                                 shape = CircleShape,
                                 color = MaterialTheme.colorScheme.error,
@@ -310,9 +336,9 @@ fun PengeluaranScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                                shape = RoundedCornerShape(12.dp)
+                                shape = RoundedCornerShape(14.dp)
                             ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
+                                Column(modifier = Modifier.padding(14.dp)) {
                                     Text(
                                         text = "Rincian per Kategori",
                                         style = MaterialTheme.typography.labelSmall,
@@ -336,14 +362,17 @@ fun PengeluaranScreen(
                                                 fontWeight = FontWeight.Medium,
                                                 color = MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            Text(
-                                                text = FormatUtils.formatRupiah(nominal),
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = nominal,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.error,
-                                                maxLines = 1
+                                                minFontSize = 10.sp,
+                                                textAlign = TextAlign.End
                                             )
                                         }
                                     }
@@ -354,79 +383,31 @@ fun PengeluaranScreen(
 
                 if (filteredList.isEmpty()) {
                     item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(28.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.surfaceVariant,
-                                    modifier = Modifier.size(52.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Receipt,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(26.dp)
-                                        )
-                                    }
+                        val isUnfilteredEmpty = searchQuery.isBlank() && selectedCategoryFilter == "Semua"
+                        SantoyaEmptyState(
+                            illustrationRes = R.drawable.img_empty_laporan,
+                            title = if (isUnfilteredEmpty) "Belum Ada Pengeluaran" else "Pengeluaran Tidak Ditemukan",
+                            subtitle = if (isUnfilteredEmpty) {
+                                "Catat biaya listrik, tutup galon, atau BBM antar agar laba bersih tercatat akurat."
+                            } else {
+                                "Pengeluaran tidak ditemukan untuk filter ini."
+                            },
+                            primaryActionLabel = if (isUnfilteredEmpty) "Catat Pengeluaran" else null,
+                            primaryActionIcon = if (isUnfilteredEmpty) Icons.Default.Add else null,
+                            onPrimaryAction = if (isUnfilteredEmpty) {
+                                { showAddDialog = true }
+                            } else null,
+                            secondaryActionLabel = if (!isUnfilteredEmpty) "Reset Filter" else null,
+                            secondaryActionIcon = if (!isUnfilteredEmpty) Icons.Default.Clear else null,
+                            onSecondaryAction = if (!isUnfilteredEmpty) {
+                                {
+                                    searchQuery = ""
+                                    selectedCategoryFilter = "Semua"
+                                    focusManager.clearFocus()
                                 }
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = if (searchQuery.isBlank() && selectedCategoryFilter == "Semua") {
-                                        "Belum Ada Pengeluaran"
-                                    } else {
-                                        "Pengeluaran Tidak Ditemukan"
-                                    },
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (searchQuery.isBlank() && selectedCategoryFilter == "Semua") {
-                                        "Ketuk tombol + untuk mencatat pengeluaran."
-                                    } else {
-                                        "Tidak ada catatan yang cocok dengan filter."
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                                if (searchQuery.isNotBlank() || selectedCategoryFilter != "Semua") {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedButton(
-                                        onClick = {
-                                            searchQuery = ""
-                                            selectedCategoryFilter = "Semua"
-                                            focusManager.clearFocus()
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Clear,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Reset Filter")
-                                    }
-                                }
-                            }
-                        }
+                            } else null,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                     }
                 } else {
                     items(filteredList, key = { it.id }) { item ->
@@ -442,12 +423,12 @@ fun PengeluaranScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                        shape = RoundedCornerShape(16.dp)
+                        shape = RoundedCornerShape(18.dp)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
+                                .padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
@@ -458,7 +439,7 @@ fun PengeluaranScreen(
                                 Surface(
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
-                                    modifier = Modifier.size(36.dp)
+                                    modifier = Modifier.size(38.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
@@ -479,18 +460,23 @@ fun PengeluaranScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
                                         Surface(
                                             shape = RoundedCornerShape(4.dp),
-                                            color = kategoriColor.copy(alpha = 0.12f)
+                                            color = kategoriColor.copy(alpha = 0.12f),
+                                            modifier = Modifier.weight(1f, fill = false)
                                         ) {
                                             Text(
                                                 text = item.kategori,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = kategoriColor,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                                maxLines = 1
+                                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
                                             )
                                         }
                                         Spacer(modifier = Modifier.width(6.dp))
@@ -504,23 +490,27 @@ fun PengeluaranScreen(
                                     }
                                 }
                             }
+                            Spacer(modifier = Modifier.width(6.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "- ${FormatUtils.formatRupiah(item.nominal)}",
+                                SantoyaAdaptiveCurrencyText(
+                                    amount = item.nominal,
+                                    customText = "- ${FormatUtils.formatRupiah(item.nominal)}",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.error,
-                                    maxLines = 1
+                                    minFontSize = 10.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.widthIn(max = 124.dp)
                                 )
                                 IconButton(
                                     onClick = { itemToDelete = item },
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Hapus",
                                         tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -539,132 +529,141 @@ fun PengeluaranScreen(
         var tanggalMillis by remember { mutableStateOf(System.currentTimeMillis()) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         val kategoriOptions = listOf("Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Operasional", "Lainnya")
+        val nominalFocusRequester = remember { FocusRequester() }
+        val sheetFocusManager = LocalFocusManager.current
 
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = {
-                Text(
-                    text = "Catat Pengeluaran",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            val cal = Calendar.getInstance().apply { timeInMillis = tanggalMillis }
-                            DatePickerDialog(
-                                context,
-                                { _, y, m, d ->
-                                    val newCal = Calendar.getInstance().apply { set(y, m, d) }
-                                    tanggalMillis = newCal.timeInMillis
-                                },
-                                cal.get(Calendar.YEAR),
-                                cal.get(Calendar.MONTH),
-                                cal.get(Calendar.DAY_OF_MONTH)
-                            ).show()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(FormatUtils.formatDate(tanggalMillis))
-                    }
-
-                    OutlinedTextField(
-                        value = namaItem,
-                        onValueChange = {
-                            namaItem = it
-                            errorMessage = null
-                        },
-                        label = { Text("Nama Pengeluaran *") },
-                        placeholder = { Text("Contoh: Tutup galon, Listrik") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-
-                    Text(
-                        text = "Kategori",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                    ) {
-                        kategoriOptions.forEach { kat ->
-                            FilterChip(
-                                selected = selectedKategori.equals(kat, ignoreCase = true),
-                                onClick = { selectedKategori = kat },
-                                label = { Text(kat, maxLines = 1) },
-                                modifier = Modifier.height(32.dp),
-                                leadingIcon = if (selectedKategori.equals(kat, ignoreCase = true)) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                                } else null
-                            )
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = nominalStr,
-                        onValueChange = {
-                            nominalStr = it.filter { char -> char.isDigit() }
-                            errorMessage = null
-                        },
-                        label = { Text("Nominal (Rp) *") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-
-                    if (errorMessage != null) {
-                        Text(
-                            text = errorMessage ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmed = namaItem.trim()
-                        if (trimmed.isBlank()) {
-                            errorMessage = "Nama pengeluaran wajib diisi"
-                            return@Button
-                        }
-                        val nominal = nominalStr.toDoubleOrNull()
-                        if (nominal == null || nominal <= 0) {
-                            errorMessage = "Nominal tidak valid"
-                            return@Button
-                        }
-                        viewModel.addPengeluaran(trimmed, selectedKategori, nominal, tanggalMillis)
-                        showAddDialog = false
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Simpan")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("Batal")
+        val submitExpense = {
+            val trimmed = namaItem.trim()
+            val nominal = nominalStr.toDoubleOrNull()
+            when {
+                trimmed.isBlank() -> errorMessage = "Nama pengeluaran wajib diisi"
+                nominal == null || nominal <= 0 -> errorMessage = "Nominal tidak valid"
+                else -> {
+                    viewModel.addPengeluaran(trimmed, selectedKategori, nominal, tanggalMillis)
+                    showAddDialog = false
                 }
             }
-        )
+        }
+
+        SantoyaFormBottomSheet(
+            title = "Catat Pengeluaran",
+            subtitle = "Biaya operasional depot & antar",
+            headerIcon = Icons.Default.MoneyOff,
+            headerAccent = MaterialTheme.colorScheme.error,
+            confirmLabel = "Simpan",
+            confirmContainerColor = MaterialTheme.colorScheme.primary,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { submitExpense() }
+        ) {
+            OutlinedButton(
+                onClick = {
+                    val cal = Calendar.getInstance().apply { timeInMillis = tanggalMillis }
+                    DatePickerDialog(
+                        context,
+                        { _, y, m, d ->
+                            val newCal = Calendar.getInstance().apply { set(y, m, d) }
+                            tanggalMillis = newCal.timeInMillis
+                        },
+                        cal.get(Calendar.YEAR),
+                        cal.get(Calendar.MONTH),
+                        cal.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(FormatUtils.formatDate(tanggalMillis))
+            }
+
+            OutlinedTextField(
+                value = namaItem,
+                onValueChange = {
+                    namaItem = it
+                    errorMessage = null
+                },
+                label = { Text("Nama Pengeluaran *") },
+                placeholder = { Text("Contoh: Tutup galon, Listrik") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { nominalFocusRequester.requestFocus() }
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Text(
+                text = "Kategori",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+            ) {
+                kategoriOptions.forEach { kat ->
+                    FilterChip(
+                        selected = selectedKategori.equals(kat, ignoreCase = true),
+                        onClick = { selectedKategori = kat },
+                        label = { Text(kat, maxLines = 1) },
+                        modifier = Modifier.height(34.dp),
+                        leadingIcon = if (selectedKategori.equals(kat, ignoreCase = true)) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                        } else null
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = nominalStr,
+                onValueChange = {
+                    nominalStr = it.filter { char -> char.isDigit() }
+                    errorMessage = null
+                },
+                label = { Text("Nominal (Rp) *") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        sheetFocusManager.clearFocus()
+                        submitExpense()
+                    }
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(nominalFocusRequester)
+                    .bringIntoViewOnFocus(),
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 
     itemToDelete?.let { item ->

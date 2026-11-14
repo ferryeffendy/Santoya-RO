@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -53,15 +60,25 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Produk
+import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
+import com.example.ui.components.bringIntoViewOnFocus
+import com.example.ui.components.rememberIsImeVisible
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -81,23 +98,30 @@ fun ProdukScreen(
     var editingProduk by remember { mutableStateOf<Produk?>(null) }
     var produkToDelete by remember { mutableStateOf<Produk?>(null) }
 
+    val isImeVisible = rememberIsImeVisible()
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("produk_screen"),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .padding(16.dp)
-                    .testTag("fab_add_produk")
+            AnimatedVisibility(
+                visible = !isImeVisible,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Tambah Produk"
-                )
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.testTag("fab_add_produk")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah Produk"
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -105,14 +129,14 @@ fun ProdukScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 84.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 SantoyaSectionBanner(
                     icon = Icons.Default.Sell,
                     title = "Produk & Harga",
-                    subtitle = "Daftar produk & harga galon",
+                    subtitle = "Atur produk & harga jual",
                     badgeText = "${displayList.size} Produk",
                     accentColor = MaterialTheme.colorScheme.primary,
                     onAccentColor = MaterialTheme.colorScheme.onPrimary
@@ -121,58 +145,20 @@ fun ProdukScreen(
 
             if (displayList.isEmpty()) {
                 item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(52.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.Inventory2,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Belum Ada Produk",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Ketuk tombol + untuk menambah produk baru.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    SantoyaEmptyState(
+                        illustrationRes = R.drawable.img_empty_depot,
+                        title = "Belum Ada Produk",
+                        subtitle = "Tambahkan daftar galon atau layanan isi ulang agar siap digunakan di kasir.",
+                        primaryActionLabel = "Tambah Produk",
+                        primaryActionIcon = Icons.Default.Add,
+                        onPrimaryAction = { showAddDialog = true },
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             } else {
                 items(displayList, key = { it.id }) { produk ->
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -181,7 +167,7 @@ fun ProdukScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
+                                .padding(14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -192,7 +178,7 @@ fun ProdukScreen(
                                 Surface(
                                     shape = CircleShape,
                                     color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size(38.dp)
+                                    modifier = Modifier.size(40.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
@@ -207,20 +193,20 @@ fun ProdukScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = produk.nama_produk,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = FormatUtils.formatRupiah(produk.harga),
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = produk.harga,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        minFontSize = 11.sp,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
                             }
@@ -228,24 +214,24 @@ fun ProdukScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
                                     onClick = { editingProduk = produk },
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier.size(42.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
                                         contentDescription = "Edit Produk",
                                         tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                                 IconButton(
                                     onClick = { produkToDelete = produk },
-                                    modifier = Modifier.size(34.dp)
+                                    modifier = Modifier.size(42.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Hapus Produk",
                                         tint = MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(20.dp)
                                     )
                                 }
                             }
@@ -256,166 +242,98 @@ fun ProdukScreen(
         }
     }
 
-    if (showAddDialog) {
-        var nama by remember { mutableStateOf("") }
-        var harga by remember { mutableStateOf("6000") }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
+    if (showAddDialog || editingProduk != null) {
+        val target = editingProduk
+        var nama by remember(target) { mutableStateOf(target?.nama_produk ?: "") }
+        var harga by remember(target) { mutableStateOf(target?.harga?.toLong()?.toString() ?: "6000") }
+        var errorMessage by remember(target) { mutableStateOf<String?>(null) }
+        val hargaFocusRequester = remember { FocusRequester() }
+        val sheetFocusManager = LocalFocusManager.current
 
-        AlertDialog(
-            onDismissRequest = { showAddDialog = false },
-            title = {
-                Text(
-                    text = "Tambah Produk",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = nama,
-                        onValueChange = {
-                            nama = it
-                            errorMessage = null
-                        },
-                        label = { Text("Nama Produk *") },
-                        placeholder = { Text("Contoh: Galon RO 19L") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    OutlinedTextField(
-                        value = harga,
-                        onValueChange = {
-                            harga = it.filter { c -> c.isDigit() }
-                            errorMessage = null
-                        },
-                        label = { Text("Harga Satuan (Rp) *") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    if (errorMessage != null) {
-                        Text(
-                            text = errorMessage ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmedNama = nama.trim()
-                        val hVal = harga.toDoubleOrNull() ?: 0.0
-                        if (trimmedNama.isBlank()) {
-                            errorMessage = "Nama produk wajib diisi"
-                            return@Button
-                        }
-                        if (hVal <= 0.0) {
-                            errorMessage = "Harga harus lebih dari 0"
-                            return@Button
-                        }
+        val submitProduk = {
+            val trimmedNama = nama.trim()
+            val hVal = harga.toDoubleOrNull() ?: 0.0
+            when {
+                trimmedNama.isBlank() -> errorMessage = "Nama produk wajib diisi"
+                hVal <= 0.0 -> errorMessage = "Harga harus lebih dari 0"
+                else -> {
+                    if (target == null) {
                         viewModel.addProduk(trimmedNama, hVal)
                         showAddDialog = false
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Simpan")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
-                    Text("Batal")
-                }
-            }
-        )
-    }
-
-    if (editingProduk != null) {
-        val target = editingProduk!!
-        var nama by remember { mutableStateOf(target.nama_produk) }
-        var harga by remember { mutableStateOf(target.harga.toLong().toString()) }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
-
-        AlertDialog(
-            onDismissRequest = { editingProduk = null },
-            title = {
-                Text(
-                    text = "Edit Produk",
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(
-                        value = nama,
-                        onValueChange = {
-                            nama = it
-                            errorMessage = null
-                        },
-                        label = { Text("Nama Produk *") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    OutlinedTextField(
-                        value = harga,
-                        onValueChange = {
-                            harga = it.filter { c -> c.isDigit() }
-                            errorMessage = null
-                        },
-                        label = { Text("Harga Satuan (Rp) *") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    if (errorMessage != null) {
-                        Text(
-                            text = errorMessage ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val trimmedNama = nama.trim()
-                        val hVal = harga.toDoubleOrNull() ?: target.harga
-                        if (trimmedNama.isBlank()) {
-                            errorMessage = "Nama produk wajib diisi"
-                            return@Button
-                        }
-                        if (hVal <= 0.0) {
-                            errorMessage = "Harga harus lebih dari 0"
-                            return@Button
-                        }
+                    } else {
                         viewModel.updateProduk(target.copy(nama_produk = trimmedNama, harga = hVal))
                         editingProduk = null
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Perbarui")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingProduk = null }) {
-                    Text("Batal")
+                    }
                 }
             }
-        )
+        }
+
+        SantoyaFormBottomSheet(
+            title = if (target == null) "Tambah Produk" else "Edit Produk",
+            subtitle = "Atur nama dan harga jual per galon",
+            headerIcon = Icons.Default.WaterDrop,
+            confirmLabel = if (target == null) "Simpan" else "Perbarui",
+            onDismiss = {
+                showAddDialog = false
+                editingProduk = null
+            },
+            onConfirm = { submitProduk() }
+        ) {
+            OutlinedTextField(
+                value = nama,
+                onValueChange = {
+                    nama = it
+                    errorMessage = null
+                },
+                label = { Text("Nama Produk *") },
+                placeholder = { Text("Contoh: Galon RO 19L") },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { hargaFocusRequester.requestFocus() }
+                ),
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .bringIntoViewOnFocus(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            OutlinedTextField(
+                value = harga,
+                onValueChange = {
+                    harga = it.filter { c -> c.isDigit() }
+                    errorMessage = null
+                },
+                label = { Text("Harga Satuan (Rp) *") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        sheetFocusManager.clearFocus()
+                        submitProduk()
+                    }
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(hargaFocusRequester)
+                    .bringIntoViewOnFocus(),
+                shape = RoundedCornerShape(12.dp)
+            )
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage ?: "",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 
     if (produkToDelete != null) {
@@ -469,7 +387,7 @@ fun ProdukScreen(
                     }
 
                     Text(
-                        text = "Riwayat transaksi yang sudah tercatat tetap tersimpan di laporan.",
+                        text = "Catatan transaksi lama tetap aman di laporan.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

@@ -1,5 +1,10 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,11 +22,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -51,14 +56,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
+import com.example.ui.components.bringIntoViewOnFocus
+import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
@@ -87,23 +104,30 @@ fun KurirScreen(
     var editingKurir by remember { mutableStateOf<Kurir?>(null) }
     var kurirToDelete by remember { mutableStateOf<Kurir?>(null) }
 
+    val isImeVisible = rememberIsImeVisible()
+
     Scaffold(
         modifier = modifier
             .fillMaxSize()
             .testTag("kurir_screen"),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .padding(16.dp)
-                    .testTag("tambah_kurir_fab")
+            AnimatedVisibility(
+                visible = !isImeVisible,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Tambah Karyawan"
-                )
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.testTag("tambah_kurir_fab")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Tambah Karyawan"
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -111,14 +135,14 @@ fun KurirScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 84.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             item {
                 SantoyaSectionBanner(
                     icon = Icons.Default.DeliveryDining,
                     title = "Karyawan & Komisi",
-                    subtitle = "Kelola daftar karyawan dan tarif komisi tetap per galon",
+                    subtitle = "Atur akun kurir & tarif komisi",
                     badgeText = "${displayKurirList.size} Karyawan",
                     accentColor = MaterialTheme.colorScheme.secondary,
                     onAccentColor = MaterialTheme.colorScheme.onSecondary
@@ -127,53 +151,15 @@ fun KurirScreen(
 
             if (displayKurirList.isEmpty()) {
                 item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 24.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(28.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.size(52.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.DeliveryDining,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.outline,
-                                        modifier = Modifier.size(26.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Text(
-                                text = "Belum Ada Karyawan",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Ketuk tombol + untuk menambah karyawan dan tarif komisinya.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
+                    SantoyaEmptyState(
+                        illustrationRes = R.drawable.img_empty_depot,
+                        title = "Belum Ada Karyawan",
+                        subtitle = "Tambahkan akun kurir & tarif komisi per galon agar pengiriman otomatis tercatat.",
+                        primaryActionLabel = "Tambah Karyawan",
+                        primaryActionIcon = Icons.Default.Add,
+                        onPrimaryAction = { showAddDialog = true },
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             } else {
                 items(displayKurirList, key = { it.id }) { kurir ->
@@ -189,7 +175,7 @@ fun KurirScreen(
                     val colors = MaterialTheme.santoyaColors
 
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -197,7 +183,7 @@ fun KurirScreen(
                             .fillMaxWidth()
                             .testTag("kurir_card_${kurir.id}")
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(14.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -254,27 +240,27 @@ fun KurirScreen(
                                     IconButton(
                                         onClick = { editingKurir = kurir },
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(42.dp)
                                             .testTag("btn_edit_kurir_${kurir.id}")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = "Edit Karyawan",
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                     IconButton(
                                         onClick = { kurirToDelete = kurir },
                                         modifier = Modifier
-                                            .size(40.dp)
+                                            .size(42.dp)
                                             .testTag("btn_delete_kurir_${kurir.id}")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
                                             contentDescription = "Hapus Karyawan",
                                             tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
@@ -294,19 +280,22 @@ fun KurirScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Total Antar: ${compSummary.totalGallons} Galon (${compSummary.totalOrders}x)",
+                                        text = "Total Antar: ${FormatUtils.formatNumber(compSummary.totalGallons)} Galon (${compSummary.totalOrders}x)",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
                                     )
-                                    Text(
-                                        text = "Total Komisi: ${FormatUtils.formatRupiah(compSummary.totalKomisi)}",
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = compSummary.totalKomisi,
+                                        customText = "Komisi: ${FormatUtils.formatRupiah(compSummary.totalKomisi)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        minFontSize = 10.sp,
+                                        textAlign = TextAlign.End
                                     )
                                 }
                             }
@@ -341,7 +330,7 @@ fun KurirScreen(
                                             modifier = Modifier.weight(1f)
                                         )
                                         Text(
-                                            text = if (isActive) "Sinkron Aktif" else "Nonaktif",
+                                            text = if (isActive) "Aktif" else "Nonaktif",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.Bold,
                                             color = if (isActive) colors.success else MaterialTheme.colorScheme.error
@@ -413,7 +402,7 @@ fun KurirScreen(
             },
             text = {
                 Text(
-                    text = "\"${kurir.nama}\" akan dihapus. Riwayat transaksi lama tetap tersimpan.",
+                    text = "Hapus \"${kurir.nama}\" dari daftar? Riwayat transaksi lama tetap aman.",
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -471,180 +460,168 @@ private fun KurirFormDialog(
     var aksesAktif by remember(initialKurir) { mutableStateOf(initialKurir?.akses_aktif ?: true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 460.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+    val komisiFocusRequester = remember { FocusRequester() }
+    val emailFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+
+    val validateAndSubmit = {
+        val trimmedNama = nama.trim()
+        val komisi = komisiStr.toDoubleOrNull()
+        val rawEmail = emailInput.trim().removePrefix("@").lowercase()
+        val cleanEmail = when {
+            rawEmail.isBlank() -> ""
+            !rawEmail.contains("@") -> "$rawEmail@gmail.com"
+            else -> rawEmail
+        }
+        val targetId = initialKurir?.id
+        val isDuplicate = cleanEmail.isNotBlank() && existingKurirList.any { existing ->
+            if (existing.id == targetId) return@any false
+            val exRaw = existing.email.trim().lowercase()
+            val exNormalized = if (exRaw.isNotBlank() && !exRaw.contains("@")) "$exRaw@gmail.com" else exRaw
+            exNormalized == cleanEmail
+        }
+        when {
+            trimmedNama.isBlank() -> errorMessage = "Nama karyawan wajib diisi"
+            komisi == null || komisi < 0.0 -> errorMessage = "Nominal komisi tidak valid"
+            cleanEmail.isNotBlank() && (cleanEmail.length < 5 || !cleanEmail.contains("@") || cleanEmail.endsWith("@")) ->
+                errorMessage = "Format email Google tidak valid"
+            isDuplicate -> errorMessage = "Email '$cleanEmail' sudah dipakai karyawan lain"
+            else -> onSubmit(trimmedNama, komisi, cleanEmail, aksesAktif)
+        }
+    }
+
+    SantoyaFormBottomSheet(
+        title = title,
+        subtitle = "Tarif komisi & akses Google karyawan",
+        headerIcon = Icons.Default.DeliveryDining,
+        headerAccent = MaterialTheme.colorScheme.secondary,
+        confirmLabel = confirmLabel,
+        confirmTestTag = "btn_simpan_kurir",
+        onDismiss = onDismiss,
+        onConfirm = { validateAndSubmit() }
+    ) {
+        OutlinedTextField(
+            value = nama,
+            onValueChange = {
+                nama = it
+                errorMessage = null
+            },
+            label = { Text("Nama Karyawan *") },
+            placeholder = { Text("Contoh: Fitri, Budi") },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { komisiFocusRequester.requestFocus() }
+            ),
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .bringIntoViewOnFocus()
+                .testTag("input_kurir_nama"),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        OutlinedTextField(
+            value = komisiStr,
+            onValueChange = {
+                komisiStr = it.filter { char -> char.isDigit() }
+                errorMessage = null
+            },
+            label = { Text("Komisi per Galon (Rp) *") },
+            supportingText = {
+                Text("Dihitung otomatis per galon yang diantar.")
+            },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { emailFocusRequester.requestFocus() }
+            ),
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(komisiFocusRequester)
+                .bringIntoViewOnFocus()
+                .testTag("input_kurir_komisi"),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+
+        Text(
+            text = "Akun Google Karyawan (Opsional)",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        OutlinedTextField(
+            value = emailInput,
+            onValueChange = {
+                emailInput = it.replace(" ", "").lowercase()
+                errorMessage = null
+            },
+            label = { Text("Email Google Karyawan") },
+            placeholder = { Text("contoh: fitri@gmail.com") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { focusManager.clearFocus() }
+            ),
+            supportingText = {
+                Text("Masukkan email Google kurir supaya datanya tersambung ke HP-nya.")
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(emailFocusRequester)
+                .bringIntoViewOnFocus()
+                .testTag(if (initialKurir == null) "input_kurir_email" else "input_edit_kurir_email"),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        if (emailInput.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedTextField(
-                    value = nama,
-                    onValueChange = {
-                        nama = it
-                        errorMessage = null
-                    },
-                    label = { Text("Nama Karyawan *") },
-                    placeholder = { Text("Contoh: Fitri, Budi") },
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("input_kurir_nama"),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                OutlinedTextField(
-                    value = komisiStr,
-                    onValueChange = {
-                        komisiStr = it.filter { char -> char.isDigit() }
-                        errorMessage = null
-                    },
-                    label = { Text("Komisi per Galon (Rp) *") },
-                    supportingText = {
-                        Text("Dikalikan dengan total galon setiap kali pengantaran.")
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("input_kurir_komisi"),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-
-                Text(
-                    text = "Akses Akun Google Karyawan (Opsional)",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                OutlinedTextField(
-                    value = emailInput,
-                    onValueChange = {
-                        emailInput = it.replace(" ", "").lowercase()
-                        errorMessage = null
-                    },
-                    label = { Text("Email Google Karyawan") },
-                    placeholder = { Text("contoh: fitri@gmail.com") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    supportingText = {
-                        Text("Isi email Google karyawan agar perangkatnya otomatis terhubung real-time ke depot ini.")
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag(if (initialKurir == null) "input_kurir_email" else "input_edit_kurir_email"),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                if (emailInput.isNotBlank()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Status Akses Sinkronisasi",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                text = "Matikan sementara jika karyawan sedang libur atau nonaktif.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Switch(
-                            checked = aksesAktif,
-                            onCheckedChange = { aksesAktif = it },
-                            modifier = Modifier.testTag(
-                                if (initialKurir == null) "switch_kurir_akses" else "switch_edit_kurir_akses"
-                            )
-                        )
-                    }
-                }
-
-                if (errorMessage != null) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = errorMessage ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+                        text = "Izinkan Akses Depot",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Matikan jika kurir sedang libur atau berhenti.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val trimmedNama = nama.trim()
-                    if (trimmedNama.isBlank()) {
-                        errorMessage = "Nama karyawan wajib diisi"
-                        return@Button
-                    }
-                    val komisi = komisiStr.toDoubleOrNull()
-                    if (komisi == null || komisi < 0.0) {
-                        errorMessage = "Nominal komisi tidak valid"
-                        return@Button
-                    }
-
-                    val rawEmail = emailInput.trim().removePrefix("@").lowercase()
-                    val cleanEmail = when {
-                        rawEmail.isBlank() -> ""
-                        !rawEmail.contains("@") -> "$rawEmail@gmail.com"
-                        else -> rawEmail
-                    }
-                    if (cleanEmail.isNotBlank()) {
-                        if (cleanEmail.length < 5 || !cleanEmail.contains("@") || cleanEmail.endsWith("@")) {
-                            errorMessage = "Format email Google tidak valid"
-                            return@Button
-                        }
-                        val targetId = initialKurir?.id
-                        val isDuplicate = existingKurirList.any { existing ->
-                            if (existing.id == targetId) return@any false
-                            val exRaw = existing.email.trim().lowercase()
-                            val exNormalized = if (exRaw.isNotBlank() && !exRaw.contains("@")) "$exRaw@gmail.com" else exRaw
-                            exNormalized == cleanEmail
-                        }
-                        if (isDuplicate) {
-                            errorMessage = "Email '$cleanEmail' sudah dipakai karyawan lain"
-                            return@Button
-                        }
-                    }
-
-                    onSubmit(
-                        trimmedNama,
-                        komisi,
-                        cleanEmail,
-                        aksesAktif
+                Spacer(modifier = Modifier.width(8.dp))
+                Switch(
+                    checked = aksesAktif,
+                    onCheckedChange = { aksesAktif = it },
+                    modifier = Modifier.testTag(
+                        if (initialKurir == null) "switch_kurir_akses" else "switch_edit_kurir_akses"
                     )
-                },
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.testTag("btn_simpan_kurir")
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Batal")
+                )
             }
         }
-    )
+
+        if (errorMessage != null) {
+            Text(
+                text = errorMessage ?: "",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
 }

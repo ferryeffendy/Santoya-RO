@@ -3,7 +3,6 @@ package com.example.ui.screens
 import android.app.DatePickerDialog
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,14 +17,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DeliveryDining
@@ -75,8 +75,23 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HydroBentoCard
+import com.example.ui.components.HydroCourierWaveIcon
+import com.example.ui.components.HydroDropletSparkIcon
+import com.example.ui.components.HydroExpenseFlowIcon
+import com.example.ui.components.HydroGalonIcon
+import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.HydroReceiptNoteIcon
+import com.example.ui.components.HydroReportChartIcon
+import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaEmptyState
+import com.example.ui.theme.AccentAmber
+import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.AccentEmerald
+import com.example.ui.theme.AccentRose
 import com.example.ui.theme.HeroDeficitEnd
 import com.example.ui.theme.HeroDeficitMid
 import com.example.ui.theme.HeroDeficitStart
@@ -335,13 +350,14 @@ fun LaporanScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-            // 1. Prominent Period Filter Bar (Date Picker & FilterChips)
+            // 1. Prominent Period Filter Bar (Date Picker & Proportional 5-Tab Selector)
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(16.dp)
+                HydroBentoCard(
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    cornerRadius = 20.dp,
+                    tintAlpha = 0.07f,
+                    showWaterRipple = true,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(
@@ -353,98 +369,114 @@ fun LaporanScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size(32.dp)
+                                HydroGradientBadge(
+                                    gradientColors = listOf(MaterialTheme.colorScheme.primary, AccentCyan),
+                                    size = 36.dp,
+                                    cornerRadius = 11.dp,
+                                    elevation = 3.dp
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.CalendarToday,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarToday,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(17.dp)
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Periode Laporan",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = if (!isCustomDateRange && startTime == 0L) {
-                                            "Semua Riwayat Transaksi"
-                                        } else {
-                                            "${FormatUtils.formatDateShort(startTime)} – ${FormatUtils.formatDateShort(endTime)}"
-                                        },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                                Text(
+                                    text = "Periode Laporan",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
 
                             Spacer(modifier = Modifier.width(8.dp))
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Surface(
-                                    onClick = { openCustomDateRangePicker() },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isCustomDateRange) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
-                                    }
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.DateRange,
-                                            contentDescription = "Pilih Rentang Tanggal",
-                                            tint = if (isCustomDateRange) {
-                                                MaterialTheme.colorScheme.onPrimary
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            },
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "Kalender",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isCustomDateRange) {
-                                                MaterialTheme.colorScheme.onPrimary
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            }
-                                        )
-                                    }
+                            Surface(
+                                onClick = { openCustomDateRangePicker() },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isCustomDateRange) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
                                 }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
                                 ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = "Pilih Rentang Tanggal",
+                                        tint = if (isCustomDateRange) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Kalender",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isCustomDateRange) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (!isCustomDateRange && startTime == 0L) {
+                                    "Semua waktu"
+                                } else {
+                                    "${FormatUtils.formatDateUi(startTime)} – ${FormatUtils.formatDateUi(endTime)}"
+                                },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    HydroGalonIcon(
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(12.dp)
+                                    )
                                     Text(
                                         text = "${filteredTx.sumOf { it.transaksi.jumlah }} Galon",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                        maxLines = 1,
+                                        softWrap = false
                                     )
                                 }
                             }
@@ -453,10 +485,9 @@ fun LaporanScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState())
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             val chipLabels = mapOf(
                                 LaporanPeriode.HARI_INI to "Harian",
@@ -467,52 +498,50 @@ fun LaporanScreen(
                             )
                             LaporanPeriode.values().forEach { filter ->
                                 val isSelected = !isCustomDateRange && selectedPeriode == filter
-                                FilterChip(
-                                    selected = isSelected,
+                                Surface(
                                     onClick = {
                                         isCustomDateRange = false
                                         viewModel.setLaporanPeriode(filter)
                                         showAllDetails = false
                                     },
-                                    label = {
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.surface
+                                    },
+                                    border = if (isSelected) {
+                                        null
+                                    } else {
+                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(34.dp)
+                                ) {
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(horizontal = 2.dp)
+                                    ) {
                                         Text(
                                             text = chipLabels[filter] ?: filter.label,
+                                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            maxLines = 1
+                                            color = if (isSelected) {
+                                                MaterialTheme.colorScheme.onPrimary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            },
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center
                                         )
-                                    },
-                                    modifier = Modifier.height(34.dp),
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                )
+                                    }
+                                }
                             }
-
-                            FilterChip(
-                                selected = isCustomDateRange,
-                                onClick = { openCustomDateRangePicker() },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.DateRange,
-                                        contentDescription = "Pilih Rentang Tanggal",
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                },
-                                label = {
-                                    Text(
-                                        text = "Custom",
-                                        fontWeight = if (isCustomDateRange) FontWeight.Bold else FontWeight.Medium,
-                                        maxLines = 1
-                                    )
-                                },
-                                modifier = Modifier.height(34.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            )
                         }
                     }
                 }
@@ -521,84 +550,35 @@ fun LaporanScreen(
             // 2. Main Profit & Loss Summary Card OR Empty State
             if (!hasPeriodActivity) {
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 24.dp, vertical = 36.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                                modifier = Modifier.size(68.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.AccountBalanceWallet,
-                                        contentDescription = "Dompet Kosong",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(34.dp)
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text(
-                                text = "Belum ada transaksi di periode ini",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Pilih periode lain atau catat transaksi baru untuk melihat ringkasan laba bersih.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center
-                            )
+                    SantoyaEmptyState(
+                        illustrationRes = R.drawable.img_empty_laporan,
+                        title = "Belum ada transaksi di periode ini",
+                        subtitle = "Belum ada data. Coba pilih periode lain atau catat transaksi baru.",
+                        primaryActionLabel = "Catat Transaksi",
+                        primaryActionIcon = Icons.Default.Add,
+                        onPrimaryAction = {
+                            viewModel.setTransaksiTab(0)
+                            viewModel.navigateTo(SantoyaScreen.TRANSAKSI)
                         }
-                    }
+                    )
                 }
             } else {
-                // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Luxury Fintech Style)
+                // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Solid Brand Navy Style)
                 item {
-                    val heroGradient = if (isProfit) {
-                        Brush.linearGradient(
-                            colors = listOf(
-                                HeroGradientStart,
-                                HeroGradientMid,
-                                HeroGradientEnd
-                            )
-                        )
-                    } else {
-                        Brush.linearGradient(
-                            colors = listOf(
-                                HeroDeficitStart,
-                                HeroDeficitMid,
-                                HeroDeficitEnd
-                            )
-                        )
-                    }
+                    val heroContainerColor = if (isProfit) HeroGradientStart else HeroDeficitStart
                     val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
-                    val formattedMargin = String.format(Locale.US, "%.1f", marginLabaPersen)
-                    val formattedLabaBersih = FormatUtils.formatRupiah(labaBersih)
+                    val formattedMargin = FormatUtils.formatPercent(marginLabaPersen)
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(22.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors = CardDefaults.cardColors(containerColor = heroContainerColor)
                     ) {
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(heroGradient)
+                                .background(heroContainerColor)
                                 .padding(20.dp)
                         ) {
                             // Top Header Row: Label (Weighted so it never collides on small screens)
@@ -611,23 +591,20 @@ fun LaporanScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = heroAccent.copy(alpha = 0.2f),
-                                        modifier = Modifier.size(38.dp)
+                                    HydroGradientBadge(
+                                        gradientColors = if (isProfit) {
+                                            listOf(AccentEmerald, AccentCyan)
+                                        } else {
+                                            listOf(AccentRose, AccentAmber)
+                                        },
+                                        size = 40.dp,
+                                        cornerRadius = 13.dp,
+                                        elevation = 3.dp
                                     ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = if (isProfit) {
-                                                    Icons.AutoMirrored.Outlined.TrendingUp
-                                                } else {
-                                                    Icons.AutoMirrored.Outlined.TrendingDown
-                                                },
-                                                contentDescription = "Status Laba",
-                                                tint = heroAccent,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
+                                        HydroReportChartIcon(
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
@@ -641,7 +618,7 @@ fun LaporanScreen(
                                             overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Pendapatan lunas dikurangi beban & komisi",
+                                            text = "Uang masuk dikurangi biaya & komisi",
                                             style = MaterialTheme.typography.labelSmall,
                                             color = Color.White.copy(alpha = 0.75f),
                                             maxLines = 1,
@@ -654,17 +631,13 @@ fun LaporanScreen(
                             Spacer(modifier = Modifier.height(12.dp))
 
                             // Hero Number: Laba Bersih with Adaptive Font Size so tens/hundreds of millions never clip
-                            Text(
-                                text = formattedLabaBersih,
-                                style = if (formattedLabaBersih.length > 14) {
-                                    MaterialTheme.typography.headlineLarge
-                                } else {
-                                    MaterialTheme.typography.displaySmall
-                                },
+                            SantoyaAdaptiveCurrencyText(
+                                amount = labaBersih,
+                                style = MaterialTheme.typography.displaySmall,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                                minFontSize = 18.sp,
+                                modifier = Modifier.fillMaxWidth()
                             )
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -680,7 +653,7 @@ fun LaporanScreen(
                                     border = BorderStroke(1.dp, heroAccent.copy(alpha = 0.45f))
                                 ) {
                                     Text(
-                                        text = "Margin Laba: $formattedMargin%",
+                                        text = "Margin Laba: $formattedMargin",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = heroAccent,
@@ -815,13 +788,13 @@ fun LaporanScreen(
                         !it.transaksi.status.equals("Lunas", ignoreCase = true) && it.transaksi.uangMuka > 0L
                     }
                     val pendapatanSubtitle = if (dpCount > 0) {
-                        "$lunasCount Lunas + $dpCount DP (${(collectionRatio * 100).toInt()}% Tertagih)"
+                        "$lunasCount Lunas • $dpCount DP (${(collectionRatio * 100).toInt()}%)"
                     } else {
-                        "$lunasCount Trx Lunas (${(collectionRatio * 100).toInt()}% Tertagih)"
+                        "$lunasCount Lunas (${(collectionRatio * 100).toInt()}% tertagih)"
                     }
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // Top 2-Column Bento Grid: Total Pendapatan vs Total Pengeluaran
+                        // Top Asymmetric 2-Column Bento Grid: Total Pendapatan (1.14f) vs Total Pengeluaran (1f)
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -830,9 +803,9 @@ fun LaporanScreen(
                         ) {
                             BentoFinancialCard(
                                 modifier = Modifier
-                                    .weight(1f)
+                                    .weight(1.14f)
                                     .fillMaxHeight(),
-                                icon = Icons.Outlined.AccountBalanceWallet,
+                                gradientColors = listOf(profitColor, AccentEmerald),
                                 label = "Total Pendapatan",
                                 amount = FormatUtils.formatRupiah(pendapatanLunas),
                                 subtitle = pendapatanSubtitle,
@@ -849,6 +822,12 @@ fun LaporanScreen(
                                     }
                                 } else {
                                     null
+                                },
+                                iconContent = {
+                                    HydroDropletSparkIcon(
+                                        tint = Color.White,
+                                        modifier = Modifier.size(19.dp)
+                                    )
                                 }
                             )
 
@@ -861,29 +840,42 @@ fun LaporanScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight(),
-                                icon = Icons.Outlined.ShoppingCart,
+                                gradientColors = listOf(lossColor, AccentRose),
                                 label = "Total Pengeluaran",
                                 amount = FormatUtils.formatRupiah(totalBebanKeluar),
-                                subtitle = "Beban terhadap pendapatan",
+                                subtitle = "Porsi beban dari pendapatan",
                                 accentColor = lossColor,
-                                progress = expenseRatio
+                                progress = expenseRatio,
+                                iconContent = {
+                                    HydroExpenseFlowIcon(
+                                        tint = Color.White,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
                             )
                         }
 
                         // Secondary Breakdown Card: Biaya Operasional Kas & Komisi Kurir (+ Piutang Kasbon if any)
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        HydroBentoCard(
+                            accentColor = MaterialTheme.colorScheme.primary,
+                            cornerRadius = 18.dp,
+                            tintAlpha = 0.05f,
+                            showWaterRipple = false,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 FinancialBreakdownRow(
-                                    icon = Icons.Outlined.ShoppingCart,
+                                    gradientColors = listOf(lossColor, AccentRose),
                                     title = "Biaya Operasional",
                                     subtitle = "${filteredExp.size} catatan pengeluaran",
                                     nominalText = "- ${FormatUtils.formatRupiah(totalPengeluaran)}",
-                                    accentColor = lossColor
+                                    accentColor = lossColor,
+                                    iconContent = {
+                                        HydroExpenseFlowIcon(
+                                            tint = Color.White,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
                                 )
 
                                 HorizontalDivider(
@@ -892,11 +884,17 @@ fun LaporanScreen(
                                 )
 
                                 FinancialBreakdownRow(
-                                    icon = Icons.Outlined.LocalShipping,
+                                    gradientColors = listOf(santoyaColors.warning, AccentAmber),
                                     title = "Komisi Kurir",
-                                    subtitle = "Akumulasi komisi pengantaran",
+                                    subtitle = "Total komisi kurir periode ini",
                                     nominalText = "- ${FormatUtils.formatRupiah(totalKomisiKurir)}",
-                                    accentColor = santoyaColors.warning
+                                    accentColor = santoyaColors.warning,
+                                    iconContent = {
+                                        HydroCourierWaveIcon(
+                                            tint = Color.White,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
                                 )
 
                                 if (piutangKasbonPeriode > 0) {
@@ -906,11 +904,17 @@ fun LaporanScreen(
                                     )
 
                                     FinancialBreakdownRow(
-                                        icon = Icons.Outlined.AccountBalanceWallet,
+                                        gradientColors = listOf(santoyaColors.warning, AccentRose),
                                         title = "Piutang Kasbon",
-                                        subtitle = "Masuk ke laba bersih setelah lunas",
+                                        subtitle = "Masuk ke laba setelah dilunasi",
                                         nominalText = FormatUtils.formatRupiah(piutangKasbonPeriode),
-                                        accentColor = santoyaColors.warning
+                                        accentColor = santoyaColors.warning,
+                                        iconContent = {
+                                            HydroReceiptNoteIcon(
+                                                tint = Color.White,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
                                     )
                                 }
                             }
@@ -924,11 +928,12 @@ fun LaporanScreen(
             item {
                 val monthProgress = (currentDay.toFloat() / daysInMonth.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
                 val projectedColor = if (projectedProfit >= 0) profitColor else lossColor
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                    shape = RoundedCornerShape(16.dp)
+                HydroBentoCard(
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    cornerRadius = 20.dp,
+                    tintAlpha = 0.08f,
+                    showWaterRipple = true,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -940,19 +945,16 @@ fun LaporanScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primaryContainer,
-                                    modifier = Modifier.size(34.dp)
+                                HydroGradientBadge(
+                                    gradientColors = listOf(MaterialTheme.colorScheme.primary, AccentCyan),
+                                    size = 38.dp,
+                                    cornerRadius = 12.dp,
+                                    elevation = 3.dp
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Insights,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
+                                    HydroReportChartIcon(
+                                        tint = Color.White,
+                                        modifier = Modifier.size(19.dp)
+                                    )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
@@ -973,15 +975,15 @@ fun LaporanScreen(
                             }
 
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
                             ) {
                                 Text(
                                     text = "${(monthProgress * 100).toInt()}% Bulan",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                                 )
                             }
                         }
@@ -992,7 +994,7 @@ fun LaporanScreen(
                             progress = { monthProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(5.dp)
+                                .height(6.dp)
                                 .clip(RoundedCornerShape(3.dp)),
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -1005,19 +1007,30 @@ fun LaporanScreen(
                         ) {
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "Proyeksi Volume",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        HydroGalonIcon(
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = "Proyeksi Volume",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(3.dp))
                                     Text(
                                         text = "$projectedGalon Galon",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.ExtraBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
@@ -1028,9 +1041,10 @@ fun LaporanScreen(
                                 }
                             }
                             Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.weight(1f)
+                                color = projectedColor.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, projectedColor.copy(alpha = 0.28f)),
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.weight(1.18f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
@@ -1038,20 +1052,22 @@ fun LaporanScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Text(
-                                        text = FormatUtils.formatRupiah(projectedProfit),
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = projectedProfit,
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.ExtraBold,
                                         color = projectedColor,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        minFontSize = 11.sp,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
-                                    Text(
-                                        text = "Aktual: ${FormatUtils.formatRupiah(monthNetProfit)}",
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = monthNetProfit,
+                                        customText = "Aktual: ${FormatUtils.formatRupiah(monthNetProfit)}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        minFontSize = 10.sp,
+                                        modifier = Modifier.fillMaxWidth()
                                     )
                                 }
                             }
@@ -1064,30 +1080,30 @@ fun LaporanScreen(
             // 4. Peringkat Penjualan Terbanyak (Desa & Kurir) with Top 5 Expand/Collapse
             if (hasPeriodActivity) {
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                HydroBentoCard(
+                    accentColor = santoyaColors.rankGold,
+                    cornerRadius = 20.dp,
+                    tintAlpha = 0.06f,
+                    showWaterRipple = false,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Surface(
-                                shape = CircleShape,
-                                color = MaterialTheme.colorScheme.primaryContainer,
-                                modifier = Modifier.size(34.dp)
+                            HydroGradientBadge(
+                                gradientColors = listOf(santoyaColors.rankGold, AccentAmber),
+                                size = 38.dp,
+                                cornerRadius = 12.dp,
+                                elevation = 3.dp
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.EmojiEvents,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.EmojiEvents,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(19.dp)
+                                )
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
@@ -1099,7 +1115,7 @@ fun LaporanScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Volume galon per wilayah & kurir",
+                                    text = "Penjualan galon per desa & kurir",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
@@ -1258,20 +1274,37 @@ fun LaporanScreen(
 
             // 5. Strategic Export Panel (PDF & CSV + Mode Ringkasan) — Placed ABOVE transaction list so it's always reachable
             item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                HydroBentoCard(
+                    accentColor = MaterialTheme.colorScheme.secondary,
+                    cornerRadius = 20.dp,
+                    tintAlpha = 0.06f,
+                    showWaterRipple = false,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "Ekspor Laporan",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            HydroGradientBadge(
+                                gradientColors = listOf(MaterialTheme.colorScheme.secondary, AccentCyan),
+                                size = 34.dp,
+                                cornerRadius = 11.dp,
+                                elevation = 2.dp
+                            ) {
+                                HydroReceiptNoteIcon(
+                                    tint = Color.White,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                            Text(
+                                text = "Ekspor Laporan",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1285,7 +1318,7 @@ fun LaporanScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Kelompokkan total lunas & kasbon per tanggal",
+                                    text = "Gabungkan total per hari di PDF",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1313,7 +1346,7 @@ fun LaporanScreen(
                                         val totalKasbon = piutangKasbonPeriode
                                         val totalKomisi = totalKomisiKurir
                                         val netProfit = labaBersih
-                                        val marginFormatted = String.format(Locale.US, "%.1f", marginLabaPersen)
+                                        val marginFormatted = FormatUtils.formatPercent(marginLabaPersen)
 
                                         append("<html><head><style>")
                                         append("body { font-family: Arial, sans-serif; padding: 20px; color: #333; }")
@@ -1326,7 +1359,7 @@ fun LaporanScreen(
                                         append(".right { text-align: right; }")
                                         append("</style></head><body>")
                                         append("<h1>Laporan Keuangan Santoya RO</h1>")
-                                        append("<div class='subtitle'>Periode: ${if (!isCustomDateRange && startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDate(startTime)} s/d ${FormatUtils.formatDate(endTime)}"}</div>")
+                                        append("<div class='subtitle'>Periode: ${if (!isCustomDateRange && startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDateUi(startTime)} s/d ${FormatUtils.formatDateUi(endTime)}"}</div>")
 
                                         append("<div class='card'>")
                                         append("<b>Ringkasan Finansial:</b><br/>")
@@ -1335,7 +1368,7 @@ fun LaporanScreen(
                                         append("• Piutang Kasbon: ${FormatUtils.formatRupiah(totalKasbon)}<br/>")
                                         append("• Komisi Kurir: ${FormatUtils.formatRupiah(totalKomisi)}<br/>")
                                         append("• Total Pengeluaran Operasional: ${FormatUtils.formatRupiah(totalPengeluaran)}<br/>")
-                                        append("<b>• Laba Bersih: ${FormatUtils.formatRupiah(netProfit)} (Margin: $marginFormatted%)</b>")
+                                        append("<b>• Laba Bersih: ${FormatUtils.formatRupiah(netProfit)} (Margin: $marginFormatted)</b>")
                                         append("</div>")
 
                                         if (isSummaryMode) {
@@ -1388,7 +1421,7 @@ fun LaporanScreen(
                                             }
                                             append("</tbody></table>")
                                             if (filteredTx.size > 100) {
-                                                append("<p style='text-align:center; font-style:italic;'>*Menampilkan 100 transaksi terbaru. Gunakan Ekspor CSV untuk data lengkap.</p>")
+                                                append("<p style='text-align:center; font-style:italic;'>*Menampilkan 100 transaksi terbaru. Ekspor CSV untuk data lengkap.</p>")
                                             }
                                         }
 
@@ -1501,11 +1534,18 @@ fun LaporanScreen(
                             isBayarSebagian -> "Bayar Sebagian"
                             else -> "Belum Dibayar"
                         }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        val itemAccent = if (isLunas) profitColor else santoyaColors.warning
+                        val badgeGradient = if (isLunas) {
+                            listOf(profitColor, AccentEmerald)
+                        } else {
+                            listOf(santoyaColors.warning, AccentAmber)
+                        }
+                        HydroBentoCard(
+                            accentColor = itemAccent,
+                            cornerRadius = 18.dp,
+                            tintAlpha = 0.06f,
+                            showWaterRipple = false,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1514,41 +1554,61 @@ fun LaporanScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "${item.pelanggan?.nama ?: "Umum"} • ${trx.jumlah} Galon",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${FormatUtils.formatDateShort(trx.tanggal)} • $metodeInfo • Komisi: ${FormatUtils.formatRupiah(trx.total_komisi)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    if (isBayarSebagian) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    HydroGradientBadge(
+                                        gradientColors = badgeGradient,
+                                        size = 36.dp,
+                                        cornerRadius = 11.dp,
+                                        elevation = 2.dp
+                                    ) {
+                                        HydroGalonIcon(
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "DP: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = santoyaColors.warning,
+                                            text = "${item.pelanggan?.nama ?: "Umum"} • ${trx.jumlah} Galon",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
+                                        Text(
+                                            text = "${FormatUtils.formatDateUi(trx.tanggal)} • $metodeInfo • Komisi: ${FormatUtils.formatRupiah(trx.total_komisi)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (isBayarSebagian) {
+                                            Text(
+                                                text = "DP: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = santoyaColors.warning,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = FormatUtils.formatRupiah(trx.total_harga),
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    modifier = Modifier.widthIn(max = 136.dp)
+                                ) {
+                                    SantoyaAdaptiveCurrencyText(
+                                        amount = trx.total_harga,
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isLunas) profitColor else santoyaColors.warning,
-                                        maxLines = 1,
-                                        softWrap = false
+                                        minFontSize = 10.sp,
+                                        textAlign = TextAlign.End
                                     )
                                     Text(
                                         text = trx.status.uppercase(),
@@ -1595,11 +1655,12 @@ fun LaporanScreen(
                 } else {
                     val displayedExp = if (showAllDetails) filteredExp else filteredExp.take(15)
                     items(displayedExp, key = { it.id }) { pengeluaran ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        HydroBentoCard(
+                            accentColor = lossColor,
+                            cornerRadius = 18.dp,
+                            tintAlpha = 0.06f,
+                            showWaterRipple = false,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier
@@ -1608,30 +1669,49 @@ fun LaporanScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = pengeluaran.nama_item,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = "${pengeluaran.kategori} • ${FormatUtils.formatDateShort(pengeluaran.tanggal)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    HydroGradientBadge(
+                                        gradientColors = listOf(lossColor, AccentRose),
+                                        size = 36.dp,
+                                        cornerRadius = 11.dp,
+                                        elevation = 2.dp
+                                    ) {
+                                        HydroExpenseFlowIcon(
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = pengeluaran.nama_item,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "${pengeluaran.kategori} • ${FormatUtils.formatDateUi(pengeluaran.tanggal)}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "- ${FormatUtils.formatRupiah(pengeluaran.nominal)}",
+                                SantoyaAdaptiveCurrencyText(
+                                    amount = pengeluaran.nominal,
+                                    customText = "- ${FormatUtils.formatRupiah(pengeluaran.nominal)}",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = lossColor,
-                                    maxLines = 1,
-                                    softWrap = false
+                                    minFontSize = 10.sp,
+                                    textAlign = TextAlign.End,
+                                    modifier = Modifier.widthIn(max = 136.dp)
                                 )
                             }
                         }
@@ -1689,18 +1769,19 @@ private fun CashflowLegendDot(
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(7.dp)
                 .clip(CircleShape)
                 .background(color)
         )
-        Spacer(modifier = Modifier.width(5.dp))
+        Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = Color.White.copy(alpha = 0.85f),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
-            softWrap = false
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -1767,31 +1848,25 @@ private fun MonthlyRevenueComparisonBadge(
 @Composable
 private fun BentoFinancialCard(
     modifier: Modifier = Modifier,
-    icon: ImageVector,
+    gradientColors: List<Color>,
     label: String,
     amount: String,
     subtitle: String,
     accentColor: Color,
     progress: Float,
-    comparisonBadge: (@Composable () -> Unit)? = null
+    comparisonBadge: (@Composable () -> Unit)? = null,
+    iconContent: @Composable () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    HydroBentoCard(
+        accentColor = accentColor,
+        cornerRadius = 20.dp,
+        tintAlpha = 0.09f,
+        showWaterRipple = true,
+        modifier = modifier
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            accentColor.copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
-                    )
-                )
                 .padding(14.dp)
         ) {
             Row(
@@ -1799,26 +1874,26 @@ private fun BentoFinancialCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Surface(
-                    shape = CircleShape,
-                    color = accentColor.copy(alpha = 0.14f),
-                    modifier = Modifier.size(34.dp)
+                HydroGradientBadge(
+                    gradientColors = gradientColors,
+                    size = 38.dp,
+                    cornerRadius = 12.dp,
+                    elevation = 3.dp
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = accentColor,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    iconContent()
                 }
-                Text(
-                    text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = accentColor.copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = accentColor,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -1834,17 +1909,14 @@ private fun BentoFinancialCard(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            Text(
-                text = amount,
-                style = if (amount.length > 13) {
-                    MaterialTheme.typography.titleSmall
-                } else {
-                    MaterialTheme.typography.titleMedium
-                },
+            SantoyaAdaptiveCurrencyText(
+                amount = 0.0,
+                customText = amount,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                minFontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth()
             )
 
             if (comparisonBadge != null) {
@@ -1869,8 +1941,8 @@ private fun BentoFinancialCard(
                 progress = { progress.coerceIn(0f, 1f) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp)),
                 color = accentColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
@@ -1880,11 +1952,12 @@ private fun BentoFinancialCard(
 
 @Composable
 private fun FinancialBreakdownRow(
-    icon: ImageVector,
+    gradientColors: List<Color>,
     title: String,
     subtitle: String,
     nominalText: String,
-    accentColor: Color
+    accentColor: Color,
+    iconContent: @Composable () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1895,19 +1968,13 @@ private fun FinancialBreakdownRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = accentColor.copy(alpha = 0.12f),
-                modifier = Modifier.size(38.dp)
+            HydroGradientBadge(
+                gradientColors = gradientColors,
+                size = 38.dp,
+                cornerRadius = 12.dp,
+                elevation = 2.dp
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                iconContent()
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -1929,12 +1996,15 @@ private fun FinancialBreakdownRow(
             }
         }
         Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = nominalText,
+        SantoyaAdaptiveCurrencyText(
+            amount = 0.0,
+            customText = nominalText,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.ExtraBold,
             color = accentColor,
-            maxLines = 1
+            minFontSize = 11.sp,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(max = 148.dp)
         )
     }
 }
@@ -1995,12 +2065,19 @@ private fun PenjualanDesaItemRow(
         3 -> santoyaColors.rankBronze
         else -> MaterialTheme.colorScheme.primary
     }
+    val rankGradient = when (rank) {
+        1 -> listOf(santoyaColors.rankGold, AccentAmber)
+        2 -> listOf(santoyaColors.rankSilver, Color(0xFF94A3B8))
+        3 -> listOf(santoyaColors.rankBronze, AccentAmber)
+        else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(11.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2010,18 +2087,34 @@ private fun PenjualanDesaItemRow(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = rankColor.copy(alpha = 0.2f),
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+                    if (rank <= 3) {
+                        HydroGradientBadge(
+                            gradientColors = rankGradient,
+                            size = 30.dp,
+                            cornerRadius = 9.dp,
+                            elevation = 2.dp
+                        ) {
                             Text(
                                 text = "#$rank",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = rankColor
+                                color = Color.White
                             )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = rankColor.copy(alpha = 0.14f),
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "#$rank",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = rankColor
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -2044,16 +2137,27 @@ private fun PenjualanDesaItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
-                    Text(
-                        text = "${item.total_galon} Galon",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    ) {
+                        HydroGalonIcon(
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "${item.total_galon} Galon",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))
@@ -2083,12 +2187,19 @@ private fun PenjualanKurirItemRow(
         3 -> santoyaColors.rankBronze
         else -> MaterialTheme.colorScheme.primary
     }
+    val rankGradient = when (rank) {
+        1 -> listOf(santoyaColors.rankGold, AccentAmber)
+        2 -> listOf(santoyaColors.rankSilver, Color(0xFF94A3B8))
+        3 -> listOf(santoyaColors.rankBronze, AccentAmber)
+        else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
+    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
+        shape = RoundedCornerShape(14.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(11.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2098,18 +2209,34 @@ private fun PenjualanKurirItemRow(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = rankColor.copy(alpha = 0.2f),
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+                    if (rank <= 3) {
+                        HydroGradientBadge(
+                            gradientColors = rankGradient,
+                            size = 30.dp,
+                            cornerRadius = 9.dp,
+                            elevation = 2.dp
+                        ) {
                             Text(
                                 text = "#$rank",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = rankColor
+                                color = Color.White
                             )
+                        }
+                    } else {
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = rankColor.copy(alpha = 0.14f),
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "#$rank",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = rankColor
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -2132,16 +2259,27 @@ private fun PenjualanKurirItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
-                    Text(
-                        text = "${item.total_galon} Galon",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    ) {
+                        HydroGalonIcon(
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "${item.total_galon} Galon",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(6.dp))

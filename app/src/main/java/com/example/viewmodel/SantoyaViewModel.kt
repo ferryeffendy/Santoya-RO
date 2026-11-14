@@ -21,15 +21,19 @@ import com.example.util.RealtimeSyncState
 import com.example.util.SyncSummary
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class SantoyaScreen {
     DASHBOARD,
@@ -76,6 +80,36 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     private val syncEngine = RealtimeSyncEngine(application, db)
     private val repository = SantoyaRepository(db, application) {
         syncEngine.scheduleFlush()
+    }
+
+    // --- Centralized Loading & Anti-Double-Tap Busy States ---
+    private val _isInitialDataLoaded = MutableStateFlow(false)
+    val isInitialDataLoaded: StateFlow<Boolean> = _isInitialDataLoaded.asStateFlow()
+
+    private val _isBusyAction = MutableStateFlow(false)
+    val isBusyAction: StateFlow<Boolean> = _isBusyAction.asStateFlow()
+
+    private val _busyActionMessage = MutableStateFlow<String?>(null)
+    val busyActionMessage: StateFlow<String?> = _busyActionMessage.asStateFlow()
+
+    private val busyActionGuard = AtomicBoolean(false)
+
+    private inline fun launchGuardedAction(
+        message: String,
+        crossinline block: suspend () -> Unit
+    ) {
+        if (!busyActionGuard.compareAndSet(false, true)) return
+        _isBusyAction.value = true
+        _busyActionMessage.value = message
+        viewModelScope.launch {
+            try {
+                block()
+            } finally {
+                _busyActionMessage.value = null
+                _isBusyAction.value = false
+                busyActionGuard.set(false)
+            }
+        }
     }
 
     // --- Navigation ---
@@ -131,14 +165,16 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         _currentUserEmail
     ) { sync, kurirs, email ->
         KaryawanScopeHelper.isKaryawanRole(sync.role, email, kurirs)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     val activeKaryawan: StateFlow<Kurir?> = combine(
         allKurir,
         _currentUserEmail
     ) { kurirs, email ->
         KaryawanScopeHelper.resolveActiveKaryawan(email, kurirs)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val scopedPelanggan: StateFlow<List<Pelanggan>> = combine(
         allPelanggan,
@@ -146,7 +182,8 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         activeKaryawan
     ) { pelangganList, karyawan, kurir ->
         KaryawanScopeHelper.filterPelangganForRole(pelangganList, karyawan, kurir)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scopedTransaksi: StateFlow<List<TransaksiDetail>> = combine(
         allTransaksi,
@@ -154,7 +191,8 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         activeKaryawan
     ) { transaksiList, karyawan, kurir ->
         KaryawanScopeHelper.filterTransaksiForRole(transaksiList, karyawan, kurir)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scopedPelangganTransaksi: StateFlow<List<TransaksiDetail>> = combine(
         allTransaksi,
@@ -164,17 +202,27 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     ) { transaksiList, karyawan, kurir, ownedPelanggan ->
         val ownedIds = ownedPelanggan.map { it.id }.toSet()
         KaryawanScopeHelper.filterCustomerHistoryForRole(transaksiList, karyawan, kurir, ownedIds)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val scopedPelangganUiModels: StateFlow<List<PelangganUiModel>> = combine(
         scopedPelanggan,
         scopedPelangganTransaksi
     ) { pelangganList, transaksiList ->
         getPelangganUiModels(pelangganList, transaksiList)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
+            combine(
+                repository.allPelanggan,
+                repository.allProduk,
+                repository.allTransaksiWithDetail
+            ) { _, _, _ -> true }.first()
+            _isInitialDataLoaded.value = true
+        }
+        viewModelScope.launch(Dispatchers.Default) {
             repository.reconcileKasbonDiscrepancies()
             combine(allPelanggan, allTransaksi) { pelangganList, transaksiList ->
                 val activeUnpaidByCust = transaksiList.asSequence()
@@ -364,6 +412,24 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun startQuickOrder(
+        pelangganId: Int,
+        produkId: Int? = null,
+        jumlah: Int = 1
+    ) {
+        _txTanggal.value = System.currentTimeMillis()
+        if (produkId != null && allProduk.value.any { it.id == produkId }) {
+            _txProdukId.value = produkId
+        } else if (_txProdukId.value == null) {
+            _txProdukId.value = allProduk.value.firstOrNull()?.id
+        }
+        setTxPelangganId(pelangganId)
+        setTxJumlah(jumlah.coerceAtLeast(1))
+        setTxMetodeBayar("Cash")
+        setTransaksiTab(0)
+        navigateTo(SantoyaScreen.TRANSAKSI)
+    }
+
     // --- Feedback / Dialog States ---
     private val _snackbarMessage = MutableStateFlow<String?>(null)
     val snackbarMessage: StateFlow<String?> = _snackbarMessage.asStateFlow()
@@ -377,11 +443,11 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun clearSnackbar() { _snackbarMessage.value = null }
 
     fun createFastCashTransaksi(idProduk: Int, jumlah: Int = 1) {
-        viewModelScope.launch {
+        launchGuardedAction("Mencatat penjualan cepat...") {
             try {
                 val karyawanKurirId = if (isUserKaryawan()) resolveActiveKaryawanImmediate()?.id else null
                 repository.createFastCashTransaksi(idProduk, jumlah, karyawanKurirId)
-                showSnackbar("Jual cepat tercatat ($jumlah galon • Cash)")
+                showSnackbar("Terjual $jumlah galon (Cash)")
             } catch (e: Exception) {
                 showSnackbar("Gagal mencatat transaksi: ${e.message ?: "Terjadi kesalahan"}")
             }
@@ -392,6 +458,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         repository.getKasbonLogsByPelanggan(pelangganId)
 
     fun submitTransaksi(onSuccess: (TransaksiDetail?) -> Unit) {
+        if (_isBusyAction.value) return
         val pelangganId = _txPelangganId.value
         val produkId = _txProdukId.value
         if (pelangganId == null) {
@@ -447,7 +514,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         val karyawanKurirId = if (karyawanMode) resolveActiveKaryawanImmediate()?.id else null
         val effectiveKurirId = karyawanKurirId ?: _txKurirId.value
 
-        viewModelScope.launch {
+        launchGuardedAction("Menyimpan transaksi...") {
             val newId = repository.recordTransaksi(
                 tanggal = _txTanggal.value,
                 idPelanggan = pelangganId,
@@ -498,18 +565,18 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun markTransaksiLunas(transaksiId: Int) {
-        viewModelScope.launch {
+        launchGuardedAction("Menandai lunas...") {
             repository.markTransaksiLunas(transaksiId)
             showSnackbar("Transaksi ditandai lunas")
         }
     }
 
     fun deleteTransaksi(transaksi: Transaksi) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus transaksi...") {
             if (isUserKaryawan()) {
                 val karyawanName = resolveActiveKaryawanImmediate()?.nama ?: "Karyawan"
                 repository.softDeleteTransaksiByKaryawan(transaksi, karyawanName)
-                showSnackbar("Transaksi dihapus (ditandai oleh $karyawanName)")
+                showSnackbar("Transaksi dihapus (dicatat oleh $karyawanName)")
             } else {
                 repository.deleteTransaksi(transaksi)
                 showSnackbar("Transaksi dihapus")
@@ -518,14 +585,14 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun restoreTransaksi(transaksi: Transaksi) {
-        viewModelScope.launch {
+        launchGuardedAction("Memulihkan transaksi...") {
             repository.restoreTransaksi(transaksi)
             showSnackbar("Transaksi berhasil dipulihkan")
         }
     }
 
     fun permanentDeleteTransaksi(transaksi: Transaksi) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus permanen...") {
             repository.deleteTransaksi(transaksi)
             showSnackbar("Transaksi dihapus permanen")
         }
@@ -558,7 +625,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         } else {
             hargaSatuan
         }
-        viewModelScope.launch {
+        launchGuardedAction("Memperbarui transaksi...") {
             repository.updateTransaksi(
                 id = id,
                 tanggal = tanggal,
@@ -589,7 +656,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         val karyawanKurirId = if (karyawanMode) resolveActiveKaryawanImmediate()?.id else null
         val effectiveKurirLangganan = karyawanKurirId ?: idKurirLangganan
         val effectiveHargaKhusus = if (karyawanMode) null else hargaKhusus
-        viewModelScope.launch {
+        launchGuardedAction("Menambahkan pelanggan...") {
             val id = repository.insertPelanggan(
                 Pelanggan(
                     nama = nama.trim(),
@@ -630,21 +697,21 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         } else {
             pelanggan
         }
-        viewModelScope.launch {
+        launchGuardedAction("Memperbarui pelanggan...") {
             repository.updatePelanggan(effectivePelanggan)
             showSnackbar("Data ${effectivePelanggan.nama} diperbarui")
         }
     }
 
     fun deletePelanggan(pelanggan: Pelanggan) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus pelanggan...") {
             if (isUserKaryawan()) {
                 val karyawanName = resolveActiveKaryawanImmediate()?.nama ?: "Karyawan"
                 val ok = repository.softDeletePelangganByKaryawan(pelanggan, karyawanName)
                 if (ok) {
-                    showSnackbar("Pelanggan ${pelanggan.nama} dihapus (ditandai oleh $karyawanName)")
+                    showSnackbar("${pelanggan.nama} dihapus (dicatat oleh $karyawanName)")
                 } else {
-                    showSnackbar("Pelanggan masih memiliki kasbon aktif. Lunasi terlebih dahulu sebelum menghapus.")
+                    showSnackbar("Masih ada kasbon aktif. Lunasi dulu sebelum menghapus.")
                 }
             } else {
                 repository.deletePelanggan(pelanggan)
@@ -654,14 +721,14 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun restorePelanggan(pelanggan: Pelanggan) {
-        viewModelScope.launch {
+        launchGuardedAction("Memulihkan pelanggan...") {
             repository.restorePelanggan(pelanggan)
             showSnackbar("Pelanggan ${pelanggan.nama} dipulihkan")
         }
     }
 
     fun permanentDeletePelanggan(pelanggan: Pelanggan) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus pelanggan permanen...") {
             repository.deletePelanggan(pelanggan)
             showSnackbar("Pelanggan ${pelanggan.nama} dihapus permanen")
         }
@@ -669,29 +736,29 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
 
     fun bayarKasbon(pelangganId: Int, nominalBayar: Double, metodeBayar: String = "Cash") {
         if (nominalBayar <= 0) return
-        viewModelScope.launch {
+        launchGuardedAction("Menyimpan pembayaran kasbon...") {
             repository.bayarKasbonPelanggan(pelangganId, nominalBayar, metodeBayar)
-            showSnackbar("Pelunasan ${FormatUtils.formatRupiah(nominalBayar)} ($metodeBayar) dicatat")
+            showSnackbar("Pembayaran ${FormatUtils.formatRupiah(nominalBayar)} ($metodeBayar) tersimpan")
         }
     }
 
     fun addProduk(nama: String, harga: Double) {
         if (nama.isBlank() || harga <= 0) return
-        viewModelScope.launch {
+        launchGuardedAction("Menambahkan produk...") {
             repository.insertProduk(Produk(nama_produk = nama.trim(), harga = harga))
             showSnackbar("Produk $nama ditambahkan")
         }
     }
 
     fun updateProduk(produk: Produk) {
-        viewModelScope.launch {
+        launchGuardedAction("Memperbarui produk...") {
             repository.updateProduk(produk)
             showSnackbar("Produk ${produk.nama_produk} diperbarui")
         }
     }
 
     fun deleteProduk(produk: Produk) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus produk...") {
             try {
                 if (_txProdukId.value == produk.id) {
                     _txProdukId.value = null
@@ -713,7 +780,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     ) {
         val trimmedNama = nama.trim()
         if (trimmedNama.isBlank()) return
-        viewModelScope.launch {
+        launchGuardedAction("Menambahkan kurir...") {
             repository.insertKurir(
                 Kurir(
                     nama = trimmedNama,
@@ -730,14 +797,14 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateKurir(kurir: Kurir) {
-        viewModelScope.launch {
+        launchGuardedAction("Memperbarui data kurir...") {
             repository.updateKurir(kurir)
             showSnackbar("Data kurir ${kurir.nama} diperbarui")
         }
     }
 
     fun deleteKurir(kurir: Kurir) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus kurir...") {
             repository.deleteKurir(kurir)
             showSnackbar("Kurir ${kurir.nama} dihapus")
         }
@@ -745,7 +812,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
 
     fun addPengeluaran(namaItem: String, kategori: String, nominal: Double, tanggal: Long = System.currentTimeMillis()) {
         if (namaItem.isBlank() || nominal <= 0) return
-        viewModelScope.launch {
+        launchGuardedAction("Mencatat pengeluaran...") {
             repository.insertPengeluaran(
                 Pengeluaran(
                     tanggal = tanggal,
@@ -759,21 +826,21 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updatePengeluaran(pengeluaran: Pengeluaran) {
-        viewModelScope.launch {
+        launchGuardedAction("Memperbarui pengeluaran...") {
             repository.updatePengeluaran(pengeluaran)
             showSnackbar("Pengeluaran diperbarui")
         }
     }
 
     fun deletePengeluaran(pengeluaran: Pengeluaran) {
-        viewModelScope.launch {
+        launchGuardedAction("Menghapus pengeluaran...") {
             repository.deletePengeluaran(pengeluaran)
             showSnackbar("Pengeluaran dihapus")
         }
     }
 
     fun importJsonData(jsonString: String, onFinished: ((com.example.util.ImportResult) -> Unit)? = null) {
-        viewModelScope.launch {
+        launchGuardedAction("Mengimpor data cadangan...") {
             val result = com.example.util.ExportHelper.importJsonData(getApplication(), db, jsonString)
             if (result.success) {
                 repository.reconcileKasbonDiscrepancies()
@@ -787,18 +854,22 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun syncToCloud(context: Context, userId: String) {
         if (_isSyncingCloud.value) return
         _isSyncingCloud.value = true
+        _isBusyAction.value = true
+        _busyActionMessage.value = "Menyinkronkan data ke Cloud..."
         viewModelScope.launch {
             try {
                 val res = syncEngine.forceSyncNow()
                 res.onSuccess { summary ->
                     _lastSyncSummary.value = summary
-                    showSnackbar("Sinkronisasi real-time selesai (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)")
+                    showSnackbar("Sinkronisasi selesai (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)")
                 }.onFailure { err ->
                     showSnackbar("Gagal sinkronisasi: ${err.message ?: "Periksa koneksi internet"}")
                 }
             } catch (e: Exception) {
                 showSnackbar("Koneksi gagal: ${e.message ?: "Periksa jaringan"}")
             } finally {
+                _busyActionMessage.value = null
+                _isBusyAction.value = false
                 _isSyncingCloud.value = false
             }
         }
@@ -808,25 +879,36 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         syncToCloud(context, userId)
     }
 
+    /**
+     * O(P + T) indexed customer UI model computation (replaces O(P * T) nested loops).
+     */
     fun getPelangganUiModels(
         pelangganList: List<Pelanggan>,
         transaksiList: List<TransaksiDetail>
     ): List<PelangganUiModel> {
-        val activeTx = transaksiList.filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
+        val txByCustomer = HashMap<Int, MutableList<TransaksiDetail>>(pelangganList.size.coerceAtLeast(16))
+        for (detail in transaksiList) {
+            if (!KaryawanScopeHelper.isDeletedTransaksi(detail.transaksi)) {
+                val cid = detail.transaksi.id_pelanggan ?: continue
+                txByCustomer.getOrPut(cid) { ArrayList() }.add(detail)
+            }
+        }
+
         return pelangganList.map { p ->
-            val unpaidTotal = activeTx.asSequence()
-                .filter {
-                    it.transaksi.id_pelanggan == p.id &&
-                        it.transaksi.status.equals("Kasbon", ignoreCase = true)
+            val customerTxs = txByCustomer[p.id] ?: emptyList()
+            var unpaidTotal = 0.0
+            for (detail in customerTxs) {
+                if (detail.transaksi.status.equals("Kasbon", ignoreCase = true)) {
+                    unpaidTotal += detail.transaksi.remainingKasbonAmount()
                 }
-                .sumOf { it.transaksi.remainingKasbonAmount() }
-            val effectiveKasbon = if (unpaidTotal > 0) unpaidTotal else p.sisa_kasbon
+            }
+            val effectiveKasbon = if (unpaidTotal > 0.0) unpaidTotal else p.sisa_kasbon
             val syncedPelanggan = if (effectiveKasbon != p.sisa_kasbon) {
                 p.copy(sisa_kasbon = effectiveKasbon)
             } else {
                 p
             }
-            val prediction = FormatUtils.calculateCrmPrediction(p.id, activeTx)
+            val prediction = FormatUtils.calculateCrmPredictionForCustomer(customerTxs)
             PelangganUiModel(
                 pelanggan = syncedPelanggan,
                 estimatedIntervalDays = prediction.averageIntervalDays,
@@ -856,7 +938,6 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     ): List<Pelanggan> {
         val q = query.trim().lowercase()
         val qDigits = q.filter { it.isDigit() }
-        val activeTx = transaksiList.filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
         val filtered = pelangganList
             .filter { !KaryawanScopeHelper.isSoftDeletedPelanggan(it) && it.sisa_kasbon > 0 }
             .filter { p ->
@@ -871,19 +952,35 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                         p.sisa_kasbon.toLong().toString().contains(q)
                 }
             }
+
+        if (sortOption == KasbonSortOption.TERBANYAK) {
+            return filtered.sortedByDescending { it.sisa_kasbon }
+        }
+
+        val minDateByCust = HashMap<Int, Long>()
+        val maxDateByCust = HashMap<Int, Long>()
+        for (detail in transaksiList) {
+            val tx = detail.transaksi
+            if (!KaryawanScopeHelper.isDeletedTransaksi(tx) && tx.status.equals("Kasbon", ignoreCase = true)) {
+                val cid = tx.id_pelanggan ?: continue
+                val currentMin = minDateByCust[cid]
+                if (currentMin == null || tx.tanggal < currentMin) {
+                    minDateByCust[cid] = tx.tanggal
+                }
+                val currentMax = maxDateByCust[cid]
+                if (currentMax == null || tx.tanggal > currentMax) {
+                    maxDateByCust[cid] = tx.tanggal
+                }
+            }
+        }
+
         return when (sortOption) {
             KasbonSortOption.TERBANYAK -> filtered.sortedByDescending { it.sisa_kasbon }
             KasbonSortOption.TERLAMA -> {
-                filtered.sortedBy { p ->
-                    activeTx.filter { it.transaksi.id_pelanggan == p.id && it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-                        .minOfOrNull { it.transaksi.tanggal } ?: Long.MAX_VALUE
-                }
+                filtered.sortedBy { p -> minDateByCust[p.id] ?: Long.MAX_VALUE }
             }
             KasbonSortOption.TERBARU -> {
-                filtered.sortedByDescending { p ->
-                    activeTx.filter { it.transaksi.id_pelanggan == p.id && it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-                        .maxOfOrNull { it.transaksi.tanggal } ?: 0L
-                }
+                filtered.sortedByDescending { p -> maxDateByCust[p.id] ?: 0L }
             }
         }
     }

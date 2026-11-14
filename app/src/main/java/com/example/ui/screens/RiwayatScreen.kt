@@ -66,8 +66,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
@@ -116,7 +118,7 @@ fun RiwayatScreen(
         if (devices.isEmpty()) {
             Toast.makeText(
                 context,
-                "Belum ada printer Bluetooth terpasang. Pasangkan printer di pengaturan perangkat.",
+                "Printer Bluetooth belum tersambung. Sambungkan dulu di Pengaturan HP.",
                 Toast.LENGTH_LONG
             ).show()
             return
@@ -170,7 +172,7 @@ fun RiwayatScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            text = "${filteredList.size} Transaksi Tercatat",
+                            text = "${filteredList.size} transaksi",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
@@ -234,31 +236,23 @@ fun RiwayatScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(24.dp),
+                        .padding(16.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.ReceiptLong,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = if (searchQuery.isBlank()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (searchQuery.isBlank()) "Penjualan yang tercatat akan muncul di sini." else "Coba gunakan kata kunci pencarian lain.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    SantoyaEmptyState(
+                        illustrationRes = R.drawable.img_empty_transaksi,
+                        title = if (searchQuery.isBlank()) "Belum ada transaksi" else "Transaksi tidak ditemukan",
+                        subtitle = if (searchQuery.isBlank()) {
+                            "Penjualan yang tercatat akan muncul di sini."
+                        } else {
+                            "Coba gunakan kata kunci pencarian lain."
+                        },
+                        secondaryActionLabel = if (searchQuery.isNotBlank()) "Reset Pencarian" else null,
+                        secondaryActionIcon = if (searchQuery.isNotBlank()) Icons.Default.Clear else null,
+                        onSecondaryAction = if (searchQuery.isNotBlank()) {
+                            { searchQuery = "" }
+                        } else null
+                    )
                 }
             } else {
                 LazyColumn(
@@ -480,28 +474,28 @@ fun RiwayatTransaksiCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onPrint, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onPrint, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Print,
                             contentDescription = "Cetak Struk",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onShare, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onShare, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Share,
                             contentDescription = "Bagikan Struk",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Hapus Transaksi",
                             tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }

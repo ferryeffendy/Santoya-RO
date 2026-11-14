@@ -127,17 +127,7 @@ fun AuthScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .drawBehind {
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    containerColor.copy(alpha = 0.28f),
-                                    surfaceColor,
-                                    surfaceColor
-                                ),
-                                startY = 0f,
-                                endY = size.height * 0.45f
-                            )
-                        )
+                        drawRect(color = surfaceColor)
 
                         val wave1 = Path().apply {
                             moveTo(0f, size.height * 0.16f)
@@ -212,7 +202,7 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = "Sistem kasir dan operasional depot air minum.",
+                            text = "Aplikasi kasir & antar galon Santoya RO.",
                             style = MaterialTheme.typography.bodyLarge,
                             fontFamily = PlusJakartaSansFontFamily,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -271,7 +261,7 @@ fun AuthScreen(
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = "Memverifikasi akun...",
+                                    text = "Sedang masuk...",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -353,7 +343,7 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Text(
-                            text = "Gunakan akun Google Pemilik atau Karyawan terdaftar",
+                            text = "Masuk pakai akun Google Pemilik atau Karyawan",
                             style = MaterialTheme.typography.bodySmall,
                             fontFamily = PlusJakartaSansFontFamily,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
@@ -434,7 +424,7 @@ private fun signInWithGoogle(
     val clientId = try {
         context.getString(R.string.default_web_client_id)
     } catch (e: Exception) {
-        onError("Konfigurasi login belum lengkap, hubungi pemilik depot")
+        onError("Login belum siap, hubungi pemilik depot")
         return
     }
 
@@ -455,7 +445,7 @@ private fun signInWithGoogle(
                     Firebase.auth.signInWithCredential(authCredential).await()
                     onSuccess()
                 } else {
-                    onError("Akun Google tidak dapat diverifikasi, coba lagi")
+                    onError("Akun Google belum terbaca, coba lagi ya")
                 }
             }
         } catch (e: GetCredentialCancellationException) {
@@ -464,8 +454,8 @@ private fun signInWithGoogle(
             Log.e("Auth", "Google Sign-In gagal", e)
             val msg = when {
                 e.message?.contains("network", ignoreCase = true) == true -> "Koneksi terputus, periksa internet"
-                e.message?.contains("timed out", ignoreCase = true) == true -> "Waktu koneksi habis, periksa internet lalu coba lagi"
-                else -> "Gagal masuk ke akun Google, silakan coba lagi"
+                e.message?.contains("timed out", ignoreCase = true) == true -> "Koneksi lambat, cek internet lalu coba lagi"
+                else -> "Belum bisa masuk, silakan coba lagi"
             }
             onError(msg)
         } finally {
