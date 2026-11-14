@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoGraph
@@ -68,6 +67,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +92,7 @@ import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.components.SantoyaSyncInfoBottomSheet
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
@@ -114,6 +115,8 @@ import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.CrmOrderStatus
 import com.example.util.FormatUtils
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
 import com.example.util.SyncConnectionStatus
@@ -152,6 +155,7 @@ fun DashboardScreen(
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
     val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
     var showKaryawanSignOutDialog by remember { mutableStateOf(false) }
+    var showSyncInfoSheet by remember { mutableStateOf(false) }
 
     val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
     val rawPelangganList = pelangganList ?: scopedPelangganFromVm
@@ -303,6 +307,7 @@ fun DashboardScreen(
                         ) {
                             RealtimeSyncStatusPill(
                                 syncState = syncState,
+                                onClick = { showSyncInfoSheet = true },
                                 modifier = Modifier.testTag("dashboard_sync_pill")
                             )
                             Spacer(modifier = Modifier.width(6.dp))
@@ -1367,8 +1372,6 @@ fun DashboardScreen(
                         subInfoParts.add(FormatUtils.formatDateUi(detail.transaksi.tanggal))
                     }
 
-                    val canQuickOrder = detail.pelanggan != null &&
-                        !KaryawanScopeHelper.isSoftDeletedPelanggan(detail.pelanggan)
                     val santoyaColors = MaterialTheme.santoyaColors
                     val statusAccent = if (isKasbon) santoyaColors.warning else SantoyaLeafGreen
 
@@ -1377,15 +1380,6 @@ fun DashboardScreen(
                         cornerRadius = 16.dp,
                         tintAlpha = 0.05f,
                         showWaterRipple = false,
-                        onClick = if (canQuickOrder) {
-                            {
-                                viewModel.startQuickOrder(
-                                    pelangganId = detail.pelanggan!!.id,
-                                    produkId = detail.transaksi.id_produk,
-                                    jumlah = detail.transaksi.jumlah
-                                )
-                            }
-                        } else null,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -1460,26 +1454,6 @@ fun DashboardScreen(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    if (canQuickOrder) {
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Replay,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(12.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "Ketuk untuk Order Lagi (${detail.transaksi.jumlah} galon)",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
                                 }
                             }
                             Spacer(modifier = Modifier.width(6.dp))
@@ -1556,6 +1530,26 @@ fun DashboardScreen(
                     Text("Batal")
                 }
             }
+        )
+    }
+
+    if (showSyncInfoSheet) {
+        val context = LocalContext.current
+        val currentUserId = Firebase.auth.currentUser?.uid
+        SantoyaSyncInfoBottomSheet(
+            syncState = syncState,
+            onDismiss = { showSyncInfoSheet = false },
+            onSyncNow = {
+                currentUserId?.let { uid ->
+                    viewModel.syncToCloud(context, uid)
+                }
+            },
+            onNavigateToSettings = if (!isKaryawan) {
+                {
+                    showSyncInfoSheet = false
+                    onNavigateToSettings()
+                }
+            } else null
         )
     }
 }

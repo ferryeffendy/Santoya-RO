@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -113,23 +113,29 @@ fun KasbonPelunasanDialog(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            FilterChip(
+            SantoyaFilterPill(
+                label = "Bayar Penuh",
                 selected = nominalDouble == pelanggan.sisa_kasbon,
                 onClick = { nominalInput = pelanggan.sisa_kasbon.toLong().toString() },
-                label = { Text("Bayar Penuh", fontSize = 11.sp) },
+                centerContent = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 7.dp),
                 modifier = Modifier.weight(1f)
             )
-            FilterChip(
+            SantoyaFilterPill(
+                label = "50%",
                 selected = nominalDouble == (pelanggan.sisa_kasbon / 2),
                 onClick = { nominalInput = (pelanggan.sisa_kasbon / 2).toLong().toString() },
-                label = { Text("50%", fontSize = 11.sp) },
-                modifier = Modifier.weight(0.6f)
+                centerContent = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 7.dp),
+                modifier = Modifier.weight(0.75f)
             )
-            FilterChip(
+            SantoyaFilterPill(
+                label = "Rp 10.000",
                 selected = nominalDouble == 10000.0,
                 onClick = { nominalInput = "10000" },
-                label = { Text("Rp 10.000", fontSize = 11.sp) },
-                modifier = Modifier.weight(0.6f)
+                centerContent = true,
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 7.dp),
+                modifier = Modifier.weight(0.95f)
             )
         }
 

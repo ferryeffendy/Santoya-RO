@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -72,6 +74,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -90,12 +96,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Real-time Cloud Firestore Sync Status Pill shared across Dashboard & Settings.
+ * Real-time Cloud Firestore Sync Status Pill shared across Dashboard, TopAppBar, & Settings.
  */
 @Composable
 fun RealtimeSyncStatusPill(
     syncState: RealtimeSyncState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
     val infiniteTransition = rememberInfiniteTransition(label = "sync_rotation")
@@ -149,12 +156,20 @@ fun RealtimeSyncStatusPill(
 
     val isRotating = syncState.status == SyncConnectionStatus.SYNCING ||
         syncState.status == SyncConnectionStatus.CONNECTING
+    val shape = RoundedCornerShape(20.dp)
+    val clickModifier = if (onClick != null) {
+        Modifier
+            .clip(shape)
+            .clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
 
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = shape,
         color = bgColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = modifier
+        modifier = modifier.then(clickModifier)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -181,6 +196,215 @@ fun RealtimeSyncStatusPill(
         }
     }
 }
+
+/**
+ * Bottom sheet displaying detailed cloud sync status and manual sync trigger.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SantoyaSyncInfoBottomSheet(
+    syncState: RealtimeSyncState,
+    onDismiss: () -> Unit,
+    onSyncNow: () -> Unit,
+    onNavigateToSettings: (() -> Unit)? = null
+) {
+    val santoyaColors = MaterialTheme.santoyaColors
+    val isSyncing = syncState.status == SyncConnectionStatus.SYNCING ||
+        syncState.status == SyncConnectionStatus.CONNECTING
+
+    val (statusTitle, statusDesc, statusColor, statusBg, statusIcon) = when (syncState.status) {
+        SyncConnectionStatus.LIVE -> Tuple5(
+            "Terhubung Real-Time",
+            "Database terhubung ke Firebase Firestore. Semua data dan perubahan otomatis tersinkron.",
+            santoyaColors.success,
+            santoyaColors.successContainer.copy(alpha = 0.5f),
+            Icons.Default.CloudDone
+        )
+        SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
+            "Sedang Menyinkronkan...",
+            "Mengirim dan menerima pembaruan data antara HP dan Cloud Firestore.",
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+            Icons.Default.CloudSync
+        )
+        SyncConnectionStatus.OFFLINE -> Tuple5(
+            "Mode Offline",
+            "Tidak ada koneksi internet. Data transaksi tetap tersimpan aman di HP dan akan otomatis dikirim saat online.",
+            santoyaColors.warning,
+            santoyaColors.warningContainer.copy(alpha = 0.5f),
+            Icons.Default.CloudOff
+        )
+        SyncConnectionStatus.REVOKED -> Tuple5(
+            "Akses Dibatasi",
+            "Akun ini belum memiliki izin akses depot atau dinonaktifkan oleh Pemilik.",
+            MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+            Icons.Default.Block
+        )
+        SyncConnectionStatus.ERROR -> Tuple5(
+            "Gagal Terhubung",
+            syncState.errorMessage ?: "Periksa koneksi data seluler atau WiFi perangkat Anda.",
+            MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+            Icons.Default.CloudOff
+        )
+    }
+
+    SantoyaFormBottomSheet(
+        title = "Status Sinkronisasi Cloud",
+        subtitle = "Google Firebase Firestore",
+        headerIcon = statusIcon,
+        headerAccent = statusColor,
+        confirmLabel = if (isSyncing) "Menyinkronkan..." else "Sinkronkan Sekarang",
+        confirmEnabled = !isSyncing,
+        confirmContainerColor = MaterialTheme.colorScheme.primary,
+        dismissLabel = "Tutup",
+        onDismiss = onDismiss,
+        onConfirm = onSyncNow
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = statusBg,
+            border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = statusColor.copy(alpha = 0.18f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = statusIcon,
+                            contentDescription = null,
+                            tint = statusColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = statusTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = statusColor
+                    )
+                    Text(
+                        text = statusDesc,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
+        HydroBentoCard(
+            accentColor = MaterialTheme.colorScheme.primary,
+            cornerRadius = 14.dp,
+            tintAlpha = 0.04f,
+            showWaterRipple = false,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Antrean Data Offline",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = if (syncState.pendingCount > 0) "${syncState.pendingCount} data tertunda" else "Semua data aman (0)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (syncState.pendingCount > 0) santoyaColors.warning else santoyaColors.success
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Terakhir Sinkron",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = syncState.lastSyncedAt?.let { FormatUtils.formatDateTime(it) } ?: "Belum pernah",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                if (syncState.ownerEmail.isNotBlank()) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Email Depot",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = syncState.ownerEmail,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        if (onNavigateToSettings != null) {
+            OutlinedButton(
+                onClick = onNavigateToSettings,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 44.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Buka Pengaturan Lengkap",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+
 
 private data class Tuple5<A, B, C, D, E>(
     val a: A,
@@ -828,5 +1052,72 @@ fun SantoyaBusyStatusBanner(
         }
     }
 }
+
+/**
+ * Compact adaptive filter pill without Material 3 FilterChip's 48.dp minimum vertical
+ * layout bloat, ensuring multi-row FlowRows and single-row filter bars stay tight and
+ * balanced across all Android screen widths.
+ */
+@Composable
+fun SantoyaFilterPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leadingIcon: ImageVector? = null,
+    selectedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    selectedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
+    selectedBorderColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+    unselectedContainerColor: Color = MaterialTheme.colorScheme.surface,
+    unselectedContentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    unselectedBorderColor: Color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+    centerContent: Boolean = false
+) {
+    val shape = RoundedCornerShape(10.dp)
+    val containerColor = if (selected) selectedContainerColor else unselectedContainerColor
+    val contentColor = if (selected) selectedContentColor else unselectedContentColor
+    val borderColor = if (selected) selectedBorderColor else unselectedBorderColor
+
+    Surface(
+        shape = shape,
+        color = containerColor,
+        border = BorderStroke(1.dp, borderColor),
+        modifier = modifier
+            .heightIn(min = 34.dp)
+            .clip(shape)
+            .semantics {
+                this.selected = selected
+                this.role = Role.RadioButton
+            }
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(contentPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
 
 

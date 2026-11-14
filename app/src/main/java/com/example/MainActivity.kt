@@ -11,11 +11,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -50,7 +52,9 @@ import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.components.ReceiptDialog
+import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaBusyStatusBanner
+import com.example.ui.components.SantoyaSyncInfoBottomSheet
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.KurirScreen
@@ -124,6 +128,8 @@ class MainActivity : ComponentActivity() {
                         val activeKaryawan by viewModel.activeKaryawan.collectAsStateWithLifecycle()
                         val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
                         val busyActionMessage by viewModel.busyActionMessage.collectAsStateWithLifecycle()
+                        val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
+                        var showSyncInfoSheet by remember { mutableStateOf(false) }
 
                         LaunchedEffect(currentScreen, isKaryawan) {
                             if (isKaryawan && (
@@ -218,23 +224,34 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             },
                                             actions = {
-                                                if (currentScreen != SantoyaScreen.SETTINGS && !isKaryawan) {
-                                                    IconButton(
-                                                        onClick = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
-                                                        modifier = Modifier.testTag("btn_top_settings")
-                                                    ) {
-                                                        Surface(
-                                                            shape = CircleShape,
-                                                            color = MaterialTheme.colorScheme.surfaceVariant,
-                                                            modifier = Modifier.size(36.dp)
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(end = 4.dp)
+                                                ) {
+                                                    RealtimeSyncStatusPill(
+                                                        syncState = syncState,
+                                                        onClick = { showSyncInfoSheet = true },
+                                                        modifier = Modifier.testTag("top_app_bar_sync_pill")
+                                                    )
+                                                    if (currentScreen != SantoyaScreen.SETTINGS && !isKaryawan) {
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        IconButton(
+                                                            onClick = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
+                                                            modifier = Modifier.testTag("btn_top_settings")
                                                         ) {
-                                                            Box(contentAlignment = Alignment.Center) {
-                                                                Icon(
-                                                                    imageVector = Icons.Default.Settings,
-                                                                    contentDescription = "Pengaturan",
-                                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                    modifier = Modifier.size(18.dp)
-                                                                )
+                                                            Surface(
+                                                                shape = CircleShape,
+                                                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                                                modifier = Modifier.size(36.dp)
+                                                            ) {
+                                                                Box(contentAlignment = Alignment.Center) {
+                                                                    Icon(
+                                                                        imageVector = Icons.Default.Settings,
+                                                                        contentDescription = "Pengaturan",
+                                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        modifier = Modifier.size(18.dp)
+                                                                    )
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -390,6 +407,25 @@ class MainActivity : ComponentActivity() {
                             ReceiptDialog(
                                 dialogData = receiptDialogData!!,
                                 onDismiss = { viewModel.dismissReceiptDialog() }
+                            )
+                        }
+
+                        if (showSyncInfoSheet) {
+                            val activeUser = currentUser
+                            SantoyaSyncInfoBottomSheet(
+                                syncState = syncState,
+                                onDismiss = { showSyncInfoSheet = false },
+                                onSyncNow = {
+                                    activeUser?.uid?.let { uid ->
+                                        viewModel.syncToCloud(this@MainActivity, uid)
+                                    }
+                                },
+                                onNavigateToSettings = if (!isKaryawan) {
+                                    {
+                                        viewModel.navigateTo(SantoyaScreen.SETTINGS)
+                                        showSyncInfoSheet = false
+                                    }
+                                } else null
                             )
                         }
                     }
