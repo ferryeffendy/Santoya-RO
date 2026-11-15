@@ -16,6 +16,7 @@ import com.example.data.entity.PendingSyncEntity
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -59,6 +60,7 @@ data class RealtimeSyncState(
     val isOnline: Boolean = true,
     val lastSyncedAt: Long? = null,
     val errorMessage: String? = null,
+    val isSwitchingOwner: Boolean = false,
     val sessionReads: Int = 0,
     val sessionWrites: Int = 0
 )
@@ -142,6 +144,46 @@ class RealtimeSyncEngine(
         registerNetworkCallback()
         observePendingQueue()
 
+        val previousOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
+        if (!previousOwnerUid.isNullOrBlank() && previousOwnerUid != uid) {
+            // Jangan pernah mempercayai data lokal saat pemilik akun berganti.
+            // Bersihkan dulu, baru lanjut memuat depot milik pemilik baru.
+            _state.update { it.copy(isSwitchingOwner = true) }
+            scope.launch {
+                val wiped = try {
+                    clearLocalDataInternal()
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Gagal menghapus data pemilik sebelumnya", e)
+                    false
+                }
+                if (activeUid != uid) return@launch
+                if (!wiped) {
+                    // Jangan lanjut memakai data lama: lebih aman menolak sesi.
+                    _state.update {
+                        it.copy(
+                            isSwitchingOwner = false,
+                            status = SyncConnectionStatus.ERROR,
+                            errorMessage = "Gagal membersihkan data akun sebelumnya. Coba login ulang."
+                        )
+                    }
+                    return@launch
+                }
+                prefs.edit().putString(KEY_LAST_OWNER_UID, uid).apply()
+                _state.update { it.copy(isSwitchingOwner = false) }
+                continueStart(uid, cleanEmail)
+            }
+        } else {
+            if (previousOwnerUid.isNullOrBlank()) {
+                prefs.edit().putString(KEY_LAST_OWNER_UID, uid).apply()
+            }
+            continueStart(uid, cleanEmail)
+        }
+    }
+
+    private fun continueStart(uid: String, cleanEmail: String) {
+        if (activeUid != uid) return
+
         if (cleanEmail.isBlank() || !isValidEmailKey(cleanEmail)) {
             switchToDepot(
                 depotId = "depot_$uid",
@@ -180,6 +222,7 @@ class RealtimeSyncEngine(
                             ownerEmail = ownerEmail
                         )
                     } else {
+                        val wasRevoked = _state.value.status == SyncConnectionStatus.REVOKED
                         detachCollectionListeners()
                         activeDepotId = ""
                         activeRole = DepotRole.STAFF
@@ -191,6 +234,10 @@ class RealtimeSyncEngine(
                                 ownerEmail = ownerEmail,
                                 errorMessage = "Akses akun karyawan dinonaktifkan oleh pemilik"
                             )
+                        }
+                        if (!wasRevoked) {
+                            // Data depot tidak boleh tetap bisa dibaca setelah akses dicabut.
+                            scope.launch { clearLocalDataInternal() }
                         }
                     }
                 } else {
@@ -224,6 +271,32 @@ class RealtimeSyncEngine(
             sessionReads = _state.value.sessionReads,
             sessionWrites = _state.value.sessionWrites
         )
+    }
+
+    /**
+     * Menghapus seluruh data lokal. Dipakai saat logout dan saat pemilik akun berganti,
+     * supaya data depot lama tidak pernah tercampur dengan depot baru.
+     */
+    suspend fun clearLocalData() {
+        clearLocalDataInternal()
+        _state.value = RealtimeSyncState(
+            sessionReads = _state.value.sessionReads,
+            sessionWrites = _state.value.sessionWrites
+        )
+    }
+
+    private suspend fun clearLocalDataInternal() {
+        db.withTransaction {
+            db.pengeluaranDao().deleteAll()
+            db.transaksiDao().deleteAll()
+            db.kasbonLogDao().deleteAll()
+            db.pelangganDao().deleteAll()
+            db.kurirDao().deleteAll()
+            db.produkDao().deleteAll()
+            db.pendingSyncDao().deleteAll()
+        }
+        cachedSnapshots.clear()
+        receivedInitialCollections.clear()
     }
 
     fun scheduleFlush(delayMs: Long = 250L) {
@@ -264,17 +337,19 @@ class RealtimeSyncEngine(
         }
     }
 
-    suspend fun forceSyncNow(): Result<SyncSummary> {
+    suspend fun forceSyncNow(pushLocalFirst: Boolean = true): Result<SyncSummary> {
         val uid = activeUid ?: return Result.failure(IllegalStateException("Belum masuk akun Google"))
         val depotId = activeDepotId.ifBlank { "depot_$uid" }
         val firestore = firestoreProvider()
         return try {
             _state.update { it.copy(status = SyncConnectionStatus.SYNCING, errorMessage = null) }
             if (activeRole == DepotRole.OWNER) {
-                enqueueMissingLocalRecordsForOwner()
+                if (pushLocalFirst) enqueueMissingLocalRecordsForOwner()
                 ensureDepotAndStaffLinks(firestore, depotId, uid, activeEmail)
             }
-            flushPendingQueueInternal()
+            // Mode "Ambil Data" tidak boleh mengirim antrean lokal sebelum cloud
+            // selesai diterapkan. Antrean tetap disimpan untuk sinkronisasi berikutnya.
+            if (pushLocalFirst) flushPendingQueueInternal()
 
             val depotRef = firestore.collection("depots").document(depotId)
             val cols = buildList {
@@ -363,23 +438,31 @@ class RealtimeSyncEngine(
         }
 
         scope.launch {
-            if (role == DepotRole.STAFF && previousDepot != depotId) {
+            val sessionUid = activeUid ?: return@launch
+            // Setiap perpindahan depot wajib menghapus data depot lama, apa pun
+            // perannya. Ini mencegah data staf lama tetap terbaca saat tautan
+            // staf dihapus dan aplikasi jatuh kembali ke mode pemilik.
+            if (previousDepot != null && previousDepot != depotId) {
                 db.withTransaction {
                     db.pengeluaranDao().deleteAll()
-                    if (previousDepot != null) {
-                        db.transaksiDao().deleteAll()
-                        db.kasbonLogDao().deleteAll()
-                        db.pelangganDao().deleteAll()
-                        db.kurirDao().deleteAll()
-                        db.produkDao().deleteAll()
-                        db.pendingSyncDao().deleteAll()
-                    }
+                    db.transaksiDao().deleteAll()
+                    db.kasbonLogDao().deleteAll()
+                    db.pelangganDao().deleteAll()
+                    db.kurirDao().deleteAll()
+                    db.produkDao().deleteAll()
+                    db.pendingSyncDao().deleteAll()
                 }
+                cachedSnapshots.clear()
+                receivedInitialCollections.clear()
+            } else if (role == DepotRole.STAFF && previousDepot == null) {
+                // Login staf pertama kali di perangkat: buang sisa data yang tidak dikenal.
+                db.withTransaction { db.pengeluaranDao().deleteAll() }
             }
+            if (activeUid != sessionUid) return@launch
             prefs.edit().putString(KEY_LAST_DEPOT_ID, depotId).apply()
 
             val firestore = firestoreProvider()
-            val uid = activeUid ?: return@launch
+            val uid = sessionUid
 
             if (role == DepotRole.OWNER) {
                 try {
@@ -434,7 +517,8 @@ class RealtimeSyncEngine(
                         return@addSnapshotListener
                     }
                     if (snapshot != null) {
-                        val readsCount = if (isInitialSnapshotForCol) {
+                        val isInitialForCollection = isInitialSnapshotForCol
+                        val readsCount = if (isInitialForCollection) {
                             isInitialSnapshotForCol = false
                             snapshot.documents.size.coerceAtLeast(1)
                         } else {
@@ -447,7 +531,11 @@ class RealtimeSyncEngine(
                                 cachedSnapshots[colName] = snapshot.documents
                                 receivedInitialCollections.add(colName)
                             }
-                            applyAllSnapshotsInOrder()
+                            if (isInitialForCollection) {
+                                applyAllSnapshotsInOrder()
+                            } else {
+                                applyChangedDocuments(colName, snapshot.documentChanges)
+                            }
 
                             if (role == DepotRole.OWNER && !hasSeededInitialOwnerPush &&
                                 receivedInitialCollections.containsAll(collections)
@@ -508,6 +596,11 @@ class RealtimeSyncEngine(
     }
 
     private suspend fun enqueueMissingLocalRecordsForOwner() {
+        // Jaring pengaman: jangan pernah mengunggah data lokal jika pemilik sesi
+        // tidak sama dengan pemilik yang tercatat di perangkat ini.
+        val recordedOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
+        if (recordedOwnerUid.isNullOrBlank() || recordedOwnerUid != activeUid) return
+
         val pendingKeys = db.pendingSyncDao().getAllPending()
             .map { "${it.collectionName}:${it.syncId}" }
             .toSet()
@@ -591,6 +684,105 @@ class RealtimeSyncEngine(
         }
     }
 
+    /**
+     * Terapkan hanya dokumen yang berubah, bukan seluruh koleksi. Ini menjaga
+     * biaya sinkronisasi tetap proporsional saat data depot sudah besar.
+     */
+    private suspend fun applyChangedDocuments(colName: String, changes: List<DocumentChange>) {
+        if (changes.isEmpty()) return
+        applyMutex.withLock {
+            val pendingMap = db.pendingSyncDao().getAllPending()
+                .associateBy { "${it.collectionName}:${it.syncId}" }
+            val pelangganSyncToId = if (colName == SyncCollections.PELANGGAN ||
+                colName == SyncCollections.TRANSAKSI ||
+                colName == SyncCollections.KASBON_LOGS
+            ) {
+                db.pelangganDao().getAllOnce().associate { it.syncId to it.id }
+            } else {
+                emptyMap()
+            }
+            val kurirSyncToId = if (colName == SyncCollections.PELANGGAN ||
+                colName == SyncCollections.TRANSAKSI
+            ) {
+                db.kurirDao().getAllOnce().associate { it.syncId to it.id }
+            } else {
+                emptyMap()
+            }
+            val produkSyncToId = if (colName == SyncCollections.TRANSAKSI) {
+                db.produkDao().getAllOnce().associate { it.syncId to it.id }
+            } else {
+                emptyMap()
+            }
+
+            db.withTransaction {
+                changes.forEach { change ->
+                    val doc = change.document
+                    val pending = pendingMap["$colName:${doc.id}"]
+                    if (change.type == DocumentChange.Type.REMOVED) {
+                        deleteLocalBySyncId(colName, doc.id)
+                    } else {
+                        when (colName) {
+                            SyncCollections.PRODUK -> applyProdukDoc(doc, pending)
+                            SyncCollections.KURIR -> applyKurirDoc(doc, pending)
+                            SyncCollections.PELANGGAN -> applyPelangganDoc(doc, kurirSyncToId, pending)
+                            SyncCollections.TRANSAKSI -> applyTransaksiDoc(
+                                doc = doc,
+                                pelangganSyncToId = pelangganSyncToId,
+                                kurirSyncToId = kurirSyncToId,
+                                produkSyncToId = produkSyncToId,
+                                pending = pending
+                            )
+                            SyncCollections.KASBON_LOGS -> applyKasbonLogDoc(
+                                doc = doc,
+                                pelangganSyncToId = pelangganSyncToId,
+                                pending = pending
+                            )
+                            SyncCollections.PENGELUARAN -> applyPengeluaranDoc(doc, pending)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun deleteLocalBySyncId(colName: String, syncId: String) {
+        when (colName) {
+            SyncCollections.PRODUK -> db.produkDao().deleteBySyncId(syncId)
+            SyncCollections.KURIR -> {
+                val local = db.kurirDao().getBySyncId(syncId)
+                if (local != null) {
+                    db.kurirDao().update(
+                        local.copy(
+                            akses_aktif = false,
+                            isDeleted = true,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                    )
+                }
+            }
+            SyncCollections.PELANGGAN -> {
+                val local = db.pelangganDao().getBySyncId(syncId)
+                if (local != null) {
+                    if (db.transaksiDao().countByPelanggan(local.id) > 0) {
+                        if (!KaryawanScopeHelper.isSoftDeletedPelanggan(local)) {
+                            db.pelangganDao().update(
+                                local.copy(
+                                    alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(local.alamat, "Pemilik"),
+                                    updatedAt = System.currentTimeMillis()
+                                )
+                            )
+                        }
+                    } else {
+                        db.pelangganDao().deleteBySyncId(syncId)
+                    }
+                }
+            }
+            SyncCollections.TRANSAKSI -> db.transaksiDao().deleteBySyncId(syncId)
+            SyncCollections.KASBON_LOGS -> db.kasbonLogDao().deleteBySyncId(syncId)
+            SyncCollections.PENGELUARAN -> db.pengeluaranDao().deleteBySyncId(syncId)
+        }
+    }
+
     private suspend fun applyProdukDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
         val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
@@ -640,8 +832,15 @@ class RealtimeSyncEngine(
 
         if (isDeleted) {
             if (local != null && cloudUpdatedAt >= local.updatedAt) {
-                db.transaksiDao().clearKurirFromTransaksi(local.id, cloudUpdatedAt)
-                db.kurirDao().deleteBySyncId(syncId)
+                // Jangan hapus baris atau mengosongkan id_kurir di transaksi lama:
+                // komisi historis harus tetap bisa dihitung.
+                db.kurirDao().update(
+                    local.copy(
+                        akses_aktif = false,
+                        isDeleted = true,
+                        updatedAt = cloudUpdatedAt
+                    )
+                )
             }
             return
         }
@@ -676,7 +875,8 @@ class RealtimeSyncEngine(
                     akses_aktif = aksesAktif,
                     skema_komisi = skema,
                     aturan_komisi = aturan,
-                    updatedAt = cloudUpdatedAt
+                    updatedAt = cloudUpdatedAt,
+                    isDeleted = false
                 )
             )
         }
@@ -696,7 +896,20 @@ class RealtimeSyncEngine(
 
         if (isDeleted) {
             if (local != null && cloudUpdatedAt >= local.updatedAt) {
-                db.pelangganDao().deleteBySyncId(syncId)
+                if (db.transaksiDao().countByPelanggan(local.id) > 0) {
+                    // Pelanggan dihapus di perangkat lain, tetapi transaksi lama
+                    // masih merujuk ke baris ini. Tandai soft-delete, jangan hapus.
+                    if (!KaryawanScopeHelper.isSoftDeletedPelanggan(local)) {
+                        db.pelangganDao().update(
+                            local.copy(
+                                alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(local.alamat, "Pemilik"),
+                                updatedAt = cloudUpdatedAt
+                            )
+                        )
+                    }
+                } else {
+                    db.pelangganDao().deleteBySyncId(syncId)
+                }
             }
             return
         }
@@ -737,6 +950,25 @@ class RealtimeSyncEngine(
         }
     }
 
+    /**
+     * Pelanggan bisa sudah dihapus permanen di perangkat lain. Agar riwayat
+     * transaksi/kasbon tidak hilang, buat baris placeholder lokal dengan syncId
+     * yang sama. Placeholder ditandai soft-delete dan tidak pernah diunggah.
+     */
+    private suspend fun ensurePlaceholderPelanggan(pelangganSyncId: String): Int {
+        db.pelangganDao().getBySyncId(pelangganSyncId)?.let { return it.id }
+        return db.pelangganDao().insert(
+            Pelanggan(
+                nama = "Pelanggan Dihapus",
+                alamat = "[DIHAPUS:Pemilik]",
+                no_hp = "",
+                sisa_kasbon = 0.0,
+                updatedAt = 0L,
+                syncId = pelangganSyncId
+            )
+        ).toInt()
+    }
+
     private suspend fun applyTransaksiDoc(
         doc: DocumentSnapshot,
         pelangganSyncToId: Map<String, Int>,
@@ -759,7 +991,7 @@ class RealtimeSyncEngine(
         }
 
         val pelangganSyncId = doc.getString("pelangganSyncId") ?: return
-        val idPelanggan = pelangganSyncToId[pelangganSyncId] ?: return
+        val idPelanggan = pelangganSyncToId[pelangganSyncId] ?: ensurePlaceholderPelanggan(pelangganSyncId)
         val kurirSyncId = doc.getString("kurirSyncId")
         val idKurir = kurirSyncId?.let { kurirSyncToId[it] }
         val produkSyncId = doc.getString("produkSyncId")
@@ -835,7 +1067,7 @@ class RealtimeSyncEngine(
         }
 
         val pelangganSyncId = doc.getString("pelangganSyncId") ?: return
-        val idPelanggan = pelangganSyncToId[pelangganSyncId] ?: return
+        val idPelanggan = pelangganSyncToId[pelangganSyncId] ?: ensurePlaceholderPelanggan(pelangganSyncId)
         val tanggal = (doc.get("tanggal") as? Number)?.toLong() ?: System.currentTimeMillis()
         val jumlahBayar = (doc.get("jumlah_bayar") as? Number)?.toDouble() ?: 0.0
         val sebelum = (doc.get("sisa_kasbon_sebelum") as? Number)?.toDouble() ?: 0.0
@@ -1078,7 +1310,7 @@ class RealtimeSyncEngine(
                         "skema_komisi" to k.skema_komisi.take(40),
                         "aturan_komisi" to k.aturan_komisi.take(200),
                         "updatedAt" to k.updatedAt,
-                        "isDeleted" to false,
+                        "isDeleted" to k.isDeleted,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()
                     )
                 }
@@ -1443,6 +1675,7 @@ class RealtimeSyncEngine(
         private const val TAG = "RealtimeSyncEngine"
         private const val PREFS_NAME = "santoya_sync_prefs"
         private const val KEY_LAST_DEPOT_ID = "last_depot_id"
+        private const val KEY_LAST_OWNER_UID = "last_owner_uid"
         private val EMAIL_KEY_REGEX = Regex("^[a-zA-Z0-9_.+\\-@]+$")
     }
 }

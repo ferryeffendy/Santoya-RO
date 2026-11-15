@@ -113,10 +113,13 @@ class KaryawanScopeUnitTest {
         val inactiveRudi = sampleKurir(id = 2, nama = "Rudi", email = "rudi@gmail.com", aksesAktif = false)
         val couriers = listOf(activeFitri, inactiveRudi)
 
-        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.STAFF, "any@gmail.com", couriers))
-        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "FITRI@GMAIL.COM", couriers))
-        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "rudi@gmail.com", couriers))
-        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "pemilik@gmail.com", couriers))
+        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.STAFF, "any@gmail.com", "pemilik@gmail.com", couriers))
+        // Pemilik yang emailnya juga terdaftar sebagai kurir tetap owner.
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "FITRI@GMAIL.COM", "fitri@gmail.com", couriers))
+        // Karyawan yang emailnya ada di daftar kurir tetap dikenali sebagai karyawan.
+        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "FITRI@GMAIL.COM", "pemilik@gmail.com", couriers))
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "rudi@gmail.com", "pemilik@gmail.com", couriers))
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "pemilik@gmail.com", "pemilik@gmail.com", couriers))
     }
 
     @Test

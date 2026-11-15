@@ -1,5 +1,10 @@
 package com.example.ui.components
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -52,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.data.entity.Pelanggan
 import com.example.ui.theme.PrimaryContainerLight
 import com.example.ui.theme.PrimaryLight
@@ -250,6 +256,24 @@ fun ReceiptDialog(
     var printStatus by remember { mutableStateOf<String?>(null) }
     val parsedReceipt = remember(dialogData) { extractReceiptUi(dialogData) }
 
+    val startBluetoothPrint: () -> Unit = {
+        SantoyaReceiptHelper.printViaBluetooth(
+            context = context,
+            receiptText = dialogData.receiptText
+        ) { status ->
+            printStatus = status
+        }
+    }
+    val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            startBluetoothPrint()
+        } else {
+            printStatus = "Izin Bluetooth ditolak. Aktifkan di Pengaturan aplikasi untuk mencetak."
+        }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(20.dp),
@@ -304,11 +328,15 @@ fun ReceiptDialog(
 
                 Button(
                     onClick = {
-                        SantoyaReceiptHelper.printViaBluetooth(
-                            context = context,
-                            receiptText = dialogData.receiptText
-                        ) { status ->
-                            printStatus = status
+                        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.BLUETOOTH_CONNECT
+                            ) != PackageManager.PERMISSION_GRANTED
+                        if (needsPermission) {
+                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        } else {
+                            startBluetoothPrint()
                         }
                     },
                     shape = RoundedCornerShape(10.dp),

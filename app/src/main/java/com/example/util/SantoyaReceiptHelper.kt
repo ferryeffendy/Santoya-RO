@@ -1,10 +1,12 @@
 package com.example.util
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -14,6 +16,7 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Transaksi
@@ -288,7 +291,20 @@ object SantoyaReceiptHelper {
         targetDeviceAddress: String? = null,
         onStatus: (String) -> Unit
     ) {
-        val adapter = BluetoothAdapter.getDefaultAdapter()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            onStatus("Izin Bluetooth belum diberikan. Aktifkan izin Bluetooth di Pengaturan aplikasi.")
+            return
+        }
+
+        val adapter = try {
+            BluetoothAdapter.getDefaultAdapter()
+        } catch (e: SecurityException) {
+            onStatus("Izin Bluetooth ditolak oleh sistem.")
+            return
+        }
         if (adapter == null) {
             onStatus("Bluetooth tidak tersedia di perangkat ini")
             return
@@ -298,7 +314,12 @@ object SantoyaReceiptHelper {
             return
         }
 
-        val bondedDevices = adapter.bondedDevices
+        val bondedDevices = try {
+            adapter.bondedDevices
+        } catch (e: SecurityException) {
+            onStatus("Izin Bluetooth ditolak oleh sistem.")
+            return
+        }
         if (bondedDevices.isNullOrEmpty()) {
             onStatus("Printer Bluetooth belum tersambung. Sambungkan dulu di Pengaturan HP.")
             return
