@@ -69,5 +69,5 @@ jobs:
           }
           JSON
 
-      - name: Kompilasi Kotlin debug
-        run: ./gradlew compileDebugKotlin --stacktrace
+      - name: Build debug untuk validasi
+        run: ./gradlew assembleDebug --stacktrace
