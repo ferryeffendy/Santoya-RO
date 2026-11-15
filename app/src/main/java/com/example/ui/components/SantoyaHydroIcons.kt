@@ -24,11 +24,14 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.SantoyaLeafGreen
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaWaterBlue
 import com.example.ui.theme.pressClickEffect
+import com.example.ui.theme.santoyaColors
 
 /**
  * Solid Organic Squircle Badge for Santoya RO Iconography.
@@ -39,7 +42,7 @@ fun HydroGradientBadge(
     gradientColors: List<Color>,
     modifier: Modifier = Modifier,
     size: Dp = 44.dp,
-    cornerRadius: Dp = 14.dp,
+    cornerRadius: Dp = SantoyaRadius.md,
     elevation: Dp = 0.dp,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -135,8 +138,9 @@ fun HydroGalonIcon(
     modifier: Modifier = Modifier,
     leafAccent: Color? = null
 ) {
-    val resolvedLeafColor = leafAccent ?: if (tint == Color.White) {
-        Color(0xFFA7F3B5)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val resolvedLeafColor = leafAccent ?: if (tint == santoyaColors.onHero || tint.luminance() > 0.85f) {
+        santoyaColors.heroLeafTint
     } else {
         SantoyaLeafGreen
     }
@@ -209,8 +213,9 @@ fun HydroDropletSparkIcon(
     modifier: Modifier = Modifier,
     leafAccent: Color? = null
 ) {
-    val resolvedLeafColor = leafAccent ?: if (tint == Color.White) {
-        Color(0xFFA7F3B5)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val resolvedLeafColor = leafAccent ?: if (tint == santoyaColors.onHero || tint.luminance() > 0.85f) {
+        santoyaColors.heroLeafTint
     } else {
         SantoyaLeafGreen
     }
@@ -270,8 +275,9 @@ fun HydroCustomerDropIcon(
     modifier: Modifier = Modifier,
     waterAccent: Color? = null
 ) {
-    val resolvedWaterColor = waterAccent ?: if (tint == Color.White) {
-        Color(0xFFA7F3B5)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val resolvedWaterColor = waterAccent ?: if (tint == santoyaColors.onHero || tint.luminance() > 0.85f) {
+        santoyaColors.heroLeafTint
     } else {
         SantoyaWaterBlue
     }
@@ -327,8 +333,9 @@ fun HydroExpenseFlowIcon(
     modifier: Modifier = Modifier,
     leafAccent: Color? = null
 ) {
-    val resolvedAccent = leafAccent ?: if (tint == Color.White) {
-        Color(0xFFA7F3B5)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val resolvedAccent = leafAccent ?: if (tint == santoyaColors.onHero || tint.luminance() > 0.85f) {
+        santoyaColors.heroLeafTint
     } else {
         SantoyaLeafGreen
     }
@@ -384,8 +391,9 @@ fun HydroReportChartIcon(
     modifier: Modifier = Modifier,
     leafAccent: Color? = null
 ) {
-    val resolvedLeafColor = leafAccent ?: if (tint == Color.White) {
-        Color(0xFFA7F3B5)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val resolvedLeafColor = leafAccent ?: if (tint == santoyaColors.onHero || tint.luminance() > 0.85f) {
+        santoyaColors.heroLeafTint
     } else {
         SantoyaLeafGreen
     }

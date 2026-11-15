@@ -87,7 +87,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -100,7 +99,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.TransaksiDetail
@@ -124,7 +122,7 @@ import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
-import com.example.ui.theme.RankSilverLight
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.santoyaColors
 import com.example.util.CrmOrderPrediction
 import com.example.util.CrmOrderStatus
@@ -357,8 +355,7 @@ fun PelangganScreen(
         )
     }
 
-    if (editingPelanggan != null) {
-        val target = editingPelanggan!!
+    editingPelanggan?.let { target ->
         PelangganFormDialog(
             title = "Edit Pelanggan",
             pelanggan = target,
@@ -381,8 +378,7 @@ fun PelangganScreen(
         )
     }
 
-    if (payingKasbonPelanggan != null) {
-        val target = payingKasbonPelanggan!!
+    payingKasbonPelanggan?.let { target ->
         val unpaidTargetList = remember(effectiveTransaksiList, target.id) {
             effectiveTransaksiList
                 .filter {
@@ -412,8 +408,7 @@ fun PelangganScreen(
         )
     }
 
-    if (pelangganToDelete != null) {
-        val target = pelangganToDelete!!
+    pelangganToDelete?.let { target ->
         val isAuditDeleted = KaryawanScopeHelper.isSoftDeletedPelanggan(target)
         val deletedBy = KaryawanScopeHelper.extractDeletedByPelanggan(target) ?: "Karyawan"
         val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(target.alamat)
@@ -675,10 +670,10 @@ private fun SemuaPelangganTab(
             .asSequence()
             .filter {
                 !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) &&
-                    it.transaksi.status.equals("Kasbon", ignoreCase = true) &&
-                    it.transaksi.id_pelanggan != null
+                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
             }
-            .groupBy({ it.transaksi.id_pelanggan!! }, { it.transaksi })
+            .mapNotNull { detail -> detail.transaksi.id_pelanggan?.let { pid -> pid to detail.transaksi } }
+            .groupBy({ it.first }, { it.second })
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -989,8 +984,8 @@ private fun PelangganItemCard(
                         Text(
                             text = initials,
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.santoyaColors.onHero
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -998,7 +993,7 @@ private fun PelangganItemCard(
                         Text(
                             text = pelanggan.nama,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -1071,13 +1066,13 @@ private fun PelangganItemCard(
             ) {
                 if (isSoftDeleted) {
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.xs),
                         color = MaterialTheme.colorScheme.errorContainer
                     ) {
                         Text(
                             text = "Dihapus oleh ${deletedBy ?: "Karyawan"}",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.error,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1235,7 +1230,7 @@ private fun PelangganItemCard(
                             SantoyaAdaptiveCurrencyText(
                                 amount = pelanggan.sisa_kasbon,
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.santoyaColors.warning,
                                 minFontSize = 11.sp,
                                 modifier = Modifier.fillMaxWidth()
@@ -1446,10 +1441,10 @@ private fun KasbonPelangganTab(
         transaksiList
             .filter {
                 !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) &&
-                    it.transaksi.status.equals("Kasbon", ignoreCase = true) &&
-                    it.transaksi.id_pelanggan != null
+                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
             }
-            .groupBy { it.transaksi.id_pelanggan!! }
+            .mapNotNull { detail -> detail.transaksi.id_pelanggan?.let { pid -> pid to detail } }
+            .groupBy({ it.first }, { it.second })
             .mapValues { (_, list) -> list.sortedByDescending { it.transaksi.tanggal } }
     }
 
@@ -1545,7 +1540,7 @@ private fun KasbonPelangganTab(
                                         elevation = 2.dp
                                     ) {
                                         HydroExpenseFlowIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1561,7 +1556,7 @@ private fun KasbonPelangganTab(
                                         SantoyaAdaptiveCurrencyText(
                                             amount = totalPiutang,
                                             style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.error,
                                             minFontSize = 11.sp,
                                             modifier = Modifier.fillMaxWidth()
@@ -1570,13 +1565,13 @@ private fun KasbonPelangganTab(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
                                 ) {
                                     Text(
                                         text = "${sortedKasbon.size} Pelanggan",
                                         style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         maxLines = 1,
                                         softWrap = false,
@@ -1594,7 +1589,7 @@ private fun KasbonPelangganTab(
 
                         HydroBentoCard(
                             accentColor = MaterialTheme.colorScheme.error,
-                            cornerRadius = 16.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.05f,
                             showWaterRipple = false,
                             modifier = Modifier
@@ -1617,7 +1612,7 @@ private fun KasbonPelangganTab(
                                         Text(
                                             text = cust.nama,
                                             style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1635,7 +1630,7 @@ private fun KasbonPelangganTab(
                                         SantoyaAdaptiveCurrencyText(
                                             amount = cust.sisa_kasbon,
                                             style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.error,
                                             minFontSize = 11.sp,
                                             textAlign = TextAlign.End
@@ -1655,7 +1650,7 @@ private fun KasbonPelangganTab(
                                 if (unpaid.isNotEmpty()) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
-                                        shape = RoundedCornerShape(10.dp),
+                                        shape = RoundedCornerShape(SantoyaRadius.sm),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Column(
@@ -1670,7 +1665,7 @@ private fun KasbonPelangganTab(
                                                 Text(
                                                     text = "Rincian Kasbon (${unpaid.size})",
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.Bold,
+                                                    fontWeight = FontWeight.SemiBold,
                                                     color = MaterialTheme.colorScheme.error,
                                                     maxLines = 1,
                                                     modifier = Modifier.weight(1f)
@@ -1679,12 +1674,12 @@ private fun KasbonPelangganTab(
                                                     Text(
                                                         text = if (isExpanded) "Ringkas" else "+${unpaid.size - 3} lainnya",
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.Bold,
+                                                        fontWeight = FontWeight.SemiBold,
                                                         color = MaterialTheme.colorScheme.primary,
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         modifier = Modifier
-                                                            .clip(RoundedCornerShape(4.dp))
+                                                            .clip(RoundedCornerShape(SantoyaRadius.xs))
                                                             .clickable {
                                                                 expandedCustomerIds = if (isExpanded) {
                                                                     expandedCustomerIds - cust.id
@@ -1707,7 +1702,7 @@ private fun KasbonPelangganTab(
                                                 ) {
                                                     Text(
                                                         text = when {
-                                                            dpPaid > 0L -> "${FormatUtils.formatDateUi(t.transaksi.tanggal)} • ${t.transaksi.jumlah} gln • DP ${FormatUtils.formatRupiah(dpPaid.toDouble())}"
+                                                            dpPaid > 0L -> "${FormatUtils.formatDateUi(t.transaksi.tanggal)} • ${t.transaksi.jumlah} gln • Uang Muka ${FormatUtils.formatRupiah(dpPaid.toDouble())}"
                                                             isPartiallyPaid -> "${FormatUtils.formatDateUi(t.transaksi.tanggal)} • ${t.transaksi.jumlah} gln • Cicilan"
                                                             else -> "${FormatUtils.formatDateUi(t.transaksi.tanggal)} • ${t.transaksi.jumlah} galon"
                                                         },
@@ -1720,8 +1715,8 @@ private fun KasbonPelangganTab(
                                                     Spacer(modifier = Modifier.width(6.dp))
                                                     Text(
                                                         text = FormatUtils.formatRupiah(noteSisaKasbon),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        fontWeight = FontWeight.Bold,
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                                        fontWeight = FontWeight.SemiBold,
                                                         maxLines = 1,
                                                         softWrap = false
                                                     )
@@ -1902,14 +1897,14 @@ private fun TopRankingTab(
                             }
                             val rankGradient = when (rank) {
                                 1 -> listOf(santoyaColors.rankGold, AccentAmber)
-                                2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
+                                2 -> listOf(santoyaColors.rankSilver, santoyaColors.rankSilver.copy(alpha = 0.78f))
                                 3 -> listOf(santoyaColors.rankBronze, AccentAmber)
                                 else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
                             }
 
                             HydroBentoCard(
                                 accentColor = rankColor,
-                                cornerRadius = 16.dp,
+                                cornerRadius = SantoyaRadius.lg,
                                 tintAlpha = if (rank <= 3) 0.10f else 0.05f,
                                 showWaterRipple = rank <= 3,
                                 modifier = Modifier
@@ -1936,16 +1931,16 @@ private fun TopRankingTab(
                                             ) {
                                                 Text(
                                                     text = "#$rank",
-                                                    style = MaterialTheme.typography.labelMedium,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = Color.White,
+                                                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.santoyaColors.onHero,
                                                     maxLines = 1,
                                                     softWrap = false
                                                 )
                                             }
                                         } else {
                                             Surface(
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.md),
                                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                                 modifier = Modifier.defaultMinSize(minWidth = 36.dp, minHeight = 36.dp)
                                             ) {
@@ -1955,8 +1950,8 @@ private fun TopRankingTab(
                                                 ) {
                                                     Text(
                                                         text = "#$rank",
-                                                        style = MaterialTheme.typography.labelMedium,
-                                                        fontWeight = FontWeight.ExtraBold,
+                                                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                                        fontWeight = FontWeight.Bold,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         maxLines = 1,
                                                         softWrap = false
@@ -1969,7 +1964,7 @@ private fun TopRankingTab(
                                             Text(
                                                 text = cust.nama,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -2159,7 +2154,7 @@ private fun PasifPelangganTab(
                                         elevation = 2.dp
                                     ) {
                                         HydroCustomerDropIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -2168,7 +2163,7 @@ private fun PasifPelangganTab(
                                         Text(
                                             text = cust.nama,
                                             style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -2303,7 +2298,7 @@ private fun PelangganFormDialog(
         subtitle = "Data pelanggan & langganan Santoya RO",
         headerIconContent = {
             HydroCustomerDropIcon(
-                tint = Color.White,
+                tint = MaterialTheme.santoyaColors.onHero,
                 modifier = Modifier.size(21.dp)
             )
         },
@@ -2583,7 +2578,7 @@ private fun PelunasanKasbonDialog(
                         ) {
                             Text(
                                 text = if (dpPaid > 0L) {
-                                    "• ${FormatUtils.formatDateUi(t.transaksi.tanggal)} (${t.transaksi.jumlah} gln • DP ${FormatUtils.formatRupiah(dpPaid.toDouble())})"
+                                    "• ${FormatUtils.formatDateUi(t.transaksi.tanggal)} (${t.transaksi.jumlah} gln • Uang Muka ${FormatUtils.formatRupiah(dpPaid.toDouble())})"
                                 } else {
                                     "• ${FormatUtils.formatDateUi(t.transaksi.tanggal)} (${t.transaksi.jumlah} gln)"
                                 },
@@ -2673,7 +2668,7 @@ private fun PelunasanKasbonDialog(
         ) {
             listOf("Cash", "Transfer").forEach { metode ->
                 SantoyaFilterPill(
-                    label = metode,
+                    label = FormatUtils.formatMetodeBayarLabel(metode),
                     selected = selectedMetode == metode,
                     onClick = { selectedMetode = metode },
                     centerContent = true,
@@ -2685,7 +2680,7 @@ private fun PelunasanKasbonDialog(
 
         val santoyaColors = MaterialTheme.santoyaColors
         Surface(
-            shape = RoundedCornerShape(10.dp),
+            shape = RoundedCornerShape(SantoyaRadius.sm),
             color = if (isLunasPenuh) santoyaColors.successContainer
             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth()
@@ -2702,8 +2697,8 @@ private fun PelunasanKasbonDialog(
                 )
                 Text(
                     text = if (isLunasPenuh) "LUNAS" else FormatUtils.formatRupiah(sisaSetelahBayar),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
                     color = if (isLunasPenuh) santoyaColors.onSuccessContainer else santoyaColors.danger
                 )
             }

@@ -39,6 +39,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,24 +58,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
+import com.example.ui.components.SantoyaTopBarIconButton
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
+import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
-import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
 
@@ -161,39 +162,44 @@ fun RiwayatScreen(
     Scaffold(
         modifier = modifier.testTag("riwayat_screen"),
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Riwayat Transaksi",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = "Riwayat Transaksi",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${filteredList.size} transaksi",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    navigationIcon = {
+                        SantoyaTopBarIconButton(
+                            icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Kembali",
+                            onClick = onBack,
+                            modifier = Modifier
+                                .padding(start = 4.dp)
+                                .testTag("riwayat_back_button")
                         )
-                        Text(
-                            text = "${filteredList.size} transaksi",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("riwayat_back_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Kembali"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
                 )
-            )
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                )
+            }
         }
     ) { innerPadding ->
         Column(
@@ -206,7 +212,7 @@ fun RiwayatScreen(
                 onValueChange = { searchQuery = it },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = SantoyaSpacing.pageHorizontal, vertical = SantoyaSpacing.sm)
                     .testTag("input_search_riwayat"),
                 placeholder = { Text("Cari nota, pelanggan, kurir, produk...") },
                 leadingIcon = {
@@ -229,7 +235,7 @@ fun RiwayatScreen(
                     }
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(SantoyaRadius.md)
             )
 
             if (filteredList.isEmpty()) {
@@ -305,8 +311,7 @@ fun RiwayatScreen(
         }
     }
 
-    if (transaksiToDelete != null) {
-        val trx = transaksiToDelete!!
+    transaksiToDelete?.let { trx ->
         AlertDialog(
             onDismissRequest = { transaksiToDelete = null },
             title = { Text("Hapus Transaksi?", fontWeight = FontWeight.Bold) },
@@ -324,7 +329,7 @@ fun RiwayatScreen(
                         Toast.makeText(context, "Transaksi dihapus", Toast.LENGTH_SHORT).show()
                     }
                 ) {
-                    Text("Hapus", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text("Hapus", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
@@ -358,7 +363,7 @@ fun RiwayatScreen(
                                         Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
                             Row(
@@ -374,7 +379,7 @@ fun RiwayatScreen(
                                 Column {
                                     Text(
                                         text = deviceName,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -423,11 +428,11 @@ fun RiwayatTransaksiCard(
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        shape = RoundedCornerShape(16.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = RoundedCornerShape(SantoyaRadius.lg)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(SantoyaSpacing.md)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -459,7 +464,7 @@ fun RiwayatTransaksiCard(
                         Text(
                             text = namaPelanggan,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -474,7 +479,7 @@ fun RiwayatTransaksiCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onPrint, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onPrint, modifier = Modifier.size(SantoyaSize.touchTarget)) {
                         Icon(
                             imageVector = Icons.Outlined.Print,
                             contentDescription = "Cetak Struk",
@@ -482,7 +487,7 @@ fun RiwayatTransaksiCard(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onShare, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onShare, modifier = Modifier.size(SantoyaSize.touchTarget)) {
                         Icon(
                             imageVector = Icons.Outlined.Share,
                             contentDescription = "Bagikan Struk",
@@ -490,7 +495,7 @@ fun RiwayatTransaksiCard(
                             modifier = Modifier.size(20.dp)
                         )
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(SantoyaSize.touchTarget)) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,
                             contentDescription = "Hapus Transaksi",
@@ -512,12 +517,12 @@ fun RiwayatTransaksiCard(
                     Text(
                         text = "$namaProduk x $jumlah (${FormatUtils.formatRupiah(hargaSatuan)})",
                         style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "$metodeBayar • Kurir: $namaKurir",
+                        text = "${FormatUtils.formatMetodeBayarLabel(metodeBayar)} • Kurir: $namaKurir",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -528,18 +533,18 @@ fun RiwayatTransaksiCard(
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = FormatUtils.formatRupiah(totalHarga),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Surface(
-                        shape = RoundedCornerShape(4.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.xs),
                         color = if (isLunas) santoyaColors.successContainer else santoyaColors.warningContainer
                     ) {
                         Text(
                             text = status.uppercase(),
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (isLunas) santoyaColors.onSuccessContainer else santoyaColors.onWarningContainer,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -554,18 +559,19 @@ fun RiwayatTransaksiCard(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(36.dp),
-                    shape = RoundedCornerShape(10.dp)
+                        .height(40.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Check,
                         contentDescription = null,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Tandai Lunas", style = MaterialTheme.typography.labelMedium)
+                    Text("Tandai Lunas", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

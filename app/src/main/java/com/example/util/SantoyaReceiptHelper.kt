@@ -69,8 +69,9 @@ object SantoyaReceiptHelper {
         val date = FormatUtils.formatDateShort(detail.transaksi.tanggal)
         sb.append(leftRightText("Tgl:", date)).append("\n")
         sb.append(leftRightText("Pelanggan:", detail.pelanggan?.nama ?: "Pelanggan Umum")).append("\n")
-        if (!detail.pelanggan?.alamat.isNullOrBlank()) {
-            sb.append(leftRightText("Alamat:", detail.pelanggan!!.alamat)).append("\n")
+        val pelangganAlamat = detail.pelanggan?.alamat
+        if (!pelangganAlamat.isNullOrBlank()) {
+            sb.append(leftRightText("Alamat:", pelangganAlamat)).append("\n")
         }
         if (detail.kurir != null) {
             sb.append(leftRightText("Kurir:", detail.kurir.nama)).append("\n")
@@ -95,12 +96,12 @@ object SantoyaReceiptHelper {
         val metodeText = when {
             isKasbon && dpPaid > 0L -> "Bayar Sebagian"
             isKasbon -> "- (Kasbon)"
-            else -> detail.transaksi.metode_bayar.ifBlank { "Cash" }
+            else -> FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
         }
         sb.append(leftRightText("Metode:", metodeText)).append("\n")
         sb.append(leftRightText("Status:", detail.transaksi.status.uppercase())).append("\n")
         if (isKasbon && dpPaid > 0L) {
-            sb.append(leftRightText("Uang Muka (DP):", FormatUtils.formatRupiah(dpPaid.toDouble()))).append("\n")
+            sb.append(leftRightText("Uang Muka:", FormatUtils.formatRupiah(dpPaid.toDouble()))).append("\n")
             sb.append(leftRightText("Sisa Nota:", FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount()))).append("\n")
         }
 
@@ -196,7 +197,7 @@ object SantoyaReceiptHelper {
         }
 
         val headerPaint = Paint().apply {
-            color = Color.parseColor("#0284C7")
+            color = Color.parseColor("#1B6FC0")
             textSize = fontSize
             typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
             isAntiAlias = true
@@ -211,7 +212,7 @@ object SantoyaReceiptHelper {
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.WHITE)
 
-        val barPaint = Paint().apply { color = Color.parseColor("#0284C7") }
+        val barPaint = Paint().apply { color = Color.parseColor("#1B6FC0") }
         canvas.drawRect(0f, 0f, width.toFloat(), 12f, barPaint)
 
         var y = verticalPadding + lineHeight

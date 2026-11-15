@@ -16,21 +16,16 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -48,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +51,7 @@ import com.example.ui.components.ReceiptDialog
 import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaBusyStatusBanner
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
+import com.example.ui.components.SantoyaTopBarIconButton
 import com.example.ui.screens.AuthScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.KurirScreen
@@ -83,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         configureAppCheck(this, intent)
         enableEdgeToEdge()
@@ -206,7 +204,7 @@ class MainActivity : ComponentActivity() {
                                                             SantoyaScreen.PERAWATAN -> "Jadwal Perawatan RO"
                                                         },
                                                         style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.ExtraBold,
+                                                        fontWeight = FontWeight.Bold,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis
                                                     )
@@ -230,27 +228,15 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             },
                                             navigationIcon = {
-                                                IconButton(
+                                                SantoyaTopBarIconButton(
+                                                    icon = Icons.AutoMirrored.Outlined.ArrowBack,
+                                                    contentDescription = "Kembali ke Beranda",
                                                     onClick = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
+                                                    tint = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier
                                                         .padding(start = 4.dp)
                                                         .testTag("btn_back_to_dashboard")
-                                                ) {
-                                                    Surface(
-                                                        shape = CircleShape,
-                                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                                        modifier = Modifier.size(36.dp)
-                                                    ) {
-                                                        Box(contentAlignment = Alignment.Center) {
-                                                            Icon(
-                                                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                                                                contentDescription = "Kembali ke Beranda",
-                                                                tint = MaterialTheme.colorScheme.onSurface,
-                                                                modifier = Modifier.size(18.dp)
-                                                            )
-                                                        }
-                                                    }
-                                                }
+                                                )
                                             },
                                             actions = {
                                                 Row(
@@ -263,26 +249,13 @@ class MainActivity : ComponentActivity() {
                                                         modifier = Modifier.testTag("top_app_bar_sync_pill")
                                                     )
                                                     if (currentScreen != SantoyaScreen.SETTINGS && !isKaryawan) {
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        IconButton(
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        SantoyaTopBarIconButton(
+                                                            icon = Icons.Outlined.Settings,
+                                                            contentDescription = "Pengaturan",
                                                             onClick = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
                                                             modifier = Modifier.testTag("btn_top_settings")
-                                                        ) {
-                                                            Surface(
-                                                                shape = CircleShape,
-                                                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                                                modifier = Modifier.size(36.dp)
-                                                            ) {
-                                                                Box(contentAlignment = Alignment.Center) {
-                                                                    Icon(
-                                                                        imageVector = Icons.Outlined.Settings,
-                                                                        contentDescription = "Pengaturan",
-                                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        modifier = Modifier.size(18.dp)
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
+                                                        )
                                                     }
                                                 }
                                             },
@@ -438,9 +411,9 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        if (receiptDialogData != null) {
+                        receiptDialogData?.let { activeReceipt ->
                             ReceiptDialog(
-                                dialogData = receiptDialogData!!,
+                                dialogData = activeReceipt,
                                 onDismiss = { viewModel.dismissReceiptDialog() }
                             )
                         }

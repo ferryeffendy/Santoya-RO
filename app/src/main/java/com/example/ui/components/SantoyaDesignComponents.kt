@@ -89,7 +89,9 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize
+import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.RealtimeSyncState
@@ -160,7 +162,7 @@ fun RealtimeSyncStatusPill(
 
     val isRotating = syncState.status == SyncConnectionStatus.SYNCING ||
         syncState.status == SyncConnectionStatus.CONNECTING
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(SantoyaRadius.xl)
     val clickModifier = if (onClick != null) {
         Modifier
             .clip(shape)
@@ -193,7 +195,7 @@ fun RealtimeSyncStatusPill(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = tint,
                 maxLines = 1
             )
@@ -295,7 +297,7 @@ fun SantoyaSyncInfoBottomSheet(
                     Text(
                         text = statusTitle,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         color = statusColor
                     )
                     Text(
@@ -309,7 +311,7 @@ fun SantoyaSyncInfoBottomSheet(
 
         HydroBentoCard(
             accentColor = MaterialTheme.colorScheme.primary,
-            cornerRadius = 14.dp,
+            cornerRadius = SantoyaRadius.lg,
             tintAlpha = 0.04f,
             showWaterRipple = false,
             modifier = Modifier.fillMaxWidth()
@@ -333,7 +335,7 @@ fun SantoyaSyncInfoBottomSheet(
                     Text(
                         text = if (syncState.pendingCount > 0) "${syncState.pendingCount} data tertunda" else "Semua data aman (0)",
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = if (syncState.pendingCount > 0) santoyaColors.warning else santoyaColors.success
                     )
                 }
@@ -353,7 +355,7 @@ fun SantoyaSyncInfoBottomSheet(
                     Text(
                         text = syncState.lastSyncedAt?.let { FormatUtils.formatDateTime(it) } ?: "Belum pernah",
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -374,7 +376,7 @@ fun SantoyaSyncInfoBottomSheet(
                         Text(
                             text = syncState.ownerEmail,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -387,10 +389,10 @@ fun SantoyaSyncInfoBottomSheet(
         if (onNavigateToSettings != null) {
             OutlinedButton(
                 onClick = onNavigateToSettings,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(SantoyaRadius.md),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 44.dp)
+                    .heightIn(min = 48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Settings,
@@ -401,7 +403,7 @@ fun SantoyaSyncInfoBottomSheet(
                 Text(
                     text = "Buka Pengaturan Lengkap",
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -429,7 +431,7 @@ fun LocalStorageStatusPill(
     val santoyaColors = MaterialTheme.santoyaColors
     val isConnected = isCloudActive
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(SantoyaRadius.xl),
         color = if (isConnected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f) else santoyaColors.successContainer.copy(alpha = 0.55f),
         border = BorderStroke(1.dp, if (isConnected) MaterialTheme.colorScheme.primary.copy(alpha = 0.4f) else santoyaColors.success.copy(alpha = 0.35f)),
         modifier = modifier
@@ -448,7 +450,7 @@ fun LocalStorageStatusPill(
             Text(
                 text = if (isConnected) "Terhubung" else "Lokal HP",
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else santoyaColors.onSuccessContainer
             )
         }
@@ -472,14 +474,14 @@ fun SantoyaSectionBanner(
 ) {
     HydroBentoCard(
         accentColor = accentColor,
-        cornerRadius = 18.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.09f,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(SantoyaSpacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
             HydroGradientBadge(
@@ -488,7 +490,7 @@ fun SantoyaSectionBanner(
                     accentColor.copy(alpha = 0.78f)
                 ),
                 size = 44.dp,
-                cornerRadius = 14.dp
+                cornerRadius = SantoyaRadius.md
             ) {
                 if (iconContent != null) {
                     iconContent()
@@ -506,7 +508,7 @@ fun SantoyaSectionBanner(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -521,14 +523,14 @@ fun SantoyaSectionBanner(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(SantoyaRadius.sm),
                 color = accentColor.copy(alpha = 0.14f),
                 border = BorderStroke(1.dp, accentColor.copy(alpha = 0.30f))
             ) {
                 Text(
                     text = badgeText,
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = accentColor,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     maxLines = 1
@@ -628,7 +630,7 @@ fun SantoyaFormBottomSheet(
                                 Icon(
                                     imageVector = headerIcon,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = MaterialTheme.santoyaColors.onHero,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
@@ -639,7 +641,7 @@ fun SantoyaFormBottomSheet(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -696,7 +698,7 @@ fun SantoyaFormBottomSheet(
             ) {
                 OutlinedButton(
                     onClick = onDismiss,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
@@ -704,7 +706,7 @@ fun SantoyaFormBottomSheet(
                     Text(
                         text = dismissLabel,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
                 val confirmModifier = Modifier
@@ -714,14 +716,14 @@ fun SantoyaFormBottomSheet(
                 Button(
                     onClick = onConfirm,
                     enabled = confirmEnabled,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     colors = ButtonDefaults.buttonColors(containerColor = confirmContainerColor),
                     modifier = confirmModifier
                 ) {
                     Text(
                         text = confirmLabel,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -771,7 +773,7 @@ fun SantoyaEmptyState(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
@@ -809,14 +811,14 @@ fun SantoyaEmptyState(
                             Text(
                                 text = secondaryActionLabel,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
                     if (primaryActionLabel != null && onPrimaryAction != null) {
                         Button(
                             onClick = onPrimaryAction,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                             modifier = Modifier.heightIn(min = 48.dp)
                         ) {
@@ -831,7 +833,7 @@ fun SantoyaEmptyState(
                             Text(
                                 text = primaryActionLabel,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -954,7 +956,7 @@ fun SantoyaLoadingSkeleton(
         repeat(itemCount) {
             HydroBentoCard(
                 accentColor = MaterialTheme.colorScheme.primary,
-                cornerRadius = 18.dp,
+                cornerRadius = SantoyaRadius.lg,
                 tintAlpha = 0.04f,
                 showWaterRipple = false,
                 modifier = Modifier.fillMaxWidth()
@@ -1049,11 +1051,49 @@ fun SantoyaBusyStatusBanner(
             Text(
                 text = message,
                 style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+/**
+ * Tombol aksi standar di TopAppBar Santoya RO dengan area sentuh 48dp,
+ * lingkaran visual 38dp, dan garis tepi halus 1dp.
+ */
+@Composable
+fun SantoyaTopBarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+    borderColor: Color = MaterialTheme.colorScheme.outlineVariant,
+    enabled: Boolean = true
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(SantoyaSize.touchTarget)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            border = BorderStroke(1.dp, borderColor),
+            modifier = Modifier.size(SantoyaSize.topBarCircle)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }
@@ -1360,7 +1400,7 @@ fun SantoyaAdaptiveTabPillRow(
                                             fontSize = labelFontSize,
                                             lineHeight = labelFontSize
                                         ),
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                         color = contentColor,
                                         maxLines = 1,
                                         softWrap = false,
@@ -1395,7 +1435,7 @@ fun SantoyaAdaptiveTabPillRow(
                                                     fontSize = effectiveBadgeFontSize,
                                                     lineHeight = effectiveBadgeFontSize
                                                 ),
-                                                fontWeight = FontWeight.ExtraBold,
+                                                fontWeight = FontWeight.Bold,
                                                 color = badgeFg,
                                                 maxLines = 1,
                                                 softWrap = false,
@@ -1413,8 +1453,8 @@ fun SantoyaAdaptiveTabPillRow(
                 }
             }
             HorizontalDivider(
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
             )
         }
     }

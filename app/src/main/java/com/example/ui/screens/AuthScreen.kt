@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -50,7 +51,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -71,8 +71,9 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.aistudio.companion.kzpmrw.R
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.HeroOnSurface
 import com.example.ui.theme.PlusJakartaSansFontFamily
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.pressClickEffect
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -90,33 +91,32 @@ fun AuthScreen(
     onAuthSuccess: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    MyApplicationTheme(darkTheme = false) {
-        val context = LocalContext.current
-        val view = LocalView.current
-        val isInspection = LocalInspectionMode.current
+    val context = LocalContext.current
+    val view = LocalView.current
+    val isInspection = LocalInspectionMode.current
+    val isDarkTheme = isSystemInDarkTheme()
 
-        if (!isInspection && !view.isInEditMode) {
-            SideEffect {
-                val window = (context as? Activity)?.window
-                if (window != null) {
-                    val controller = WindowCompat.getInsetsController(window, view)
-                    controller.isAppearanceLightStatusBars = true
-                    controller.isAppearanceLightNavigationBars = true
-                }
+    if (!isInspection && !view.isInEditMode) {
+        SideEffect {
+            val window = (context as? Activity)?.window
+            if (window != null) {
+                val controller = WindowCompat.getInsetsController(window, view)
+                controller.isAppearanceLightStatusBars = !isDarkTheme
+                controller.isAppearanceLightNavigationBars = !isDarkTheme
             }
         }
+    }
 
-        val coroutineScope = rememberCoroutineScope()
-        val credentialManager = remember { CredentialManager.create(context) }
-        var isLoading by remember { mutableStateOf(false) }
-        var errorMessage by remember { mutableStateOf<String?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    val credentialManager = remember { CredentialManager.create(context) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
-        val surfaceColor = MaterialTheme.colorScheme.surface
-        val primaryColor = MaterialTheme.colorScheme.primary
-        val secondaryColor = MaterialTheme.colorScheme.secondary
-        val containerColor = MaterialTheme.colorScheme.primaryContainer
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val secondaryColor = MaterialTheme.colorScheme.secondary
 
-        Scaffold(
+    Scaffold(
             modifier = modifier
                 .fillMaxSize()
                 .testTag("auth_screen"),
@@ -193,7 +193,7 @@ fun AuthScreen(
                         Text(
                             text = "Santoya RO",
                             style = MaterialTheme.typography.displaySmall,
-                            fontWeight = FontWeight.Black,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onBackground,
                             letterSpacing = (-0.8).sp,
                             textAlign = TextAlign.Center
@@ -236,7 +236,7 @@ fun AuthScreen(
                                 )
                             },
                             enabled = !isLoading,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -244,7 +244,7 @@ fun AuthScreen(
                                 disabledContentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             elevation = ButtonDefaults.buttonElevation(
-                                defaultElevation = 2.dp,
+                                defaultElevation = 0.dp,
                                 pressedElevation = 0.dp
                             ),
                             modifier = Modifier
@@ -263,7 +263,7 @@ fun AuthScreen(
                                 Text(
                                     text = "Sedang masuk...",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             } else {
                                 Row(
@@ -273,8 +273,8 @@ fun AuthScreen(
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
-                                            shape = RoundedCornerShape(10.dp),
-                                            color = Color.White,
+                                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                                            color = HeroOnSurface,
                                             modifier = Modifier.size(30.dp)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
@@ -285,7 +285,7 @@ fun AuthScreen(
                                         Text(
                                             text = "Masuk dengan Google",
                                             style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             letterSpacing = 0.1.sp
                                         )
                                     }
@@ -306,7 +306,7 @@ fun AuthScreen(
                             Column {
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.md),
                                     color = MaterialTheme.colorScheme.errorContainer,
                                     border = BorderStroke(
                                         1.dp,
@@ -355,7 +355,6 @@ fun AuthScreen(
                 }
             }
         }
-    }
 }
 
 @Composable

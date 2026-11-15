@@ -66,7 +66,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.HydroCourierWaveIcon
@@ -77,6 +76,7 @@ import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
@@ -181,10 +181,10 @@ fun KurirScreen(
                     val colors = MaterialTheme.santoyaColors
 
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.lg),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("kurir_card_${kurir.id}")
@@ -217,7 +217,7 @@ fun KurirScreen(
                                             Text(
                                                 text = initials,
                                                 style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.ExtraBold,
+                                                fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onTertiaryContainer
                                             )
                                         }
@@ -227,7 +227,7 @@ fun KurirScreen(
                                         Text(
                                             text = kurir.nama,
                                             style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -236,7 +236,7 @@ fun KurirScreen(
                                             text = ruleSummaryText,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.primary,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -329,7 +329,7 @@ fun KurirScreen(
                                         Text(
                                             text = "Email Google: $displayEmail",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Medium,
                                             color = if (isActive) colors.onSuccessContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -338,7 +338,7 @@ fun KurirScreen(
                                         Text(
                                             text = if (isActive) "Aktif" else "Nonaktif",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = if (isActive) colors.success else MaterialTheme.colorScheme.error
                                         )
                                     }
@@ -500,7 +500,7 @@ private fun KurirFormDialog(
         headerAccent = MaterialTheme.colorScheme.secondary,
         headerIconContent = {
             HydroCourierWaveIcon(
-                tint = androidx.compose.ui.graphics.Color.White,
+                tint = MaterialTheme.santoyaColors.onHero,
                 modifier = Modifier.size(21.dp)
             )
         },

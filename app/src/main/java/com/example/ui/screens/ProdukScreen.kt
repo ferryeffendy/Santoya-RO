@@ -58,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +66,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Produk
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
@@ -77,6 +75,9 @@ import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaSectionBanner
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
+import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -161,10 +162,10 @@ fun ProdukScreen(
             } else {
                 items(displayList, key = { it.id }) { produk ->
                     Card(
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.lg),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -195,7 +196,7 @@ fun ProdukScreen(
                                     Text(
                                         text = produk.nama_produk,
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -204,7 +205,7 @@ fun ProdukScreen(
                                     SantoyaAdaptiveCurrencyText(
                                         amount = produk.harga,
                                         style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
                                         minFontSize = 11.sp,
                                         modifier = Modifier.fillMaxWidth()
@@ -215,7 +216,7 @@ fun ProdukScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
                                     onClick = { editingProduk = produk },
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(SantoyaSize.touchTarget)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Edit,
@@ -226,7 +227,7 @@ fun ProdukScreen(
                                 }
                                 IconButton(
                                     onClick = { produkToDelete = produk },
-                                    modifier = Modifier.size(48.dp)
+                                    modifier = Modifier.size(SantoyaSize.touchTarget)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Delete,
@@ -274,7 +275,7 @@ fun ProdukScreen(
             subtitle = "Atur nama dan harga jual per galon",
             headerIconContent = {
                 HydroGalonIcon(
-                    tint = Color.White,
+                    tint = MaterialTheme.santoyaColors.onHero,
                     modifier = Modifier.size(21.dp)
                 )
             },
@@ -342,8 +343,7 @@ fun ProdukScreen(
         }
     }
 
-    if (produkToDelete != null) {
-        val target = produkToDelete!!
+    produkToDelete?.let { target ->
         AlertDialog(
             onDismissRequest = { produkToDelete = null },
             icon = {
@@ -369,14 +369,14 @@ fun ProdukScreen(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text(
                                 text = target.nama_produk,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -385,8 +385,8 @@ fun ProdukScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Harga: ${FormatUtils.formatRupiah(target.harga)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -409,7 +409,8 @@ fun ProdukScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,

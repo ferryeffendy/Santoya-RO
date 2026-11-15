@@ -62,7 +62,7 @@ object FormatUtils {
     fun formatRupiah(amount: Double): String {
         val isNegative = amount < 0
         val absVal = kotlin.math.abs(amount)
-        val numStr = integerNumberFormatter.get()!!.format(absVal)
+        val numStr = requireNotNull(integerNumberFormatter.get()).format(absVal)
         return if (isNegative) "-Rp $numStr" else "Rp $numStr"
     }
 
@@ -70,7 +70,7 @@ object FormatUtils {
      * Standard Indonesian number grouping: "1.250"
      */
     fun formatNumber(number: Number): String {
-        return integerNumberFormatter.get()!!.format(number)
+        return requireNotNull(integerNumberFormatter.get()).format(number)
     }
 
     /**
@@ -78,8 +78,8 @@ object FormatUtils {
      */
     fun formatPercent(percent: Double, decimals: Int = 1): String {
         val formatted = when {
-            decimals <= 0 -> integerNumberFormatter.get()!!.format(percent)
-            decimals == 1 -> singleDecimalFormatter.get()!!.format(percent)
+            decimals <= 0 -> requireNotNull(integerNumberFormatter.get()).format(percent)
+            decimals == 1 -> requireNotNull(singleDecimalFormatter.get()).format(percent)
             else -> {
                 val pattern = "#,##0." + "0".repeat(decimals)
                 java.text.DecimalFormat(pattern, idSymbols).format(percent)
@@ -89,31 +89,44 @@ object FormatUtils {
     }
 
     /**
+     * Memformat label metode bayar untuk tampilan UI dalam Bahasa Indonesia.
+     * Menjaga kompatibilitas data historis "Cash" agar tetap tampil sebagai "Tunai".
+     */
+    fun formatMetodeBayarLabel(metode: String?): String {
+        val clean = metode?.trim().orEmpty()
+        return when {
+            clean.isBlank() || clean == "-" || clean.equals("Cash", ignoreCase = true) || clean.equals("Tunai", ignoreCase = true) -> "Tunai"
+            clean.equals("Bayar Sebagian", ignoreCase = true) -> "Bayar Sebagian"
+            else -> clean
+        }
+    }
+
+    /**
      * Standard UI date: "13 Nov 2026"
      */
     fun formatDateUi(timestamp: Long): String {
-        return dateUiFormatter.get()!!.format(Date(timestamp))
+        return requireNotNull(dateUiFormatter.get()).format(Date(timestamp))
     }
 
     /**
      * Standard UI date with time: "13 Nov 2026, 14:30"
      */
     fun formatDateTimeUi(timestamp: Long): String {
-        return dateTimeUiFormatter.get()!!.format(Date(timestamp))
+        return requireNotNull(dateTimeUiFormatter.get()).format(Date(timestamp))
     }
 
     /**
      * Standard Table / Receipt date: "13/11/2026"
      */
     fun formatDateTable(timestamp: Long): String {
-        return dateTableFormatter.get()!!.format(Date(timestamp))
+        return requireNotNull(dateTableFormatter.get()).format(Date(timestamp))
     }
 
     /**
      * Standard Table / Receipt date with time: "13/11/2026 14:30"
      */
     fun formatDateTimeTable(timestamp: Long): String {
-        return dateTimeTableFormatter.get()!!.format(Date(timestamp))
+        return requireNotNull(dateTimeTableFormatter.get()).format(Date(timestamp))
     }
 
     fun formatDate(timestamp: Long): String {
@@ -129,7 +142,7 @@ object FormatUtils {
     }
 
     fun formatTimeOnly(timestamp: Long): String {
-        return timeOnlyFormatter.get()!!.format(Date(timestamp))
+        return requireNotNull(timeOnlyFormatter.get()).format(Date(timestamp))
     }
 
     fun daysSince(timestamp: Long): Long {
@@ -275,7 +288,7 @@ object FormatUtils {
         val daysUntilExpected = java.time.temporal.ChronoUnit.DAYS.between(today, nextExpectedDate).toInt()
 
         val nextExpectedMillis = nextExpectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
-        val formattedDate = shortDayMonthFormatter.get()!!.format(Date(nextExpectedMillis))
+        val formattedDate = requireNotNull(shortDayMonthFormatter.get()).format(Date(nextExpectedMillis))
 
         val status = when {
             daysUntilExpected > 1 -> CrmOrderStatus.ACTIVE

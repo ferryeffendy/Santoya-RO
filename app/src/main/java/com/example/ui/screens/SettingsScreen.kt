@@ -72,6 +72,9 @@ import com.example.ui.components.HydroCourierWaveIcon
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.ImportJsonDialog
 import com.example.ui.components.RealtimeSyncStatusPill
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
+import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
@@ -107,7 +110,7 @@ fun SettingsScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = SantoyaSpacing.pageHorizontal),
         contentPadding = PaddingValues(top = 14.dp, bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
@@ -118,10 +121,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -150,7 +153,7 @@ fun SettingsScreen(
                             Text(
                                 text = currentUser?.displayName?.takeIf { it.isNotBlank() } ?: "Pemilik Santoya RO",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -166,7 +169,9 @@ fun SettingsScreen(
 
                         IconButton(
                             onClick = { showSignOutDialog = true },
-                            modifier = Modifier.testTag("btn_sign_out")
+                            modifier = Modifier
+                                .size(SantoyaSize.touchTarget)
+                                .testTag("btn_sign_out")
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.Logout,
@@ -178,7 +183,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.santoyaColors.success.copy(alpha = 0.12f)
                     ) {
                         Row(
@@ -209,10 +214,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
@@ -275,10 +280,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -287,7 +292,7 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             modifier = Modifier.size(44.dp)
                         ) {
@@ -307,7 +312,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Sinkronisasi Otomatis",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
@@ -327,7 +332,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -360,9 +365,10 @@ fun SettingsScreen(
                                 )
                             }
 
-                            if (syncState.lastSyncedAt != null) {
+                            val lastSyncedAt = syncState.lastSyncedAt
+                            if (lastSyncedAt != null) {
                                 Text(
-                                    text = "Terakhir diperbarui: ${FormatUtils.formatDate(syncState.lastSyncedAt!!)}",
+                                    text = "Terakhir diperbarui: ${FormatUtils.formatDate(lastSyncedAt)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -374,10 +380,10 @@ fun SettingsScreen(
                                 )
                             }
 
-                            if (lastSyncSummary != null) {
+                            lastSyncSummary?.let { summary ->
                                 Text(
-                                    text = "Rekap Cloud: ${lastSyncSummary?.pelangganCount ?: 0} pelanggan • ${lastSyncSummary?.transaksiCount ?: 0} transaksi",
-                                    style = MaterialTheme.typography.bodySmall,
+                                    text = "Rekap Cloud: ${summary.pelangganCount} pelanggan • ${summary.transaksiCount} transaksi",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -395,7 +401,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                         modifier = Modifier.fillMaxWidth()
@@ -417,7 +423,7 @@ fun SettingsScreen(
                                     Text(
                                         text = "Penggunaan Firestore Sesi Ini",
                                         style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
@@ -431,7 +437,7 @@ fun SettingsScreen(
                                     Text(
                                         text = "Detail Ukur",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                 }
@@ -444,7 +450,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -456,15 +462,15 @@ fun SettingsScreen(
                                         )
                                         Text(
                                             text = "${syncState.sessionReads} Dokumen",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
                                         )
                                     }
                                 }
 
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -476,8 +482,8 @@ fun SettingsScreen(
                                         )
                                         Text(
                                             text = "${syncState.sessionWrites} Dokumen",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.secondary
                                         )
                                     }
@@ -508,14 +514,14 @@ fun SettingsScreen(
                                 }
                             },
                             enabled = !isSyncingCloud && currentUser != null,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
+                                .height(SantoyaSize.touchTarget)
                                 .testTag("btn_sync_to_cloud")
                         ) {
                             if (isSyncingCloud) {
@@ -536,7 +542,7 @@ fun SettingsScreen(
                                 Text(
                                     text = "Cadangkan",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -546,14 +552,14 @@ fun SettingsScreen(
                         OutlinedButton(
                             onClick = { showRestoreCloudDialog = true },
                             enabled = !isSyncingCloud && currentUser != null,
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
+                                .height(SantoyaSize.touchTarget)
                                 .testTag("btn_restore_from_cloud")
                         ) {
                             Icon(
@@ -565,7 +571,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Ambil Data",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -581,10 +587,10 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -608,14 +614,14 @@ fun SettingsScreen(
                                     mimeType = "application/json"
                                 )
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
+                                .height(SantoyaSize.touchTarget)
                                 .testTag("btn_export_json")
                         ) {
                             Icon(
@@ -627,7 +633,7 @@ fun SettingsScreen(
                             Text(
                                 "File Cadangan",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -646,14 +652,14 @@ fun SettingsScreen(
                                     mimeType = "text/csv"
                                 )
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.primary
                             ),
                             modifier = Modifier
                                 .weight(1f)
-                                .height(48.dp)
+                                .height(SantoyaSize.touchTarget)
                                 .testTag("btn_export_csv")
                         ) {
                             Icon(
@@ -665,7 +671,7 @@ fun SettingsScreen(
                             Text(
                                 "Laporan Excel",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -676,14 +682,14 @@ fun SettingsScreen(
 
                     FilledTonalButton(
                         onClick = { showImportDialog = true },
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.md),
                         colors = ButtonDefaults.filledTonalButtonColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
                             contentColor = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(48.dp)
+                            .height(SantoyaSize.touchTarget)
                             .testTag("btn_import_json")
                     ) {
                         Icon(
@@ -695,7 +701,7 @@ fun SettingsScreen(
                         Text(
                             "Pulihkan dari File Cadangan",
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
 
@@ -708,14 +714,14 @@ fun SettingsScreen(
                                     viewModel.importJsonData(autoJson)
                                 }
                             },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.tertiary
                             ),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(48.dp)
+                                .height(SantoyaSize.touchTarget)
                                 .testTag("btn_restore_auto_backup")
                         ) {
                             Icon(
@@ -727,7 +733,7 @@ fun SettingsScreen(
                             Text(
                                 "Pulihkan Cadangan Otomatis HP",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
@@ -749,16 +755,16 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.md),
                             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
                             modifier = Modifier.size(44.dp)
                         ) {
@@ -776,7 +782,7 @@ fun SettingsScreen(
                             Text(
                                 text = "Santoya RO",
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
@@ -919,14 +925,14 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Penggunaan Sesi Aplikasi:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                            Text("• Dokumen dibaca (Reads): ${syncState.sessionReads}", style = MaterialTheme.typography.bodySmall)
-                            Text("• Dokumen ditulis (Writes): ${syncState.sessionWrites}", style = MaterialTheme.typography.bodySmall)
+                            Text("Penggunaan Sesi Aplikasi:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                            Text("• Dokumen dibaca (Reads): ${syncState.sessionReads}", style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
+                            Text("• Dokumen ditulis (Writes): ${syncState.sessionWrites}", style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
                             Text("• Kuota Gratis Spark: 50.000 reads & 20.000 writes / hari", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.santoyaColors.success, fontWeight = FontWeight.SemiBold)
                         }
                     }
@@ -953,7 +959,7 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall
                         )
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.xs),
                             color = MaterialTheme.santoyaColors.warning.copy(alpha = 0.15f),
                             border = BorderStroke(1.dp, MaterialTheme.santoyaColors.warning.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
@@ -1028,7 +1034,7 @@ private fun SystemInfoRow(
             }
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 color = valueColor,
                 maxLines = 1,
@@ -1051,13 +1057,13 @@ fun SettingsMenuRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
+            .heightIn(min = SantoyaSize.touchTarget)
             .pressClickEffect(onClick = onClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             color = iconColor.copy(alpha = 0.14f),
             modifier = Modifier.size(44.dp)
         ) {
@@ -1074,7 +1080,7 @@ fun SettingsMenuRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(2.dp))

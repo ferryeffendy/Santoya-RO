@@ -74,7 +74,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -97,6 +96,8 @@ import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.PerawatanEvaluation
@@ -182,7 +183,7 @@ fun PerawatanScreen(
                     text = {
                         Text(
                             text = "Jadwal (${evaluations.size})",
-                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (selectedTab == 0) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -202,7 +203,7 @@ fun PerawatanScreen(
                     text = {
                         Text(
                             text = "Riwayat (${logs.size})",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
+                            fontWeight = if (selectedTab == 1) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -366,7 +367,7 @@ fun PerawatanScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.sm)
                 ) {
                     Text("Hapus")
                 }
@@ -404,7 +405,7 @@ fun PerawatanScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.sm)
                 ) {
                     Text("Hapus")
                 }
@@ -433,7 +434,7 @@ private fun PerawatanSummaryBanner(
 
     HydroBentoCard(
         accentColor = accentColor,
-        cornerRadius = 16.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.10f,
         showWaterRipple = true,
         modifier = Modifier.fillMaxWidth()
@@ -452,13 +453,13 @@ private fun PerawatanSummaryBanner(
                 HydroGradientBadge(
                     gradientColors = listOf(accentColor, AccentCyan),
                     size = 40.dp,
-                    cornerRadius = 12.dp,
-                    elevation = 2.dp
+                    cornerRadius = SantoyaRadius.md,
+                    elevation = 0.dp
                 ) {
                     Icon(
                         imageVector = if (overdueCount > 0) Icons.Outlined.WarningAmber else Icons.Outlined.Build,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.santoyaColors.onHero,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -471,7 +472,7 @@ private fun PerawatanSummaryBanner(
                             else -> "Semua Mesin RO Terjadwal Aman"
                         },
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -496,7 +497,7 @@ private fun PerawatanHistorySummaryBanner(
 ) {
     HydroBentoCard(
         accentColor = MaterialTheme.colorScheme.tertiary,
-        cornerRadius = 16.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.09f,
         showWaterRipple = true,
         modifier = Modifier.fillMaxWidth()
@@ -515,13 +516,13 @@ private fun PerawatanHistorySummaryBanner(
                 HydroGradientBadge(
                     gradientColors = listOf(MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.primary),
                     size = 40.dp,
-                    cornerRadius = 12.dp,
-                    elevation = 2.dp
+                    cornerRadius = SantoyaRadius.md,
+                    elevation = 0.dp
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.History,
                         contentDescription = null,
-                        tint = Color.White,
+                        tint = MaterialTheme.santoyaColors.onHero,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -536,8 +537,8 @@ private fun PerawatanHistorySummaryBanner(
                     )
                     SantoyaAdaptiveCurrencyText(
                         amount = totalBiaya,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.tertiary,
                         minFontSize = 12.sp,
                         modifier = Modifier.fillMaxWidth()
@@ -546,13 +547,13 @@ private fun PerawatanHistorySummaryBanner(
             }
             Spacer(modifier = Modifier.width(8.dp))
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(SantoyaRadius.sm),
                 color = MaterialTheme.colorScheme.tertiaryContainer
             ) {
                 Text(
                     text = "$totalLogs Riwayat",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 )
@@ -596,7 +597,7 @@ private fun PerawatanScheduleCard(
 
     HydroBentoCard(
         accentColor = statusColor,
-        cornerRadius = 16.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = if (evaluation.isReminderDue) 0.08f else 0.04f,
         showWaterRipple = false,
         modifier = Modifier
@@ -619,7 +620,7 @@ private fun PerawatanScheduleCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.md),
                         color = statusColor.copy(alpha = 0.14f),
                         modifier = Modifier.size(40.dp)
                     ) {
@@ -637,7 +638,7 @@ private fun PerawatanScheduleCard(
                         Text(
                             text = item.nama,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -656,7 +657,7 @@ private fun PerawatanScheduleCard(
                     IconButton(
                         onClick = onEdit,
                         modifier = Modifier
-                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .sizeIn(minWidth = SantoyaSize.touchTarget, minHeight = SantoyaSize.touchTarget)
                             .testTag("btn_edit_perawatan_${item.id}")
                     ) {
                         Icon(
@@ -669,7 +670,7 @@ private fun PerawatanScheduleCard(
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier
-                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .sizeIn(minWidth = SantoyaSize.touchTarget, minHeight = SantoyaSize.touchTarget)
                             .testTag("btn_hapus_perawatan_${item.id}")
                     ) {
                         Icon(
@@ -688,19 +689,19 @@ private fun PerawatanScheduleCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm),
                     color = statusContainer
                 ) {
                     Text(
                         text = PerawatanScheduler.formatStatusBadge(evaluation),
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontWeight = FontWeight.SemiBold,
                         color = statusOnContainer,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                     )
                 }
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Text(
@@ -725,14 +726,14 @@ private fun PerawatanScheduleCard(
 
             Button(
                 onClick = onComplete,
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(SantoyaRadius.md),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (evaluation.isReminderDue) statusColor else MaterialTheme.colorScheme.primary,
-                    contentColor = Color.White
+                    contentColor = if (evaluation.isReminderDue) santoyaColors.onHero else MaterialTheme.colorScheme.onPrimary
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 48.dp)
+                    .heightIn(min = SantoyaSize.touchTarget)
                     .testTag("btn_selesai_perawatan_${item.id}")
             ) {
                 Icon(
@@ -743,7 +744,7 @@ private fun PerawatanScheduleCard(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = "Tandai Selesai",
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }
@@ -761,7 +762,7 @@ private fun PerawatanHistoryCard(
 
     HydroBentoCard(
         accentColor = accent,
-        cornerRadius = 16.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.04f,
         showWaterRipple = false,
         modifier = Modifier
@@ -784,7 +785,7 @@ private fun PerawatanHistoryCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = accent.copy(alpha = 0.14f),
                         modifier = Modifier.size(36.dp)
                     ) {
@@ -802,7 +803,7 @@ private fun PerawatanHistoryCard(
                         Text(
                             text = log.namaPerawatan,
                             style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -818,14 +819,14 @@ private fun PerawatanHistoryCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = if (hasExpense) FormatUtils.formatRupiah(log.biaya) else "Tanpa Biaya",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
                         color = if (hasExpense) MaterialTheme.colorScheme.error else MaterialTheme.santoyaColors.success
                     )
                     IconButton(
                         onClick = onDelete,
                         modifier = Modifier
-                            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                            .sizeIn(minWidth = SantoyaSize.touchTarget, minHeight = SantoyaSize.touchTarget)
                             .testTag("btn_hapus_log_perawatan_${log.id}")
                     ) {
                         Icon(
@@ -840,7 +841,7 @@ private fun PerawatanHistoryCard(
 
             if (hasExpense) {
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.xs),
                     color = MaterialTheme.colorScheme.tertiaryContainer
                 ) {
                     Row(
@@ -857,7 +858,7 @@ private fun PerawatanHistoryCard(
                         Text(
                             text = "Tercatat di Pengeluaran (Perawatan)",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
@@ -927,7 +928,7 @@ private fun PerawatanFormBottomSheet(
             Icon(
                 imageVector = Icons.Outlined.Build,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.santoyaColors.onHero,
                 modifier = Modifier.size(20.dp)
             )
         },
@@ -952,7 +953,7 @@ private fun PerawatanFormBottomSheet(
                 onNext = { intervalFocusRequester.requestFocus() }
             ),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
                 .bringIntoViewOnFocus()
@@ -981,7 +982,7 @@ private fun PerawatanFormBottomSheet(
                 onDone = { focusManager.clearFocus() }
             ),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(intervalFocusRequester)
@@ -1036,10 +1037,10 @@ private fun PerawatanFormBottomSheet(
                     cal.get(Calendar.DAY_OF_MONTH)
                 ).show()
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .heightIn(min = SantoyaSize.touchTarget)
                 .testTag("btn_pilih_jadwal_berikutnya")
         ) {
             Icon(
@@ -1087,7 +1088,7 @@ private fun CompletePerawatanBottomSheet(
             Icon(
                 imageVector = Icons.Outlined.CheckCircle,
                 contentDescription = null,
-                tint = Color.White,
+                tint = MaterialTheme.santoyaColors.onHero,
                 modifier = Modifier.size(20.dp)
             )
         },
@@ -1116,10 +1117,10 @@ private fun CompletePerawatanBottomSheet(
                     cal.get(Calendar.DAY_OF_MONTH)
                 ).show()
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .heightIn(min = SantoyaSize.touchTarget)
                 .testTag("btn_pilih_tanggal_selesai")
         ) {
             Icon(
@@ -1149,7 +1150,7 @@ private fun CompletePerawatanBottomSheet(
                 onNext = { catatanFocusRequester.requestFocus() }
             ),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
                 .bringIntoViewOnFocus()
@@ -1170,7 +1171,7 @@ private fun CompletePerawatanBottomSheet(
             ),
             minLines = 2,
             maxLines = 4,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
                 .focusRequester(catatanFocusRequester)
@@ -1179,7 +1180,7 @@ private fun CompletePerawatanBottomSheet(
         )
 
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
             modifier = Modifier.fillMaxWidth()
@@ -1198,7 +1199,7 @@ private fun CompletePerawatanBottomSheet(
                 Text(
                     text = "Jadwal berikutnya: ${FormatUtils.formatDateUi(predictedNextDue)}",
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }

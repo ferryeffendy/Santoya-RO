@@ -9,7 +9,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,11 +30,12 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -89,10 +89,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pengeluaran
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroExpenseFlowIcon
@@ -105,6 +103,9 @@ import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentRose
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
+import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.viewmodel.SantoyaScreen
@@ -218,9 +219,11 @@ fun PengeluaranScreen(
                 "bensin & transport" -> "Bensin & Transport"
                 "perawatan" -> "Perawatan"
                 "operasional" -> "Operasional"
-                else -> "Lainnya"
+                else -> null
             }
-            counts[matchedKey] = (counts[matchedKey] ?: 0) + 1
+            if (matchedKey != null) {
+                counts[matchedKey] = (counts[matchedKey] ?: 0) + 1
+            }
         }
         counts
     }
@@ -273,9 +276,15 @@ fun PengeluaranScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                    .padding(top = 6.dp, bottom = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
@@ -301,7 +310,7 @@ fun PengeluaranScreen(
                                     searchQuery = ""
                                     focusManager.clearFocus()
                                 },
-                                modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 40.dp)
+                                modifier = Modifier.sizeIn(minWidth = SantoyaSize.touchTarget, minHeight = SantoyaSize.touchTarget)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Clear,
@@ -322,7 +331,7 @@ fun PengeluaranScreen(
                         }
                     ),
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
@@ -354,8 +363,9 @@ fun PengeluaranScreen(
                         selectedDateFilter = PengeluaranDateFilter.SEMUA
                     }
                 )
+                }
 
-                PengeluaranCategoryTwoRowGrid(
+                PengeluaranCategoryFilterRow(
                     selectedCategory = selectedCategoryFilter,
                     categoryCounts = categoryCounts,
                     onSelectCategory = { cat ->
@@ -378,7 +388,7 @@ fun PengeluaranScreen(
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         HydroBentoCard(
                             accentColor = MaterialTheme.colorScheme.error,
-                            cornerRadius = 16.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.11f,
                             showWaterRipple = true,
                             modifier = Modifier.fillMaxWidth()
@@ -397,11 +407,11 @@ fun PengeluaranScreen(
                                     HydroGradientBadge(
                                         gradientColors = listOf(MaterialTheme.colorScheme.error, AccentRose),
                                         size = 36.dp,
-                                        cornerRadius = 11.dp,
-                                        elevation = 2.dp
+                                        cornerRadius = SantoyaRadius.md,
+                                        elevation = 0.dp
                                     ) {
                                         HydroExpenseFlowIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -431,8 +441,8 @@ fun PengeluaranScreen(
                                         )
                                         SantoyaAdaptiveCurrencyText(
                                             amount = totalPengeluaran,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                                            fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.error,
                                             minFontSize = 12.sp,
                                             modifier = Modifier.fillMaxWidth()
@@ -441,13 +451,13 @@ fun PengeluaranScreen(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
                                 ) {
                                     Text(
                                         text = "${filteredList.size} Catatan",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onErrorContainer,
                                         maxLines = 1,
                                         softWrap = false,
@@ -469,7 +479,7 @@ fun PengeluaranScreen(
 
                             HydroBentoCard(
                                 accentColor = MaterialTheme.colorScheme.primary,
-                                cornerRadius = 16.dp,
+                                cornerRadius = SantoyaRadius.lg,
                                 tintAlpha = 0.04f,
                                 showWaterRipple = false,
                                 modifier = Modifier.fillMaxWidth()
@@ -483,7 +493,7 @@ fun PengeluaranScreen(
                                     Text(
                                         text = "Rincian per Kategori",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1
                                     )
@@ -506,8 +516,8 @@ fun PengeluaranScreen(
                                             Spacer(modifier = Modifier.width(8.dp))
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = nominal,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.error,
                                                 minFontSize = 10.sp,
                                                 textAlign = TextAlign.End
@@ -565,7 +575,7 @@ fun PengeluaranScreen(
 
                             HydroBentoCard(
                                 accentColor = kategoriColor,
-                                cornerRadius = 16.dp,
+                                cornerRadius = SantoyaRadius.lg,
                                 tintAlpha = 0.05f,
                                 showWaterRipple = false,
                                 modifier = Modifier
@@ -588,7 +598,7 @@ fun PengeluaranScreen(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(12.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.md),
                                                 color = kategoriColor.copy(alpha = 0.14f),
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -604,7 +614,7 @@ fun PengeluaranScreen(
                                             Text(
                                                 text = item.nama_item,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.weight(1f)
@@ -618,8 +628,8 @@ fun PengeluaranScreen(
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = item.nominal,
                                                 customText = "- ${FormatUtils.formatRupiah(item.nominal)}",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                fontWeight = FontWeight.ExtraBold,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                                                fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.error,
                                                 minFontSize = 11.sp,
                                                 textAlign = TextAlign.End,
@@ -627,7 +637,7 @@ fun PengeluaranScreen(
                                             )
                                             IconButton(
                                                 onClick = { itemToDelete = item },
-                                                modifier = Modifier.size(48.dp)
+                                                modifier = Modifier.size(SantoyaSize.touchTarget)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Outlined.Delete,
@@ -645,14 +655,14 @@ fun PengeluaranScreen(
                                         verticalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         Surface(
-                                            shape = RoundedCornerShape(6.dp),
+                                            shape = RoundedCornerShape(SantoyaRadius.xs),
                                             color = kategoriColor.copy(alpha = 0.14f),
                                             modifier = Modifier.align(Alignment.CenterVertically)
                                         ) {
                                             Text(
                                                 text = item.kategori,
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = kategoriColor,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
@@ -683,7 +693,7 @@ fun PengeluaranScreen(
         var nominalStr by remember { mutableStateOf("") }
         var tanggalMillis by remember { mutableStateOf(System.currentTimeMillis()) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
-        val kategoriOptions = listOf("Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Perawatan", "Operasional", "Lainnya")
+        val kategoriOptions = PENGELUARAN_CATEGORIES
         val nominalFocusRequester = remember { FocusRequester() }
         val sheetFocusManager = LocalFocusManager.current
 
@@ -706,7 +716,7 @@ fun PengeluaranScreen(
             headerAccent = MaterialTheme.colorScheme.error,
             headerIconContent = {
                 HydroExpenseFlowIcon(
-                    tint = Color.White,
+                    tint = MaterialTheme.santoyaColors.onHero,
                     modifier = Modifier.size(20.dp)
                 )
             },
@@ -729,7 +739,7 @@ fun PengeluaranScreen(
                         cal.get(Calendar.DAY_OF_MONTH)
                     ).show()
                 },
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(SantoyaRadius.md),
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 48.dp)
@@ -762,7 +772,7 @@ fun PengeluaranScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .bringIntoViewOnFocus(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(SantoyaRadius.md)
             )
 
             Text(
@@ -808,7 +818,7 @@ fun PengeluaranScreen(
                     .fillMaxWidth()
                     .focusRequester(nominalFocusRequester)
                     .bringIntoViewOnFocus(),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(SantoyaRadius.md)
             )
 
             if (errorMessage != null) {
@@ -852,7 +862,7 @@ fun PengeluaranScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.sm)
                 ) {
                     Text("Hapus")
                 }
@@ -969,7 +979,7 @@ private fun PengeluaranDateFilterRow(
                         mutableStateOf(initialFont)
                     }
 
-                    val shape = RoundedCornerShape(50)
+                    val shape = RoundedCornerShape(SantoyaRadius.pill)
                     Surface(
                         shape = shape,
                         color = containerColor,
@@ -1005,7 +1015,7 @@ private fun PengeluaranDateFilterRow(
                                     fontSize = labelFontSize,
                                     lineHeight = labelFontSize
                                 ),
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 color = contentColor,
                                 maxLines = 1,
                                 softWrap = false,
@@ -1028,12 +1038,12 @@ private fun PengeluaranDateFilterRow(
             val rangeLabel = if (startStr == endStr) startStr else "$startStr – $endStr"
 
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(SantoyaRadius.sm),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(SantoyaRadius.sm))
                     .clickable { onOpenCustomRangePicker() }
             ) {
                 Row(
@@ -1057,7 +1067,7 @@ private fun PengeluaranDateFilterRow(
                         Text(
                             text = "Rentang: $rangeLabel (Ketuk untuk ubah)",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -1065,10 +1075,10 @@ private fun PengeluaranDateFilterRow(
                     }
                     Spacer(modifier = Modifier.width(6.dp))
                     Surface(
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(SantoyaRadius.pill),
                         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
+                            .clip(RoundedCornerShape(SantoyaRadius.pill))
                             .clickable { onResetCustomRange() }
                     ) {
                         Row(
@@ -1086,7 +1096,7 @@ private fun PengeluaranDateFilterRow(
                                 text = "Reset",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -1097,27 +1107,27 @@ private fun PengeluaranDateFilterRow(
     }
 }
 
+private val PENGELUARAN_CATEGORIES = listOf(
+    "Listrik & Air",
+    "Filter & Membran",
+    "Operasional",
+    "Tutup & Tisu Galon",
+    "Bensin & Transport",
+    "Perawatan"
+)
+
 /**
- * Balanced 2-row full-width category pill grid (Row 1: 4 items, Row 2: 3 items) so every
- * category fits edge-to-edge without any dangling 3rd row, complete with semantic color dot
- * and note count badge.
+ * Single-row horizontal scrollable expense category filter pills without color dots,
+ * keeping every label complete and readable across all screen widths.
  */
 @Composable
-private fun PengeluaranCategoryTwoRowGrid(
+private fun PengeluaranCategoryFilterRow(
     selectedCategory: String,
     categoryCounts: Map<String, Int>,
     onSelectCategory: (String) -> Unit
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
-    val density = LocalDensity.current
-    val fontScale = density.fontScale
-
-    val row1Categories = remember {
-        listOf("Semua", "Listrik & Air", "Filter & Membran", "Operasional")
-    }
-    val row2Categories = remember {
-        listOf("Tutup & Tisu Galon", "Bensin & Transport", "Perawatan", "Lainnya")
-    }
+    val filterCategories = remember { listOf("Semua") + PENGELUARAN_CATEGORIES }
 
     @Composable
     fun resolveCategoryAccent(category: String): Color {
@@ -1133,172 +1143,105 @@ private fun PengeluaranCategoryTwoRowGrid(
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val availableWidth = maxWidth
-        val gap = when {
-            availableWidth < 340.dp -> 4.dp
-            availableWidth < 400.dp -> 5.dp
-            else -> 6.dp
-        }
-        val innerHorizontal = when {
-            availableWidth < 340.dp -> 4.dp
-            availableWidth < 400.dp -> 6.dp
-            else -> 8.dp
-        }
-        val baseLabelFont = when {
-            availableWidth < 335.dp -> 9.5.sp
-            availableWidth < 370.dp -> 10.2.sp
-            availableWidth < 400.dp -> 11.sp
-            else -> 11.8.sp
-        }
-        val baseBadgeFont = when {
-            availableWidth < 335.dp -> 8.sp
-            availableWidth < 370.dp -> 8.5.sp
-            availableWidth < 400.dp -> 9.sp
-            else -> 9.5.sp
-        }
-        val dotSize = if (availableWidth < 360.dp) 5.5.dp else 6.5.dp
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("pengeluaran_category_filter_row"),
+        contentPadding = PaddingValues(horizontal = SantoyaSpacing.md),
+        horizontalArrangement = Arrangement.spacedBy(SantoyaSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        items(filterCategories, key = { it }) { cat ->
+            val isSelected = selectedCategory == cat
+            val count = categoryCounts[cat] ?: 0
+            val accentColor = resolveCategoryAccent(cat)
+            val isAll = cat == "Semua"
 
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            listOf(row1Categories, row2Categories).forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalAlignment = Alignment.CenterVertically
+            val containerColor by animateColorAsState(
+                targetValue = when {
+                    isSelected && isAll -> MaterialTheme.colorScheme.primaryContainer
+                    isSelected -> accentColor.copy(alpha = 0.14f)
+                    else -> MaterialTheme.colorScheme.surface
+                },
+                animationSpec = tween(160),
+                label = "cat_pill_bg"
+            )
+            val contentColor by animateColorAsState(
+                targetValue = when {
+                    isSelected && isAll -> MaterialTheme.colorScheme.onPrimaryContainer
+                    isSelected -> accentColor
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                animationSpec = tween(160),
+                label = "cat_pill_fg"
+            )
+            val borderColor by animateColorAsState(
+                targetValue = if (isSelected) {
+                    accentColor.copy(alpha = 0.45f)
+                } else {
+                    MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
+                },
+                animationSpec = tween(160),
+                label = "cat_pill_border"
+            )
+
+            val shape = RoundedCornerShape(SantoyaRadius.pill)
+            val pillTag = remember(cat) {
+                "filter_category_" + cat.lowercase()
+                    .replace("&", "")
+                    .trim()
+                    .replace(Regex("\\s+"), "_")
+            }
+
+            Box(
+                modifier = Modifier
+                    .heightIn(min = SantoyaSize.touchTarget)
+                    .clip(shape)
+                    .semantics {
+                        this.selected = isSelected
+                        this.role = Role.RadioButton
+                    }
+                    .clickable { onSelectCategory(cat) }
+                    .testTag(pillTag),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = shape,
+                    color = containerColor,
+                    border = BorderStroke(1.dp, borderColor),
+                    modifier = Modifier.heightIn(min = 36.dp)
                 ) {
-                    rowItems.forEach { cat ->
-                        val isSelected = selectedCategory == cat
-                        val count = categoryCounts[cat] ?: 0
-                        val accentColor = resolveCategoryAccent(cat)
-                        val itemWeight = remember(cat, count) {
-                            val badgeExtra = if (count > 0) (count.toString().length * 0.14f) + 0.18f else 0f
-                            ((cat.length * 0.12f) + 0.35f + badgeExtra).coerceAtLeast(0.75f)
-                        }
-
-                        val containerColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                if (cat == "Semua") {
-                                    MaterialTheme.colorScheme.primaryContainer
-                                } else {
-                                    accentColor.copy(alpha = 0.16f)
-                                }
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            },
-                            animationSpec = tween(160),
-                            label = "cat_pill_bg"
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = cat,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = contentColor,
+                            maxLines = 1,
+                            softWrap = false
                         )
-                        val contentColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                if (cat == "Semua") {
-                                    MaterialTheme.colorScheme.onPrimaryContainer
-                                } else {
-                                    accentColor
+                        if (count > 0) {
+                            Surface(
+                                shape = RoundedCornerShape(SantoyaRadius.pill),
+                                color = when {
+                                    isSelected && isAll -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    isSelected -> accentColor.copy(alpha = 0.2f)
+                                    else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
                                 }
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            animationSpec = tween(160),
-                            label = "cat_pill_fg"
-                        )
-                        val borderColor by animateColorAsState(
-                            targetValue = if (isSelected) {
-                                accentColor.copy(alpha = 0.55f)
-                            } else {
-                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
-                            },
-                            animationSpec = tween(160),
-                            label = "cat_pill_border"
-                        )
-
-                        val initialFont = remember(baseLabelFont, fontScale) {
-                            if (fontScale > 1.15f) {
-                                (baseLabelFont.value / (fontScale / 1.1f)).coerceAtLeast(8f).sp
-                            } else {
-                                baseLabelFont
-                            }
-                        }
-                        var labelFontSize by remember(cat, count, availableWidth, initialFont) {
-                            mutableStateOf(initialFont)
-                        }
-                        val effectiveBadgeFont: TextUnit = remember(labelFontSize, baseLabelFont, baseBadgeFont) {
-                            val ratio = (labelFontSize.value / baseLabelFont.value).coerceIn(0.75f, 1f)
-                            (baseBadgeFont.value * ratio).coerceAtLeast(7.5f).sp
-                        }
-
-                        val shape = RoundedCornerShape(10.dp)
-                        Surface(
-                            shape = shape,
-                            color = containerColor,
-                            border = BorderStroke(1.dp, borderColor),
-                            modifier = Modifier
-                                .weight(itemWeight)
-                                .heightIn(min = 34.dp)
-                                .clip(shape)
-                                .semantics {
-                                    this.selected = isSelected
-                                    this.role = Role.RadioButton
-                                }
-                                .clickable { onSelectCategory(cat) }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = innerHorizontal, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(dotSize)
-                                        .clip(CircleShape)
-                                        .background(
-                                            if (isSelected) accentColor else accentColor.copy(alpha = 0.7f)
-                                        )
-                                )
-                                Spacer(modifier = Modifier.width(if (availableWidth < 360.dp) 3.5.dp else 4.5.dp))
                                 Text(
-                                    text = cat,
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontSize = labelFontSize,
-                                        lineHeight = labelFontSize
-                                    ),
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = contentColor,
+                                    text = count.toString(),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isSelected) contentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     softWrap = false,
-                                    overflow = TextOverflow.Clip,
-                                    onTextLayout = { result ->
-                                        if (result.hasVisualOverflow && labelFontSize.value > 7.8f) {
-                                            labelFontSize = (labelFontSize.value - 0.4f).coerceAtLeast(7.8f).sp
-                                        }
-                                    }
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
                                 )
-                                if (count > 0) {
-                                    Spacer(modifier = Modifier.width(if (availableWidth < 360.dp) 3.dp else 4.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = if (isSelected) {
-                                            accentColor.copy(alpha = 0.22f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f)
-                                        }
-                                    ) {
-                                        Text(
-                                            text = count.toString(),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontSize = effectiveBadgeFont,
-                                                lineHeight = effectiveBadgeFont
-                                            ),
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = if (isSelected) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                }
                             }
                         }
                     }

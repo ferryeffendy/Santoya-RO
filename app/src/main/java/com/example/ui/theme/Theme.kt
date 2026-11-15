@@ -47,6 +47,12 @@ data class SantoyaExtendedColors(
     val rankGold: Color,
     val rankSilver: Color,
     val rankBronze: Color,
+    val onHero: Color,
+    val heroLeafTint: Color,
+    val receiptSurface: Color,
+    val receiptOnSurface: Color,
+    val receiptMuted: Color,
+    val receiptDivider: Color,
     val isDark: Boolean
 )
 
@@ -70,6 +76,12 @@ private val LightExtendedColors = SantoyaExtendedColors(
     rankGold = RankGold,
     rankSilver = RankSilver,
     rankBronze = RankBronze,
+    onHero = HeroOnSurface,
+    heroLeafTint = HeroLeafTint,
+    receiptSurface = ReceiptPaperLight,
+    receiptOnSurface = ReceiptInkLight,
+    receiptMuted = ReceiptMutedLight,
+    receiptDivider = ReceiptDividerLight,
     isDark = false
 )
 
@@ -90,9 +102,15 @@ private val DarkExtendedColors = SantoyaExtendedColors(
     onInfo = OnInfoDark,
     infoContainer = InfoContainerDark,
     onInfoContainer = OnInfoContainerDark,
-    rankGold = Color(0xFFFBBF24),
-    rankSilver = Color(0xFF94A3B8),
-    rankBronze = Color(0xFFF59E0B),
+    rankGold = RankGoldDark,
+    rankSilver = RankSilverDark,
+    rankBronze = RankBronzeDark,
+    onHero = HeroOnSurface,
+    heroLeafTint = HeroLeafTint,
+    receiptSurface = ReceiptPaperDark,
+    receiptOnSurface = ReceiptInkDark,
+    receiptMuted = ReceiptMutedDark,
+    receiptDivider = ReceiptDividerDark,
     isDark = true
 )
 

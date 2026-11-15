@@ -110,6 +110,10 @@ val RankBronze = Color(0xFFB86B1B)
 val RankBronzeContainer = Color(0xFFFDF0E1)
 val OnRankBronze = Color(0xFF4A2600)
 
+val RankGoldDark = Color(0xFFFBBF24)
+val RankSilverDark = Color(0xFF94A3B8)
+val RankBronzeDark = Color(0xFFF59E0B)
+
 // Solid Brand Hero Card Tokens (Zero Gradient, Pure Fresh Hydro Blue & Solid Sub-Panels)
 val HeroGradientStart = Color(0xFF1E78CC)
 val HeroGradientMid = Color(0xFF1E78CC)
@@ -119,6 +123,9 @@ val HeroDeficitStart = Color(0xFF8C2633)
 val HeroDeficitMid = Color(0xFF8C2633)
 val HeroDeficitEnd = Color(0xFF8C2633)
 val HeroDeficitPanel = Color(0xFF6E1B26)
+
+val HeroOnSurface = Color(0xFFFFFFFF)
+val HeroLeafTint = Color(0xFFA7F3B5)
 
 val HeroGlowCyan = Color(0xFF3B93E6)
 val HeroGlowCyanSoft = Color(0xFFD6ECFF)
@@ -144,3 +151,13 @@ val SantoyaMistBlue = Color(0xFFE8F3FC)
 val SantoyaLeafGreen = Color(0xFF52A760)
 val SantoyaDewMint = Color(0xFFE9F6EC)
 
+// Theme-aware Receipt Preview Tokens
+val ReceiptPaperLight = Color(0xFFFFFFFF)
+val ReceiptInkLight = Color(0xFF0A2E5C)
+val ReceiptMutedLight = Color(0xFF4A6583)
+val ReceiptDividerLight = Color(0xFFC9DDF0)
+
+val ReceiptPaperDark = Color(0xFF0E294D)
+val ReceiptInkDark = Color(0xFFF5F9FF)
+val ReceiptMutedDark = Color(0xFF9AB4D0)
+val ReceiptDividerDark = Color(0xFF234775)

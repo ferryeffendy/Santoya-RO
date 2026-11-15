@@ -82,7 +82,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -95,14 +94,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
@@ -117,6 +114,7 @@ import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
@@ -396,7 +394,7 @@ fun CatatPenjualanTab(
             // 1. Baris Tanggal Transaksi (Default Hari Ini + Dukungan Backdate Nota Kurir)
             HydroBentoCard(
                 accentColor = MaterialTheme.colorScheme.primary,
-                cornerRadius = 14.dp,
+                cornerRadius = SantoyaRadius.md,
                 tintAlpha = 0.06f,
                 showWaterRipple = false,
                 onClick = { datePickerDialog.show() },
@@ -424,7 +422,7 @@ fun CatatPenjualanTab(
                             Icon(
                                 imageVector = Icons.Outlined.CalendarToday,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = MaterialTheme.santoyaColors.onHero,
                                 modifier = Modifier.size(14.dp)
                             )
                         }
@@ -833,7 +831,7 @@ fun CatatPenjualanTab(
                                         elevation = 2.dp
                                     ) {
                                         HydroGalonIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -859,15 +857,15 @@ fun CatatPenjualanTab(
                                     Text(
                                         text = prod.nama_produk,
                                         style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = FormatUtils.formatRupiah(prod.harga),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.Bold,
                                         color = if (isSelected) tileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -960,7 +958,7 @@ fun CatatPenjualanTab(
 
                     HydroBentoCard(
                         accentColor = MaterialTheme.colorScheme.primary,
-                        cornerRadius = 14.dp,
+                        cornerRadius = SantoyaRadius.md,
                         tintAlpha = 0.07f,
                         showWaterRipple = false,
                         modifier = Modifier
@@ -1025,8 +1023,8 @@ fun CatatPenjualanTab(
                                 ) {
                                     Text(
                                         text = "$jumlah",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Black,
+                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
                                         textAlign = TextAlign.Center,
                                         modifier = Modifier.animateContentSize(),
@@ -1204,11 +1202,11 @@ fun CatatPenjualanTab(
                         },
                         label = {
                             Text(
-                                text = "Cash (Lunas)",
+                                text = "Tunai (Lunas)",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (isCashSelected) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isCashSelected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
@@ -1235,7 +1233,7 @@ fun CatatPenjualanTab(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (isTransferSelected) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isTransferSelected) FontWeight.SemiBold else FontWeight.Medium
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
@@ -1262,11 +1260,11 @@ fun CatatPenjualanTab(
                         },
                         label = {
                             Text(
-                                text = "DP Sebagian",
+                                text = "Bayar Sebagian",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (isBayarSebagian) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isBayarSebagian) FontWeight.SemiBold else FontWeight.Medium
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
@@ -1292,7 +1290,7 @@ fun CatatPenjualanTab(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (isKasbonPenuh) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isKasbonPenuh) FontWeight.SemiBold else FontWeight.Medium
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
@@ -1333,9 +1331,9 @@ fun CatatPenjualanTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "DP Cepat:",
+                                text = "Nominal Cepat:",
                                 style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             dpPresets.forEach { (label, presetAmount) ->
@@ -1352,7 +1350,7 @@ fun CatatPenjualanTab(
                                             text = "$label (${FormatUtils.formatRupiah(presetAmount.toDouble())})",
                                             maxLines = 1,
                                             style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isPresetSelected) FontWeight.Bold else FontWeight.Medium
+                                            fontWeight = if (isPresetSelected) FontWeight.SemiBold else FontWeight.Medium
                                         )
                                     },
                                     modifier = Modifier.height(32.dp)
@@ -1368,17 +1366,17 @@ fun CatatPenjualanTab(
                             val parsed = cleanDigits.toLongOrNull() ?: 0L
                             viewModel.setTxUangMuka(parsed)
                         },
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
                         label = {
                             Text(
-                                "Uang Muka / DP (Rp) *",
+                                "Uang Muka (Rp) *",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
                         placeholder = {
                             Text(
-                                "Tulis nominal DP",
+                                "Tulis nominal uang muka",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1387,7 +1385,7 @@ fun CatatPenjualanTab(
                             Text(
                                 "Rp ",
                                 style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.SemiBold
                             )
                         },
                         trailingIcon = {
@@ -1406,7 +1404,7 @@ fun CatatPenjualanTab(
                         },
                         isError = isDpExceedingTotal,
                         singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.md),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface
@@ -1429,7 +1427,7 @@ fun CatatPenjualanTab(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = if (isDpExceedingTotal) {
                             santoyaColors.dangerContainer
                         } else {
@@ -1448,8 +1446,8 @@ fun CatatPenjualanTab(
                             ) {
                                 Text(
                                     text = "Sisa Kasbon: ${FormatUtils.formatRupiah(sisaKasbonPreview.toDouble())}",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.Bold,
                                     color = if (isDpExceedingTotal) {
                                         santoyaColors.danger
                                     } else {
@@ -1459,9 +1457,9 @@ fun CatatPenjualanTab(
                                 )
                                 if (uangMuka > 0L && !isDpExceedingTotal) {
                                     Text(
-                                        text = "DP: ${FormatUtils.formatRupiah(uangMuka.toDouble())}",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        text = "Uang Muka: ${FormatUtils.formatRupiah(uangMuka.toDouble())}",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.SemiBold,
                                         color = santoyaColors.success
                                     )
                                 }
@@ -1514,7 +1512,7 @@ fun CatatPenjualanTab(
                             SantoyaAdaptiveCurrencyText(
                                 amount = totalHarga,
                                 style = if (isImeVisible) MaterialTheme.typography.titleMedium else MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Black,
+                                fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
                                 minFontSize = 12.sp,
                                 modifier = Modifier.weight(1f, fill = false)
@@ -1530,7 +1528,7 @@ fun CatatPenjualanTab(
                                     text = "Komisi (${kurir.nama}): ${FormatUtils.formatRupiah(komisiBreakdown.totalKomisi)} (${FormatUtils.formatRupiah(komisiBreakdown.perGalonRate)}/gal)",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.SemiBold,
+                                    fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1543,17 +1541,17 @@ fun CatatPenjualanTab(
                     val isBottomKasbon = status.equals("Kasbon", ignoreCase = true) || metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
                     val santoyaColors = MaterialTheme.santoyaColors
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.xs),
                         color = if (isBottomKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
                     ) {
                         Text(
                             text = when {
-                                metodeBayar.equals("Bayar Sebagian", ignoreCase = true) -> "KASBON (DP)"
+                                metodeBayar.equals("Bayar Sebagian", ignoreCase = true) -> "KASBON (SEBAGIAN)"
                                 isBottomKasbon -> "KASBON"
                                 else -> "LUNAS"
                             },
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (isBottomKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
@@ -1690,7 +1688,8 @@ fun CatatPenjualanTab(
                     jumlahInput = text.filter { it.isDigit() }.take(4)
                 },
                 textStyle = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Bold,
+                    fontFeatureSettings = "tnum",
                     textAlign = TextAlign.Center
                 ),
                 label = {
@@ -2266,7 +2265,7 @@ fun RiwayatTransaksiTab(
                     } else {
                         HydroBentoCard(
                             accentColor = MaterialTheme.colorScheme.primary,
-                            cornerRadius = 18.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.09f,
                             showWaterRipple = true,
                             modifier = Modifier.fillMaxWidth()
@@ -2288,7 +2287,7 @@ fun RiwayatTransaksiTab(
                                             elevation = 2.dp
                                         ) {
                                             HydroGalonIcon(
-                                                tint = Color.White,
+                                                tint = MaterialTheme.santoyaColors.onHero,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -2296,14 +2295,14 @@ fun RiwayatTransaksiTab(
                                         Text(
                                             text = "${activeFiltered.size} Transaksi • $totalGalonFiltered Galon",
                                             style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                     SantoyaAdaptiveCurrencyText(
                                         amount = totalNominalFiltered,
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Black,
+                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
                                         minFontSize = 12.sp
                                     )
@@ -2424,7 +2423,7 @@ fun RiwayatTransaksiTab(
                 }
                 HydroBentoCard(
                     accentColor = cardAccent,
-                    cornerRadius = 18.dp,
+                    cornerRadius = SantoyaRadius.lg,
                     tintAlpha = if (isDeletedTx) 0.10f else 0.06f,
                     showWaterRipple = false,
                     modifier = Modifier.fillMaxWidth()
@@ -2458,14 +2457,14 @@ fun RiwayatTransaksiTab(
                             Spacer(modifier = Modifier.width(8.dp))
                             if (isDeletedTx) {
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = MaterialTheme.colorScheme.errorContainer,
                                     modifier = Modifier.widthIn(max = 175.dp)
                                 ) {
                                     Text(
                                         text = "DIHAPUS OLEH ${(deletedBy ?: "Karyawan").uppercase()}",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.error,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -2474,13 +2473,13 @@ fun RiwayatTransaksiTab(
                                 }
                             } else {
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
                                 ) {
                                     Text(
                                         text = detail.transaksi.status.uppercase(),
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
                                         maxLines = 1,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -2511,7 +2510,7 @@ fun RiwayatTransaksiTab(
                                     elevation = 2.dp
                                 ) {
                                     HydroGalonIcon(
-                                        tint = Color.White,
+                                        tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -2520,7 +2519,7 @@ fun RiwayatTransaksiTab(
                                     Text(
                                         text = detail.pelanggan?.nama ?: "Pelanggan Umum",
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -2539,7 +2538,7 @@ fun RiwayatTransaksiTab(
                                 Text(
                                     text = "Kurir: ${resolvedKurirName ?: "Tanpa Kurir"}",
                                     style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
+                                    fontWeight = FontWeight.Normal,
                                     color = if (resolvedKurirName != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -2558,7 +2557,7 @@ fun RiwayatTransaksiTab(
                                     style = MaterialTheme.typography.titleLarge.copy(
                                         textDecoration = if (isDeletedTx) TextDecoration.LineThrough else TextDecoration.None
                                     ),
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.Bold,
                                     color = if (isDeletedTx) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                                     minFontSize = 11.sp,
                                     textAlign = TextAlign.End
@@ -2567,13 +2566,13 @@ fun RiwayatTransaksiTab(
                                     text = when {
                                         isDeletedTx -> "Tidak dihitung ke omzet"
                                         isKasbon && detail.transaksi.uangMuka > 0L -> {
-                                            "DP: ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount())}"
+                                            "Uang Muka: ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount())}"
                                         }
                                         isKasbon -> "Belum Dibayar"
-                                        else -> detail.transaksi.metode_bayar.ifBlank { "Cash" }
+                                        else -> FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
+                                    fontWeight = FontWeight.Normal,
                                     color = when {
                                         isDeletedTx -> MaterialTheme.colorScheme.error
                                         isKasbon -> MaterialTheme.santoyaColors.warning
@@ -2777,11 +2776,10 @@ fun RiwayatTransaksiTab(
         }
     }
 
-    if (markingLunasTransaksi != null) {
-        val target = markingLunasTransaksi!!
+    markingLunasTransaksi?.let { target ->
         AlertDialog(
             onDismissRequest = { markingLunasTransaksi = null },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(SantoyaRadius.lg),
             title = {
                 Text(
                     text = "Tandai Nota Lunas?",
@@ -2803,40 +2801,40 @@ fun RiwayatTransaksiTab(
                         markingLunasTransaksi = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.santoyaColors.success
+                        containerColor = MaterialTheme.santoyaColors.success,
+                        contentColor = MaterialTheme.santoyaColors.onSuccess
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md)
                 ) {
                     Text(
                         "Tandai Lunas",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = { markingLunasTransaksi = null },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.md)
                 ) {
                     Text(
                         "Batal",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
         )
     }
 
-    if (deletingTransaksi != null) {
-        val target = deletingTransaksi!!
+    deletingTransaksi?.let { target ->
         val isAuditDeleted = KaryawanScopeHelper.isDeletedTransaksi(target.transaksi)
         val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(target.transaksi) ?: "Karyawan"
         AlertDialog(
             onDismissRequest = { deletingTransaksi = null },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(SantoyaRadius.lg),
             title = {
                 Text(
                     text = if (isAuditDeleted) "Hapus Permanen Transaksi?" else "Hapus Transaksi?",
@@ -2874,12 +2872,13 @@ fun RiwayatTransaksiTab(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md)
                 ) {
                     Text(
                         if (isAuditDeleted) "Hapus Permanen" else "Hapus",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onError
                     )
                 }
@@ -2887,20 +2886,19 @@ fun RiwayatTransaksiTab(
             dismissButton = {
                 OutlinedButton(
                     onClick = { deletingTransaksi = null },
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.md)
                 ) {
                     Text(
                         "Batal",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
         )
     }
 
-    if (editingTransaksi != null) {
-        val detail = editingTransaksi!!
+    editingTransaksi?.let { detail ->
         var editJumlah by remember(detail) { mutableStateOf(detail.transaksi.jumlah.toString()) }
         var editHarga by remember(detail) { mutableStateOf(detail.transaksi.harga_satuan.toInt().toString()) }
         var editMetode by remember(detail) { mutableStateOf(detail.transaksi.metode_bayar) }
@@ -3119,8 +3117,8 @@ fun RiwayatTransaksiTab(
                         )
                         Text(
                             text = FormatUtils.formatRupiah(previewTotalHarga),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
@@ -3137,8 +3135,8 @@ fun RiwayatTransaksiTab(
                             )
                             Text(
                                 text = FormatUtils.formatRupiah(editKomisiBreakdown.totalKomisi),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
                             )
                         }
@@ -3170,10 +3168,10 @@ fun RiwayatTransaksiTab(
                     },
                     label = {
                         Text(
-                            "Cash (Lunas)",
+                            "Tunai (Lunas)",
                             maxLines = 1,
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isCash) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isCash) FontWeight.SemiBold else FontWeight.Medium
                         )
                     },
                     modifier = Modifier.weight(1f).heightIn(min = 40.dp)
@@ -3191,7 +3189,7 @@ fun RiwayatTransaksiTab(
                             "Transfer (Lunas)",
                             maxLines = 1,
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isTransfer) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isTransfer) FontWeight.SemiBold else FontWeight.Medium
                         )
                     },
                     modifier = Modifier.weight(1f).heightIn(min = 40.dp)
@@ -3209,10 +3207,10 @@ fun RiwayatTransaksiTab(
                     },
                     label = {
                         Text(
-                            "DP Sebagian",
+                            "Bayar Sebagian",
                             maxLines = 1,
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isEditBayarSebagian) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isEditBayarSebagian) FontWeight.SemiBold else FontWeight.Medium
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
@@ -3233,7 +3231,7 @@ fun RiwayatTransaksiTab(
                             "Kasbon Penuh",
                             maxLines = 1,
                             style = MaterialTheme.typography.labelLarge,
-                            fontWeight = if (isEditKasbonPenuh) FontWeight.Bold else FontWeight.Medium
+                            fontWeight = if (isEditKasbonPenuh) FontWeight.SemiBold else FontWeight.Medium
                         )
                     },
                     colors = FilterChipDefaults.filterChipColors(
@@ -3272,7 +3270,7 @@ fun RiwayatTransaksiTab(
                                         text = "$label (${FormatUtils.formatRupiah(presetAmount.toDouble())})",
                                         maxLines = 1,
                                         style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
                                     )
                                 },
                                 modifier = Modifier.height(32.dp)
@@ -3285,8 +3283,8 @@ fun RiwayatTransaksiTab(
                 OutlinedTextField(
                     value = editUangMuka,
                     onValueChange = { editUangMuka = it.filter { c -> c.isDigit() } },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    label = { Text("Uang Muka / DP (Rp) *") },
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                    label = { Text("Uang Muka (Rp) *") },
                     isError = parsedEditDp <= 0L || parsedEditDp > previewTotalLong,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(

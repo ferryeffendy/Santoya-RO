@@ -95,9 +95,9 @@ import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
+import com.example.ui.components.SantoyaTopBarIconButton
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
-import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.HeroGlowAmber
 import com.example.ui.theme.HeroGlowAmberSoft
 import com.example.ui.theme.HeroGlowCyan
@@ -106,13 +106,12 @@ import com.example.ui.theme.HeroGlowEmerald
 import com.example.ui.theme.HeroGlowEmeraldSoft
 import com.example.ui.theme.HeroGlowRose
 import com.example.ui.theme.HeroGlowRoseSoft
-import com.example.ui.theme.SantoyaDewMint
-import com.example.ui.theme.SantoyaHydroDeepText
 import com.example.ui.theme.SantoyaLeafGreen
-import com.example.ui.theme.SantoyaMistBlue
 import com.example.ui.theme.SantoyaNavy
 import com.example.ui.theme.SantoyaNavyBorder
 import com.example.ui.theme.SantoyaNavyPanel
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.SantoyaWaterBlue
 import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
@@ -153,6 +152,7 @@ fun DashboardScreen(
     activeKaryawan: Kurir? = null,
     modifier: Modifier = Modifier
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
     val scopedTransactionsFromVm by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
     val scopedPelangganFromVm by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
     val scopedPelangganUiModelsFromVm by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
@@ -293,7 +293,7 @@ fun DashboardScreen(
                                 Text(
                                     text = "SANTOYA RO",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -318,48 +318,25 @@ fun DashboardScreen(
                                 onClick = { showSyncInfoSheet = true },
                                 modifier = Modifier.testTag("dashboard_sync_pill")
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             if (!isKaryawan) {
-                                IconButton(
+                                SantoyaTopBarIconButton(
+                                    icon = Icons.Outlined.Settings,
+                                    contentDescription = "Pengaturan",
                                     onClick = onNavigateToSettings,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.testTag("dashboard_settings_button")
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.surfaceVariant,
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                        modifier = Modifier.size(38.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Settings,
-                                                contentDescription = "Pengaturan",
-                                                tint = MaterialTheme.colorScheme.onSurface,
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                                )
                             } else if (onSignOut != null) {
-                                IconButton(
+                                SantoyaTopBarIconButton(
+                                    icon = Icons.AutoMirrored.Outlined.Logout,
+                                    contentDescription = "Keluar Akun",
                                     onClick = { showKaryawanSignOutDialog = true },
+                                    tint = MaterialTheme.colorScheme.error,
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
                                     modifier = Modifier.testTag("dashboard_karyawan_sign_out_button")
-                                ) {
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.errorContainer,
-                                        modifier = Modifier.size(38.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Icon(
-                                                imageVector = Icons.AutoMirrored.Outlined.Logout,
-                                                contentDescription = "Keluar Akun",
-                                                tint = MaterialTheme.colorScheme.error,
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                                )
                             }
                         }
                     },
@@ -370,7 +347,7 @@ fun DashboardScreen(
 
                 HorizontalDivider(
                     thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                 )
             }
         }
@@ -415,8 +392,8 @@ fun DashboardScreen(
             // 1. Solid Deep Hydro Navy Hero Card (Zero Gradient, Zero Glassmorphism, Organic Logo Curve)
             item {
                 Card(
-                    shape = RoundedCornerShape(20.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.xl),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                     colors = CardDefaults.cardColors(containerColor = SantoyaNavy),
                     border = BorderStroke(1.dp, SantoyaNavyBorder),
                     modifier = Modifier
@@ -437,7 +414,7 @@ fun DashboardScreen(
                                 }
                                 drawPath(
                                     path = curve1,
-                                    color = Color.White.copy(alpha = 0.24f),
+                                    color = santoyaColors.onHero.copy(alpha = 0.24f),
                                     style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
                                 )
                                 val curve2 = Path().apply {
@@ -481,17 +458,17 @@ fun DashboardScreen(
                                         Text(
                                             text = if (isKaryawan) "SETORAN TUNAI HARI INI" else "PENDAPATAN TUNAI HARI INI",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             letterSpacing = 0.7.sp,
-                                            color = Color.White.copy(alpha = 0.78f)
+                                            color = santoyaColors.onHero.copy(alpha = 0.78f)
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                     SantoyaAdaptiveCurrencyText(
                                         amount = if (isKaryawan) karyawanMetrics.setoranTunaiHariIni else pendapatanLunasHariIni,
                                         style = MaterialTheme.typography.headlineLarge,
-                                        fontWeight = FontWeight.Black,
-                                        color = Color.White,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = santoyaColors.onHero,
                                         minFontSize = 18.sp,
                                         modifier = Modifier.fillMaxWidth()
                                     )
@@ -509,8 +486,8 @@ fun DashboardScreen(
                                         Text(
                                             text = FormatUtils.formatDateUi(System.currentTimeMillis()),
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White,
+                                            fontWeight = FontWeight.Medium,
+                                            color = santoyaColors.onHero,
                                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                         )
                                     }
@@ -523,8 +500,8 @@ fun DashboardScreen(
                                             Text(
                                                 text = effectiveActiveKaryawan.nama,
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = santoyaColors.onHero,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis,
                                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
@@ -549,7 +526,7 @@ fun DashboardScreen(
                                                 viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
                                                 onNavigateToLaporan()
                                             }),
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(SantoyaRadius.lg),
                                         color = SantoyaNavyPanel,
                                         border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
@@ -567,7 +544,7 @@ fun DashboardScreen(
                                                         Icon(
                                                             imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
                                                             contentDescription = null,
-                                                            tint = Color.White,
+                                                            tint = santoyaColors.onHero,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -577,8 +554,8 @@ fun DashboardScreen(
                                                     text = "LABA BERSIH",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.78f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -586,7 +563,7 @@ fun DashboardScreen(
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = labaBersihHariIni,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Black,
+                                                fontWeight = FontWeight.Bold,
                                                 color = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
                                                 minFontSize = 11.sp,
                                                 modifier = Modifier.fillMaxWidth()
@@ -595,7 +572,7 @@ fun DashboardScreen(
                                                 text = "Kas masuk dikurangi biaya & komisi",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                color = Color.White.copy(alpha = 0.65f),
+                                                color = santoyaColors.onHero.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -610,7 +587,7 @@ fun DashboardScreen(
                                                 viewModel.setPelangganTab(1)
                                                 onNavigateToPelanggan()
                                             }),
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(SantoyaRadius.lg),
                                         color = SantoyaNavyPanel,
                                         border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
@@ -628,7 +605,7 @@ fun DashboardScreen(
                                                         Icon(
                                                             imageVector = Icons.Outlined.HourglassEmpty,
                                                             contentDescription = null,
-                                                            tint = Color.White,
+                                                            tint = santoyaColors.onHero,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -638,8 +615,8 @@ fun DashboardScreen(
                                                     text = "TOTAL PIUTANG",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.78f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -647,7 +624,7 @@ fun DashboardScreen(
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = totalPiutangAktif,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Black,
+                                                fontWeight = FontWeight.Bold,
                                                 color = HeroGlowAmberSoft,
                                                 minFontSize = 11.sp,
                                                 modifier = Modifier.fillMaxWidth()
@@ -656,7 +633,7 @@ fun DashboardScreen(
                                                 text = "Cek daftar kasbon →",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                color = Color.White.copy(alpha = 0.65f),
+                                                color = santoyaColors.onHero.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -667,7 +644,7 @@ fun DashboardScreen(
                                 // Bottom Section (Pemilik): Solid Production Volume & Monthly Projection Bar
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.lg),
                                     color = SantoyaNavyPanel,
                                     border = BorderStroke(1.dp, SantoyaNavyBorder)
                                 ) {
@@ -689,7 +666,7 @@ fun DashboardScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(10.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                                 color = SantoyaWaterBlue,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -697,7 +674,7 @@ fun DashboardScreen(
                                                     Icon(
                                                         imageVector = Icons.Outlined.WaterDrop,
                                                         contentDescription = null,
-                                                        tint = Color.White,
+                                                        tint = santoyaColors.onHero,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
@@ -708,17 +685,17 @@ fun DashboardScreen(
                                                     text = "GALON HARI INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Row(verticalAlignment = Alignment.Bottom) {
                                                     Text(
                                                         text = FormatUtils.formatNumber(totalGalonHariIni),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Black,
-                                                        color = Color.White,
+                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = santoyaColors.onHero,
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         overflow = TextOverflow.Ellipsis,
@@ -728,8 +705,8 @@ fun DashboardScreen(
                                                     Text(
                                                         text = "Galon",
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
@@ -758,7 +735,7 @@ fun DashboardScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(10.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                                 color = SantoyaLeafGreen,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -766,7 +743,7 @@ fun DashboardScreen(
                                                     Icon(
                                                         imageVector = Icons.Outlined.AutoGraph,
                                                         contentDescription = null,
-                                                        tint = Color.White,
+                                                        tint = santoyaColors.onHero,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
@@ -777,16 +754,16 @@ fun DashboardScreen(
                                                     text = "ESTIMASI BULAN INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Row(verticalAlignment = Alignment.Bottom) {
                                                     Text(
                                                         text = FormatUtils.formatNumber(estimasiGalonBulanIni),
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Black,
+                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                                                        fontWeight = FontWeight.Bold,
                                                         color = HeroGlowEmeraldSoft,
                                                         maxLines = 1,
                                                         softWrap = false,
@@ -797,8 +774,8 @@ fun DashboardScreen(
                                                     Text(
                                                         text = "Galon",
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
@@ -822,7 +799,7 @@ fun DashboardScreen(
                                                 viewModel.setTransaksiTab(1)
                                                 onNavigateToTransaksi()
                                             }),
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(SantoyaRadius.lg),
                                         color = SantoyaNavyPanel,
                                         border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
@@ -840,7 +817,7 @@ fun DashboardScreen(
                                                         Icon(
                                                             imageVector = Icons.Outlined.WaterDrop,
                                                             contentDescription = null,
-                                                            tint = Color.White,
+                                                            tint = santoyaColors.onHero,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -850,8 +827,8 @@ fun DashboardScreen(
                                                     text = "KOMISI HARI INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.78f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -859,7 +836,7 @@ fun DashboardScreen(
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = karyawanMetrics.komisiHariIni,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Black,
+                                                fontWeight = FontWeight.Bold,
                                                 color = HeroGlowEmeraldSoft,
                                                 minFontSize = 11.sp,
                                                 modifier = Modifier.fillMaxWidth()
@@ -868,8 +845,8 @@ fun DashboardScreen(
                                                 text = "${karyawanMetrics.galonHariIni} Galon • ${karyawanMetrics.pesananHariIni} Order",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.75f),
+                                                fontWeight = FontWeight.Medium,
+                                                color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -884,7 +861,7 @@ fun DashboardScreen(
                                                 viewModel.setTransaksiTab(1)
                                                 onNavigateToTransaksi()
                                             }),
-                                        shape = RoundedCornerShape(16.dp),
+                                        shape = RoundedCornerShape(SantoyaRadius.lg),
                                         color = SantoyaNavyPanel,
                                         border = BorderStroke(1.dp, SantoyaNavyBorder)
                                     ) {
@@ -902,7 +879,7 @@ fun DashboardScreen(
                                                         Icon(
                                                             imageVector = Icons.Outlined.AutoGraph,
                                                             contentDescription = null,
-                                                            tint = Color.White,
+                                                            tint = santoyaColors.onHero,
                                                             modifier = Modifier.size(14.dp)
                                                         )
                                                     }
@@ -912,8 +889,8 @@ fun DashboardScreen(
                                                     text = "KOMISI BULAN INI",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.78f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
@@ -921,7 +898,7 @@ fun DashboardScreen(
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = karyawanMetrics.komisiBulanIni,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Black,
+                                                fontWeight = FontWeight.Bold,
                                                 color = HeroGlowCyanSoft,
                                                 minFontSize = 11.sp,
                                                 modifier = Modifier.fillMaxWidth()
@@ -930,8 +907,8 @@ fun DashboardScreen(
                                                 text = "${karyawanMetrics.galonBulanIni} Galon • ${karyawanMetrics.pesananBulanIni} Order",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 10.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = Color.White.copy(alpha = 0.75f),
+                                                fontWeight = FontWeight.Medium,
+                                                color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -942,7 +919,7 @@ fun DashboardScreen(
                                 // Bottom Section (Karyawan): Piutang Pelanggan Saya & Total Pelanggan Saya
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.lg),
                                     color = SantoyaNavyPanel,
                                     border = BorderStroke(1.dp, SantoyaNavyBorder)
                                 ) {
@@ -963,7 +940,7 @@ fun DashboardScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(10.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                                 color = HeroGlowAmber,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -971,7 +948,7 @@ fun DashboardScreen(
                                                     Icon(
                                                         imageVector = Icons.Outlined.HourglassEmpty,
                                                         contentDescription = null,
-                                                        tint = Color.White,
+                                                        tint = santoyaColors.onHero,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
@@ -982,15 +959,15 @@ fun DashboardScreen(
                                                     text = "PIUTANG PELANGGAN",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 SantoyaAdaptiveCurrencyText(
                                                     amount = totalPiutangAktif,
                                                     style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Black,
+                                                    fontWeight = FontWeight.Bold,
                                                     color = HeroGlowAmberSoft,
                                                     minFontSize = 11.sp,
                                                     modifier = Modifier.fillMaxWidth()
@@ -1016,7 +993,7 @@ fun DashboardScreen(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(10.dp),
+                                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                                 color = HeroGlowCyan,
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -1024,7 +1001,7 @@ fun DashboardScreen(
                                                     Icon(
                                                         imageVector = Icons.Outlined.People,
                                                         contentDescription = null,
-                                                        tint = Color.White,
+                                                        tint = santoyaColors.onHero,
                                                         modifier = Modifier.size(18.dp)
                                                     )
                                                 }
@@ -1035,17 +1012,17 @@ fun DashboardScreen(
                                                     text = "PELANGGAN SAYA",
                                                     style = MaterialTheme.typography.labelSmall,
                                                     fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = Color.White.copy(alpha = 0.72f),
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Row(verticalAlignment = Alignment.Bottom) {
                                                     Text(
                                                         text = "${effectivePelangganList.size}",
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        fontWeight = FontWeight.Black,
-                                                        color = Color.White,
+                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = santoyaColors.onHero,
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         overflow = TextOverflow.Ellipsis,
@@ -1055,8 +1032,8 @@ fun DashboardScreen(
                                                     Text(
                                                         text = "Orang",
                                                         style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = Color.White.copy(alpha = 0.75f),
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                         maxLines = 1,
                                                         softWrap = false,
                                                         modifier = Modifier.padding(bottom = 2.dp)
@@ -1076,10 +1053,9 @@ fun DashboardScreen(
             if (crmJadwalCustomers.isNotEmpty()) {
                 item {
                     val overdueCount = crmJadwalCustomers.count { it.crmPrediction.status == CrmOrderStatus.OVERDUE }
-                    val santoyaColors = MaterialTheme.santoyaColors
                     HydroBentoCard(
                         accentColor = santoyaColors.warning,
-                        cornerRadius = 18.dp,
+                        cornerRadius = SantoyaRadius.lg,
                         tintAlpha = 0.14f,
                         onClick = {
                             viewModel.setPelangganTab(2) // Tab Jadwal
@@ -1101,12 +1077,12 @@ fun DashboardScreen(
                                 HydroGradientBadge(
                                     gradientColors = listOf(AccentAmber, santoyaColors.warning),
                                     size = 38.dp,
-                                    cornerRadius = 12.dp
+                                    cornerRadius = SantoyaRadius.md
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.NotificationsActive,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -1115,7 +1091,7 @@ fun DashboardScreen(
                                     Text(
                                         text = "${crmJadwalCustomers.size} Pelanggan Perlu Pengingat",
                                         style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -1136,7 +1112,7 @@ fun DashboardScreen(
                             }
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                 color = santoyaColors.warningContainer,
                                 border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.35f))
                             ) {
@@ -1160,14 +1136,13 @@ fun DashboardScreen(
                     val overdueCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.TERLAMBAT }
                     val dueTodayCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.HARI_INI }
                     val soonCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.MENDEKATI }
-                    val santoyaColors = MaterialTheme.santoyaColors
                     val alertColor = if (overdueCount > 0) MaterialTheme.colorScheme.error else santoyaColors.warning
                     val alertContainer = if (overdueCount > 0) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
                     val alertOnContainer = if (overdueCount > 0) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
 
                     HydroBentoCard(
                         accentColor = alertColor,
-                        cornerRadius = 18.dp,
+                        cornerRadius = SantoyaRadius.lg,
                         tintAlpha = 0.12f,
                         onClick = onNavigateToPerawatan,
                         modifier = Modifier
@@ -1192,12 +1167,12 @@ fun DashboardScreen(
                                     HydroGradientBadge(
                                         gradientColors = listOf(alertColor, AccentCyan),
                                         size = 38.dp,
-                                        cornerRadius = 12.dp
+                                        cornerRadius = SantoyaRadius.md
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Build,
                                             contentDescription = null,
-                                            tint = Color.White,
+                                            tint = santoyaColors.onHero,
                                             modifier = Modifier.size(19.dp)
                                         )
                                     }
@@ -1206,7 +1181,7 @@ fun DashboardScreen(
                                         Text(
                                             text = "Perawatan Mesin RO (${effectivePerawatanReminders.size})",
                                             style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -1220,7 +1195,7 @@ fun DashboardScreen(
                                             text = statusSummary,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = alertColor,
-                                            fontWeight = FontWeight.SemiBold,
+                                            fontWeight = FontWeight.Medium,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1228,7 +1203,7 @@ fun DashboardScreen(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = alertContainer,
                                     border = BorderStroke(1.dp, alertColor.copy(alpha = 0.35f)),
                                     modifier = Modifier.testTag("btn_dashboard_perawatan_reminder")
@@ -1240,7 +1215,7 @@ fun DashboardScreen(
                                         Text(
                                             text = "Kelola",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = alertOnContainer
                                         )
                                         Spacer(modifier = Modifier.width(4.dp))
@@ -1257,7 +1232,6 @@ fun DashboardScreen(
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 effectivePerawatanReminders.take(3).forEach { eval ->
                                     val isLate = eval.status == PerawatanStatus.TERLAMBAT
-                                    val pillColor = if (isLate) MaterialTheme.colorScheme.error else santoyaColors.warning
                                     val pillBg = if (isLate) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
                                     val pillFg = if (isLate) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
                                     Row(
@@ -1268,7 +1242,7 @@ fun DashboardScreen(
                                         Text(
                                             text = "• ${eval.item.nama}",
                                             style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium,
+                                            fontWeight = FontWeight.Normal,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -1276,13 +1250,13 @@ fun DashboardScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Surface(
-                                            shape = RoundedCornerShape(6.dp),
+                                            shape = RoundedCornerShape(SantoyaRadius.xs),
                                             color = pillBg
                                         ) {
                                             Text(
                                                 text = PerawatanScheduler.formatStatusBadge(eval),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Bold,
+                                                fontWeight = FontWeight.SemiBold,
                                                 color = pillFg,
                                                 maxLines = 1,
                                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
@@ -1323,8 +1297,8 @@ fun DashboardScreen(
                         title = "Transaksi",
                         subtitle = "Catat penjualan galon, pengantaran & pembayaran",
                         badgeTag = "+ Nota Baru",
-                        surfaceTint = SantoyaMistBlue,
-                        accentColor = SantoyaWaterBlue,
+                        surfaceTint = MaterialTheme.colorScheme.primaryContainer,
+                        accentColor = MaterialTheme.colorScheme.primary,
                         testTag = "nav_transaksi_button",
                         onClick = {
                             viewModel.setTransaksiTab(0)
@@ -1333,8 +1307,8 @@ fun DashboardScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         HydroGalonIcon(
-                            tint = SantoyaWaterBlue,
-                            leafAccent = SantoyaLeafGreen,
+                            tint = MaterialTheme.colorScheme.primary,
+                            leafAccent = santoyaColors.success,
                             modifier = Modifier.size(26.dp)
                         )
                     }
@@ -1353,8 +1327,8 @@ fun DashboardScreen(
                                     .fillMaxHeight(),
                                 title = "Pelanggan",
                                 subtitle = "${effectivePelangganList.size} Profil & Kasbon",
-                                iconContainerColor = SantoyaDewMint,
-                                accentColor = SantoyaLeafGreen,
+                                iconContainerColor = santoyaColors.successContainer,
+                                accentColor = santoyaColors.success,
                                 testTag = "nav_pelanggan_button",
                                 onClick = {
                                     viewModel.setPelangganTab(0)
@@ -1362,8 +1336,8 @@ fun DashboardScreen(
                                 }
                             ) {
                                 HydroCustomerDropIcon(
-                                    tint = SantoyaLeafGreen,
-                                    waterAccent = SantoyaWaterBlue,
+                                    tint = santoyaColors.success,
+                                    waterAccent = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(21.dp)
                                 )
                             }
@@ -1392,15 +1366,15 @@ fun DashboardScreen(
                             title = "Laporan",
                             subtitle = "Evaluasi omzet, komisi kurir & laba bersih",
                             badgeTag = "Analitik",
-                            iconContainerColor = SantoyaMistBlue,
-                            accentColor = SantoyaWaterBlue,
+                            iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            accentColor = MaterialTheme.colorScheme.primary,
                             testTag = "nav_laporan_button",
                             onClick = onNavigateToLaporan,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             HydroReportChartIcon(
-                                tint = SantoyaWaterBlue,
-                                leafAccent = SantoyaLeafGreen,
+                                tint = MaterialTheme.colorScheme.primary,
+                                leafAccent = santoyaColors.success,
                                 modifier = Modifier.size(23.dp)
                             )
                         }
@@ -1410,8 +1384,8 @@ fun DashboardScreen(
                             title = "Pelanggan",
                             subtitle = "${effectivePelangganList.size} Profil pelanggan & catatan kasbon",
                             badgeTag = "Data Pelanggan",
-                            iconContainerColor = SantoyaDewMint,
-                            accentColor = SantoyaLeafGreen,
+                            iconContainerColor = santoyaColors.successContainer,
+                            accentColor = santoyaColors.success,
                             testTag = "nav_pelanggan_button",
                             onClick = {
                                 viewModel.setPelangganTab(0)
@@ -1420,8 +1394,8 @@ fun DashboardScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             HydroCustomerDropIcon(
-                                tint = SantoyaLeafGreen,
-                                waterAccent = SantoyaWaterBlue,
+                                tint = santoyaColors.success,
+                                waterAccent = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(23.dp)
                             )
                         }
@@ -1448,7 +1422,7 @@ fun DashboardScreen(
                     )
                     if (effectiveTransaksiList.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
                             color = MaterialTheme.colorScheme.primaryContainer,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                             modifier = Modifier.pressClickEffect(onClick = {
@@ -1463,7 +1437,7 @@ fun DashboardScreen(
                                 Text(
                                     text = "Lihat Semua",
                                     style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -1511,8 +1485,7 @@ fun DashboardScreen(
                     val metodeDisplay = if (isKasbon) {
                         "Belum dibayar"
                     } else {
-                        val m = detail.transaksi.metode_bayar.trim()
-                        if (m.isBlank() || m == "-") "Cash" else m
+                        FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
                     }
                     val subInfoParts = mutableListOf("${detail.transaksi.jumlah} Galon", metodeDisplay)
                     if (detail.kurir != null) {
@@ -1522,12 +1495,11 @@ fun DashboardScreen(
                         subInfoParts.add(FormatUtils.formatDateUi(detail.transaksi.tanggal))
                     }
 
-                    val santoyaColors = MaterialTheme.santoyaColors
-                    val statusAccent = if (isKasbon) santoyaColors.warning else SantoyaLeafGreen
+                    val statusAccent = if (isKasbon) santoyaColors.warning else santoyaColors.success
 
                     HydroBentoCard(
                         accentColor = statusAccent,
-                        cornerRadius = 16.dp,
+                        cornerRadius = SantoyaRadius.lg,
                         tintAlpha = 0.05f,
                         showWaterRipple = false,
                         modifier = Modifier.fillMaxWidth()
@@ -1552,18 +1524,18 @@ fun DashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (isKasbon) santoyaColors.warningContainer else SantoyaMistBlue,
+                                    shape = RoundedCornerShape(SantoyaRadius.md),
+                                    color = if (isKasbon) santoyaColors.warningContainer else MaterialTheme.colorScheme.primaryContainer,
                                     border = BorderStroke(
                                         1.dp,
-                                        if (isKasbon) santoyaColors.warning.copy(alpha = 0.35f) else SantoyaWaterBlue.copy(alpha = 0.3f)
+                                        if (isKasbon) santoyaColors.warning.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                                     ),
                                     modifier = Modifier.size(38.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         HydroGalonIcon(
-                                            tint = if (isKasbon) santoyaColors.warning else SantoyaWaterBlue,
-                                            leafAccent = if (isKasbon) santoyaColors.warning else SantoyaLeafGreen,
+                                            tint = if (isKasbon) santoyaColors.warning else MaterialTheme.colorScheme.primary,
+                                            leafAccent = if (isKasbon) santoyaColors.warning else santoyaColors.success,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -1574,7 +1546,7 @@ fun DashboardScreen(
                                         Text(
                                             text = detail.pelanggan?.nama ?: "Pelanggan Umum",
                                             style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
@@ -1582,15 +1554,15 @@ fun DashboardScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Surface(
-                                            shape = RoundedCornerShape(6.dp),
-                                            color = if (isKasbon) santoyaColors.warningContainer else SantoyaDewMint
+                                            shape = RoundedCornerShape(SantoyaRadius.xs),
+                                            color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
                                         ) {
                                             Text(
                                                 text = detail.transaksi.status.uppercase(),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 9.5.sp,
-                                                fontWeight = FontWeight.ExtraBold,
-                                                color = if (isKasbon) santoyaColors.onWarningContainer else SantoyaLeafGreen,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                                 maxLines = 1
                                             )
@@ -1611,7 +1583,7 @@ fun DashboardScreen(
                                 SantoyaAdaptiveCurrencyText(
                                     amount = detail.transaksi.total_harga,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     minFontSize = 11.sp,
                                     textAlign = TextAlign.End,
@@ -1632,17 +1604,17 @@ fun DashboardScreen(
                                             )
                                         )
                                     },
-                                    modifier = Modifier.size(44.dp)
+                                    modifier = Modifier.size(SantoyaSize.touchTarget)
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = SantoyaMistBlue,
-                                        border = BorderStroke(1.dp, SantoyaWaterBlue.copy(alpha = 0.25f)),
+                                        shape = RoundedCornerShape(SantoyaRadius.sm),
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                                         modifier = Modifier.size(34.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             HydroReceiptNoteIcon(
-                                                tint = SantoyaWaterBlue,
+                                                tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(17.dp)
                                             )
                                         }
@@ -1720,10 +1692,12 @@ private fun EditorialPrimaryWideBentoCard(
     modifier: Modifier = Modifier,
     iconContent: @Composable () -> Unit
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
+    val onContainerColor = MaterialTheme.colorScheme.onPrimaryContainer
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(SantoyaRadius.xl),
         color = surfaceTint,
-        border = BorderStroke(1.2.dp, accentColor.copy(alpha = 0.42f)),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.42f)),
         shadowElevation = 0.dp,
         modifier = modifier
             .testTag(testTag)
@@ -1741,7 +1715,7 @@ private fun EditorialPrimaryWideBentoCard(
                     }
                     drawPath(
                         path = leafArc,
-                        color = SantoyaLeafGreen.copy(alpha = 0.16f),
+                        color = santoyaColors.success.copy(alpha = 0.16f),
                         style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
                     )
                 }
@@ -1754,8 +1728,8 @@ private fun EditorialPrimaryWideBentoCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = Color.White,
+                    shape = RoundedCornerShape(SantoyaRadius.lg),
+                    color = MaterialTheme.colorScheme.surface,
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
                     modifier = Modifier.size(48.dp)
                 ) {
@@ -1768,8 +1742,8 @@ private fun EditorialPrimaryWideBentoCard(
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = SantoyaHydroDeepText,
+                        fontWeight = FontWeight.Bold,
+                        color = onContainerColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1777,7 +1751,7 @@ private fun EditorialPrimaryWideBentoCard(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = SantoyaHydroDeepText.copy(alpha = 0.78f),
+                        color = onContainerColor.copy(alpha = 0.78f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -1791,8 +1765,8 @@ private fun EditorialPrimaryWideBentoCard(
                 Text(
                     text = badgeTag,
                     style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     maxLines = 1,
                     modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
                 )
@@ -1818,7 +1792,7 @@ private fun EditorialCompactHorizontalBentoCard(
 ) {
     HydroBentoCard(
         accentColor = accentColor,
-        cornerRadius = 18.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.04f,
         showWaterRipple = true,
         onClick = onClick,
@@ -1831,7 +1805,7 @@ private fun EditorialCompactHorizontalBentoCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(SantoyaRadius.md),
                 color = iconContainerColor,
                 border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
                 modifier = Modifier.size(40.dp)
@@ -1850,7 +1824,7 @@ private fun EditorialCompactHorizontalBentoCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1885,9 +1859,10 @@ private fun EditorialFullBannerBentoCard(
     modifier: Modifier = Modifier,
     iconContent: @Composable () -> Unit
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
     HydroBentoCard(
         accentColor = accentColor,
-        cornerRadius = 18.dp,
+        cornerRadius = SantoyaRadius.lg,
         tintAlpha = 0.05f,
         showWaterRipple = true,
         onClick = onClick,
@@ -1905,7 +1880,7 @@ private fun EditorialFullBannerBentoCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     color = iconContainerColor,
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
                     modifier = Modifier.size(42.dp)
@@ -1920,23 +1895,23 @@ private fun EditorialFullBannerBentoCard(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = SantoyaDewMint,
-                            border = BorderStroke(1.dp, SantoyaLeafGreen.copy(alpha = 0.3f))
+                            shape = RoundedCornerShape(SantoyaRadius.xs),
+                            color = santoyaColors.successContainer,
+                            border = BorderStroke(1.dp, santoyaColors.success.copy(alpha = 0.3f))
                         ) {
                             Text(
                                 text = badgeTag,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 9.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SantoyaLeafGreen,
+                                fontWeight = FontWeight.SemiBold,
+                                color = santoyaColors.onSuccessContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                 maxLines = 1
                             )

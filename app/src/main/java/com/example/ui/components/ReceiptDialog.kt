@@ -49,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -59,15 +58,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.data.entity.Pelanggan
-import com.example.ui.theme.PrimaryContainerLight
-import com.example.ui.theme.PrimaryLight
-import com.example.ui.theme.SuccessContainerLight
-import com.example.ui.theme.SuccessLight
-import com.example.ui.theme.WarningContainerLight
-import com.example.ui.theme.WarningLight
-import com.example.ui.theme.santoyaColors
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.SantoyaReceiptHelper
 import com.example.viewmodel.ActiveReceiptDialog
@@ -122,7 +116,7 @@ private fun extractReceiptUi(dialogData: ActiveReceiptDialog): ParsedReceiptUi {
                 ),
                 totalLabel = "TOTAL BELANJA",
                 totalValue = totalStr,
-                metodeBayar = trx.metode_bayar,
+                metodeBayar = FormatUtils.formatMetodeBayarLabel(trx.metode_bayar),
                 statusNota = trx.status.uppercase(),
                 sisaKasbon = parsedSisaKasbon
             )
@@ -216,7 +210,9 @@ private fun extractReceiptUi(dialogData: ActiveReceiptDialog): ParsedReceiptUi {
                 totalLabel = "TOTAL BAYAR"
                 totalValue = line.substringAfter("Nominal Bayar:").trim()
             }
-            line.startsWith("Metode Bayar:") -> metodeBayar = line.substringAfter("Metode Bayar:").trim()
+            line.startsWith("Metode Bayar:") -> {
+                metodeBayar = FormatUtils.formatMetodeBayarLabel(line.substringAfter("Metode Bayar:").trim())
+            }
             line.startsWith("Status Nota:") -> statusNota = line.substringAfter("Status Nota:").trim()
             line.startsWith("Status:") -> statusNota = line.substringAfter("Status:").trim()
             dashSection == 1 -> itemBuffer.add(line)
@@ -288,7 +284,7 @@ fun ReceiptDialog(
                     Text(
                         text = dialogData.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "Pratinjau & Cetak Struk",
@@ -310,14 +306,14 @@ fun ReceiptDialog(
             ) {
                 ReceiptPreviewCard(receipt = parsedReceipt)
 
-                if (printStatus != null) {
+                printStatus?.let { status ->
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
                         color = MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = printStatus!!,
+                            text = status,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -339,7 +335,7 @@ fun ReceiptDialog(
                             startBluetoothPrint()
                         }
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -350,7 +346,7 @@ fun ReceiptDialog(
                     Text(
                         text = "Cetak Struk (Bluetooth)",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         lineHeight = 18.sp
                     )
@@ -364,7 +360,7 @@ fun ReceiptDialog(
                             phoneNumber = dialogData.customerPhone
                         )
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
                     colors = ButtonDefaults.filledTonalButtonColors(
                         containerColor = MaterialTheme.santoyaColors.successContainer,
@@ -379,7 +375,7 @@ fun ReceiptDialog(
                     Text(
                         text = "Kirim Gambar ke WhatsApp",
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         lineHeight = 18.sp
                     )
@@ -393,7 +389,7 @@ fun ReceiptDialog(
                             phoneNumber = dialogData.customerPhone
                         )
                     },
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.md),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -418,12 +414,13 @@ fun ReceiptDialog(
 @Composable
 private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
     val isLunas = receipt.statusNota.contains("LUNAS", ignoreCase = true)
+    val santoyaColors = MaterialTheme.santoyaColors
 
     Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+        shape = RoundedCornerShape(SantoyaRadius.md),
+        colors = CardDefaults.cardColors(containerColor = santoyaColors.receiptSurface),
+        border = BorderStroke(1.dp, santoyaColors.receiptDivider),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("receipt_preview_card")
@@ -436,12 +433,12 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
         ) {
             Surface(
                 shape = CircleShape,
-                color = PrimaryContainerLight,
+                color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     HydroDropletSparkIcon(
-                        tint = PrimaryLight,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -452,22 +449,22 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
             Text(
                 text = "SANTOYA RO",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.Black,
+                fontWeight = FontWeight.Bold,
+                color = santoyaColors.receiptOnSurface,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = receipt.subtitle1,
                 style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF475569),
+                fontWeight = FontWeight.Medium,
+                color = santoyaColors.receiptMuted,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = receipt.subtitle2,
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
+                color = santoyaColors.receiptMuted,
                 textAlign = TextAlign.Center
             )
 
@@ -495,14 +492,14 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                         Text(
                             text = "Alamat",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.DarkGray
+                            color = santoyaColors.receiptMuted
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
                             text = receipt.alamat,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color.Black,
+                            color = santoyaColors.receiptOnSurface,
                             textAlign = TextAlign.End,
                             modifier = Modifier.weight(1f)
                         )
@@ -528,8 +525,8 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                             Text(
                                 text = item.name,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Black
+                                fontWeight = FontWeight.SemiBold,
+                                color = santoyaColors.receiptOnSurface
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -538,14 +535,14 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                             ) {
                                 Text(
                                     text = item.qtyPrice,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.DarkGray
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                                    color = santoyaColors.receiptMuted
                                 )
                                 Text(
                                     text = item.subtotal,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Black
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = santoyaColors.receiptOnSurface
                                 )
                             }
                         }
@@ -558,7 +555,10 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF4F7FB), RoundedCornerShape(10.dp))
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        RoundedCornerShape(SantoyaRadius.sm)
+                    )
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -566,15 +566,15 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 Text(
                     text = receipt.totalLabel,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
+                    fontWeight = FontWeight.SemiBold,
+                    color = santoyaColors.receiptOnSurface,
                     modifier = Modifier.padding(end = 8.dp)
                 )
                 Text(
                     text = receipt.totalValue,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF0052CC),
+                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
                     softWrap = false,
                     modifier = Modifier.weight(1f),
@@ -600,17 +600,17 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                     Text(
                         text = "Status Nota",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.DarkGray
+                        color = santoyaColors.receiptMuted
                     )
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isLunas) SuccessContainerLight else WarningContainerLight
+                        shape = RoundedCornerShape(SantoyaRadius.xs),
+                        color = if (isLunas) santoyaColors.successContainer else santoyaColors.warningContainer
                     ) {
                         Text(
                             text = receipt.statusNota,
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isLunas) SuccessLight else WarningLight,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isLunas) santoyaColors.onSuccessContainer else santoyaColors.onWarningContainer,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -629,13 +629,13 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 text = "Terima Kasih",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.Gray,
+                color = santoyaColors.receiptMuted,
                 textAlign = TextAlign.Center
             )
             Text(
                 text = "Santoya RO Siap Antar",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray,
+                color = santoyaColors.receiptMuted,
                 textAlign = TextAlign.Center
             )
         }
@@ -644,13 +644,14 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
 
 @Composable
 private fun ReceiptDashedDivider(modifier: Modifier = Modifier) {
+    val dividerColor = MaterialTheme.santoyaColors.receiptDivider
     Canvas(
         modifier = modifier
             .fillMaxWidth()
             .height(1.dp)
     ) {
         drawLine(
-            color = Color(0xFFCBD5E1),
+            color = dividerColor,
             start = Offset(0f, 0f),
             end = Offset(size.width, 0f),
             strokeWidth = 2f,
@@ -664,6 +665,7 @@ private fun ReceiptInfoRow(
     label: String,
     value: String
 ) {
+    val santoyaColors = MaterialTheme.santoyaColors
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -672,7 +674,7 @@ private fun ReceiptInfoRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
-            color = Color.DarkGray,
+            color = santoyaColors.receiptMuted,
             maxLines = 1
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -680,7 +682,7 @@ private fun ReceiptInfoRow(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
-            color = Color.Black,
+            color = santoyaColors.receiptOnSurface,
             textAlign = TextAlign.End,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,

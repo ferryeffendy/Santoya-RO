@@ -95,19 +95,15 @@ import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
-import com.example.ui.theme.HeroDeficitEnd
-import com.example.ui.theme.HeroDeficitMid
 import com.example.ui.theme.HeroDeficitPanel
 import com.example.ui.theme.HeroDeficitStart
 import com.example.ui.theme.HeroGlowAmberSoft
 import com.example.ui.theme.HeroGlowEmeraldSoft
 import com.example.ui.theme.HeroGlowRoseSoft
-import com.example.ui.theme.HeroGradientEnd
-import com.example.ui.theme.HeroGradientMid
 import com.example.ui.theme.HeroGradientStart
 import com.example.ui.theme.SantoyaNavyBorder
 import com.example.ui.theme.SantoyaNavyPanel
-import com.example.ui.theme.RankSilverLight
+import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
@@ -367,7 +363,7 @@ fun LaporanScreen(
             item {
                 HydroBentoCard(
                     accentColor = MaterialTheme.colorScheme.primary,
-                    cornerRadius = 20.dp,
+                    cornerRadius = SantoyaRadius.xl,
                     tintAlpha = 0.07f,
                     showWaterRipple = true,
                     modifier = Modifier.fillMaxWidth()
@@ -391,7 +387,7 @@ fun LaporanScreen(
                                     Icon(
                                         imageVector = Icons.Outlined.CalendarToday,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(17.dp)
                                     )
                                 }
@@ -399,7 +395,7 @@ fun LaporanScreen(
                                 Text(
                                     text = "Periode Laporan",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -410,7 +406,7 @@ fun LaporanScreen(
 
                             Surface(
                                 onClick = { openCustomDateRangePicker() },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                 color = if (isCustomDateRange) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
@@ -435,7 +431,7 @@ fun LaporanScreen(
                                     Text(
                                         text = "Kalender",
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = if (isCustomDateRange) {
                                             MaterialTheme.colorScheme.onPrimary
                                         } else {
@@ -470,7 +466,7 @@ fun LaporanScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Surface(
-                                shape = RoundedCornerShape(6.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.xs),
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                             ) {
@@ -485,8 +481,8 @@ fun LaporanScreen(
                                     )
                                     Text(
                                         text = "${filteredTx.sumOf { it.transaksi.jumlah }} Galon",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         softWrap = false
@@ -582,12 +578,13 @@ fun LaporanScreen(
                     val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else HeroDeficitPanel
                     val heroBorderColor = if (isProfit) SantoyaNavyBorder else HeroGlowRoseSoft.copy(alpha = 0.45f)
                     val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
+                    val onHero = MaterialTheme.santoyaColors.onHero
                     val formattedMargin = FormatUtils.formatPercent(marginLabaPersen)
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(SantoyaRadius.xl),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                         colors = CardDefaults.cardColors(containerColor = heroContainerColor),
                         border = BorderStroke(1.dp, heroBorderColor)
                     ) {
@@ -605,7 +602,7 @@ fun LaporanScreen(
                                     }
                                     drawPath(
                                         path = curve1,
-                                        color = Color.White.copy(alpha = 0.24f),
+                                        color = onHero.copy(alpha = 0.24f),
                                         style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
                                     )
                                     val curve2 = Path().apply {
@@ -641,7 +638,7 @@ fun LaporanScreen(
                                         elevation = 3.dp
                                     ) {
                                         HydroReportChartIcon(
-                                            tint = Color.White,
+                                            tint = onHero,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -650,7 +647,7 @@ fun LaporanScreen(
                                         Text(
                                             text = if (isProfit) "LABA BERSIH" else "RUGI BERSIH",
                                             style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.ExtraBold,
+                                            fontWeight = FontWeight.Bold,
                                             color = heroAccent,
                                             letterSpacing = 0.6.sp,
                                             maxLines = 1,
@@ -659,7 +656,7 @@ fun LaporanScreen(
                                         Text(
                                             text = "Uang masuk dikurangi biaya & komisi",
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = Color.White.copy(alpha = 0.82f),
+                                            color = onHero.copy(alpha = 0.82f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -673,8 +670,8 @@ fun LaporanScreen(
                             SantoyaAdaptiveCurrencyText(
                                 amount = labaBersih,
                                 style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Black,
-                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                color = onHero,
                                 minFontSize = 18.sp,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -693,8 +690,8 @@ fun LaporanScreen(
                                 ) {
                                     Text(
                                         text = "Margin Laba: $formattedMargin",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.SemiBold,
                                         color = heroAccent,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                                     )
@@ -709,7 +706,7 @@ fun LaporanScreen(
                                         text = if (isProfit) "Surplus" else "Defisit",
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = Color.White,
+                                        color = onHero,
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                                     )
                                 }
@@ -729,7 +726,7 @@ fun LaporanScreen(
                             val komisiPct = (komisiShare * 100).toInt()
 
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.lg),
                                 color = heroSubPanelColor,
                                 border = BorderStroke(1.dp, heroBorderColor),
                                 modifier = Modifier.fillMaxWidth()
@@ -744,12 +741,12 @@ fun LaporanScreen(
                                             text = "Komposisi Arus Kas",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.85f)
+                                            color = onHero.copy(alpha = 0.85f)
                                         )
                                         Text(
                                             text = "${filteredTx.size} Trx • ${filteredExp.size} Biaya",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                            fontWeight = FontWeight.SemiBold,
                                             color = heroAccent
                                         )
                                     }
@@ -761,8 +758,8 @@ fun LaporanScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(8.dp)
-                                            .clip(RoundedCornerShape(50))
-                                            .background(Color.White.copy(alpha = 0.15f))
+                                            .clip(CircleShape)
+                                            .background(onHero.copy(alpha = 0.15f))
                                     ) {
                                         if (profitShare > 0.01f) {
                                             Box(
@@ -828,7 +825,7 @@ fun LaporanScreen(
                         !it.transaksi.status.equals("Lunas", ignoreCase = true) && it.transaksi.uangMuka > 0L
                     }
                     val pendapatanSubtitle = if (dpCount > 0) {
-                        "$lunasCount Lunas • $dpCount DP (${(collectionRatio * 100).toInt()}%)"
+                        "$lunasCount Lunas • $dpCount Sebagian (${(collectionRatio * 100).toInt()}%)"
                     } else {
                         "$lunasCount Lunas (${(collectionRatio * 100).toInt()}% tertagih)"
                     }
@@ -865,7 +862,7 @@ fun LaporanScreen(
                                 },
                                 iconContent = {
                                     HydroDropletSparkIcon(
-                                        tint = Color.White,
+                                        tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -888,7 +885,7 @@ fun LaporanScreen(
                                 progress = expenseRatio,
                                 iconContent = {
                                     HydroExpenseFlowIcon(
-                                        tint = Color.White,
+                                        tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -898,7 +895,7 @@ fun LaporanScreen(
                         // Secondary Breakdown Card: Biaya Operasional Kas & Komisi Kurir (+ Piutang Kasbon if any)
                         HydroBentoCard(
                             accentColor = MaterialTheme.colorScheme.primary,
-                            cornerRadius = 18.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.05f,
                             showWaterRipple = false,
                             modifier = Modifier.fillMaxWidth()
@@ -912,7 +909,7 @@ fun LaporanScreen(
                                     accentColor = lossColor,
                                     iconContent = {
                                         HydroExpenseFlowIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(19.dp)
                                         )
                                     }
@@ -931,7 +928,7 @@ fun LaporanScreen(
                                     accentColor = santoyaColors.warning,
                                     iconContent = {
                                         HydroCourierWaveIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(19.dp)
                                         )
                                     }
@@ -951,7 +948,7 @@ fun LaporanScreen(
                                         accentColor = santoyaColors.warning,
                                         iconContent = {
                                             HydroReceiptNoteIcon(
-                                                tint = Color.White,
+                                                tint = MaterialTheme.santoyaColors.onHero,
                                                 modifier = Modifier.size(19.dp)
                                             )
                                         }
@@ -972,7 +969,7 @@ fun LaporanScreen(
                                         accentColor = profitColor,
                                         iconContent = {
                                             HydroReceiptNoteIcon(
-                                                tint = Color.White,
+                                                tint = MaterialTheme.santoyaColors.onHero,
                                                 modifier = Modifier.size(19.dp)
                                             )
                                         }
@@ -991,7 +988,7 @@ fun LaporanScreen(
                 val projectedColor = if (projectedProfit >= 0) profitColor else lossColor
                 HydroBentoCard(
                     accentColor = MaterialTheme.colorScheme.primary,
-                    cornerRadius = 20.dp,
+                    cornerRadius = SantoyaRadius.xl,
                     tintAlpha = 0.08f,
                     showWaterRipple = true,
                     modifier = Modifier.fillMaxWidth()
@@ -1013,7 +1010,7 @@ fun LaporanScreen(
                                     elevation = 3.dp
                                 ) {
                                     HydroReportChartIcon(
-                                        tint = Color.White,
+                                        tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
@@ -1022,7 +1019,7 @@ fun LaporanScreen(
                                     Text(
                                         text = "Proyeksi Akhir Bulan",
                                         style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -1036,13 +1033,13 @@ fun LaporanScreen(
                             }
 
                             Surface(
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
                             ) {
                                 Text(
                                     text = "${(monthProgress * 100).toInt()}% Bulan",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                                 )
@@ -1056,7 +1053,7 @@ fun LaporanScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
+                                .clip(CircleShape),
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.surfaceVariant
                         )
@@ -1090,13 +1087,13 @@ fun LaporanScreen(
                                     Spacer(modifier = Modifier.height(3.dp))
                                     Text(
                                         text = "$projectedGalon Galon",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
                                         text = "Aktual: $monthGalon Galon",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -1104,7 +1101,7 @@ fun LaporanScreen(
                             Surface(
                                 color = projectedColor.copy(alpha = 0.12f),
                                 border = BorderStroke(1.dp, projectedColor.copy(alpha = 0.28f)),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.md),
                                 modifier = Modifier.weight(1.18f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -1117,7 +1114,7 @@ fun LaporanScreen(
                                     SantoyaAdaptiveCurrencyText(
                                         amount = projectedProfit,
                                         style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.ExtraBold,
+                                        fontWeight = FontWeight.Bold,
                                         color = projectedColor,
                                         minFontSize = 11.sp,
                                         modifier = Modifier.fillMaxWidth()
@@ -1138,12 +1135,12 @@ fun LaporanScreen(
             }
             }
 
-            // 4. Peringkat Penjualan Terbanyak (Desa & Kurir) with Top 5 Expand/Collapse
+            // 4. Peringkat Penjualan Terbanyak (Desa & Kurir) — 5 Teratas Expand/Collapse
             if (hasPeriodActivity) {
             item {
                 HydroBentoCard(
                     accentColor = santoyaColors.rankGold,
-                    cornerRadius = 20.dp,
+                    cornerRadius = SantoyaRadius.xl,
                     tintAlpha = 0.06f,
                     showWaterRipple = false,
                     modifier = Modifier.fillMaxWidth()
@@ -1162,7 +1159,7 @@ fun LaporanScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.EmojiEvents,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = MaterialTheme.santoyaColors.onHero,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
@@ -1171,7 +1168,7 @@ fun LaporanScreen(
                                 Text(
                                     text = "Peringkat Penjualan",
                                     style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1265,21 +1262,21 @@ fun LaporanScreen(
                                         )
                                     }
                                     if (penjualanDesaList.size > 5) {
-                                        OutlinedButton(
+                                            OutlinedButton(
                                             onClick = { showAllRanking = !showAllRanking },
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(SantoyaRadius.sm),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(36.dp)
                                         ) {
                                             Text(
                                                 text = if (showAllRanking) {
-                                                    "Tampilkan Top 5"
+                                                    "Tampilkan 5 Teratas"
                                                 } else {
                                                     "Lihat Semua (${penjualanDesaList.size})"
                                                 },
                                                 style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.SemiBold
                                             )
                                         }
                                     }
@@ -1313,19 +1310,19 @@ fun LaporanScreen(
                                     if (penjualanKurirList.size > 5) {
                                         OutlinedButton(
                                             onClick = { showAllRanking = !showAllRanking },
-                                            shape = RoundedCornerShape(10.dp),
+                                            shape = RoundedCornerShape(SantoyaRadius.sm),
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(36.dp)
                                         ) {
                                             Text(
                                                 text = if (showAllRanking) {
-                                                    "Tampilkan Top 5"
+                                                    "Tampilkan 5 Teratas"
                                                 } else {
                                                     "Lihat Semua (${penjualanKurirList.size})"
                                                 },
                                                 style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold
+                                                fontWeight = FontWeight.SemiBold
                                             )
                                         }
                                     }
@@ -1340,7 +1337,7 @@ fun LaporanScreen(
             item {
                 HydroBentoCard(
                     accentColor = MaterialTheme.colorScheme.secondary,
-                    cornerRadius = 20.dp,
+                    cornerRadius = SantoyaRadius.xl,
                     tintAlpha = 0.06f,
                     showWaterRipple = false,
                     modifier = Modifier.fillMaxWidth()
@@ -1357,14 +1354,14 @@ fun LaporanScreen(
                                 elevation = 2.dp
                             ) {
                                 HydroReceiptNoteIcon(
-                                    tint = Color.White,
+                                    tint = MaterialTheme.santoyaColors.onHero,
                                     modifier = Modifier.size(17.dp)
                                 )
                             }
                             Text(
                                 text = "Ekspor Laporan",
                                 style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         }
@@ -1470,7 +1467,7 @@ fun LaporanScreen(
                                             limitedTx.forEachIndexed { idx, item ->
                                                 val trx = item.transaksi
                                                 val statusDetail = if (trx.status.equals("Kasbon", ignoreCase = true) && trx.uangMuka > 0L) {
-                                                    "Kasbon (DP: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())})"
+                                                    "Kasbon (Uang Muka: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())})"
                                                 } else {
                                                     trx.status
                                                 }
@@ -1493,7 +1490,7 @@ fun LaporanScreen(
                                     }
                                     PdfExporter.printHtmlAsPdf(context, html, "Laporan_Keuangan_Santoya")
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("btn_export_pdf")
@@ -1504,7 +1501,7 @@ fun LaporanScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ekspor PDF", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Ekspor PDF", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
 
                             OutlinedButton(
@@ -1517,7 +1514,7 @@ fun LaporanScreen(
                                         mimeType = "text/csv"
                                     )
                                 },
-                                shape = RoundedCornerShape(10.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.sm),
                                 modifier = Modifier
                                     .weight(1f)
                                     .testTag("btn_export_csv")
@@ -1528,7 +1525,7 @@ fun LaporanScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ekspor CSV", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Ekspor CSV", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
                     }
@@ -1540,8 +1537,9 @@ fun LaporanScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    shape = RoundedCornerShape(SantoyaRadius.lg),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     TabRow(
                         selectedTabIndex = detailTabIndex,
@@ -1556,7 +1554,7 @@ fun LaporanScreen(
                             text = {
                                 Text(
                                     text = "Transaksi (${filteredTx.size})",
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
                                 )
                             }
@@ -1570,7 +1568,7 @@ fun LaporanScreen(
                             text = {
                                 Text(
                                     text = "Pengeluaran (${filteredExp.size})",
-                                    fontWeight = FontWeight.Bold,
+                                    fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
                                 )
                             }
@@ -1594,7 +1592,7 @@ fun LaporanScreen(
                         val isLunas = trx.status.equals("Lunas", ignoreCase = true)
                         val isBayarSebagian = !isLunas && trx.uangMuka > 0L
                         val metodeInfo = when {
-                            isLunas -> trx.metode_bayar.ifBlank { "Cash" }
+                            isLunas -> FormatUtils.formatMetodeBayarLabel(trx.metode_bayar)
                             isBayarSebagian -> "Bayar Sebagian"
                             else -> "Belum Dibayar"
                         }
@@ -1606,7 +1604,7 @@ fun LaporanScreen(
                         }
                         HydroBentoCard(
                             accentColor = itemAccent,
-                            cornerRadius = 18.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.06f,
                             showWaterRipple = false,
                             modifier = Modifier.fillMaxWidth()
@@ -1629,7 +1627,7 @@ fun LaporanScreen(
                                         elevation = 2.dp
                                     ) {
                                         HydroGalonIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1638,7 +1636,7 @@ fun LaporanScreen(
                                         Text(
                                             text = "${item.pelanggan?.nama ?: "Umum"} • ${trx.jumlah} Galon",
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1651,9 +1649,9 @@ fun LaporanScreen(
                                         )
                                         if (isBayarSebagian) {
                                             Text(
-                                                text = "DP: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
+                                                text = "Uang Muka: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                                fontWeight = FontWeight.Medium,
                                                 color = santoyaColors.warning,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -1677,7 +1675,7 @@ fun LaporanScreen(
                                     Text(
                                         text = trx.status.uppercase(),
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.Bold,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = if (isLunas) profitColor else santoyaColors.warning,
                                         maxLines = 1
                                     )
@@ -1690,7 +1688,7 @@ fun LaporanScreen(
                         item {
                             OutlinedButton(
                                 onClick = { showAllDetails = !showAllDetails },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.md),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(42.dp)
@@ -1702,7 +1700,7 @@ fun LaporanScreen(
                                         "Lihat Semua (${filteredTx.size})"
                                     },
                                     style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -1721,7 +1719,7 @@ fun LaporanScreen(
                     items(displayedExp, key = { it.id }) { pengeluaran ->
                         HydroBentoCard(
                             accentColor = lossColor,
-                            cornerRadius = 18.dp,
+                            cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.06f,
                             showWaterRipple = false,
                             modifier = Modifier.fillMaxWidth()
@@ -1744,7 +1742,7 @@ fun LaporanScreen(
                                         elevation = 2.dp
                                     ) {
                                         HydroExpenseFlowIcon(
-                                            tint = Color.White,
+                                            tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1753,7 +1751,7 @@ fun LaporanScreen(
                                         Text(
                                             text = pengeluaran.nama_item,
                                             style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.Bold,
+                                            fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -1841,7 +1839,7 @@ private fun CashflowLegendDot(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.85f),
+            color = MaterialTheme.santoyaColors.onHero.copy(alpha = 0.85f),
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             softWrap = false,
@@ -1882,7 +1880,7 @@ private fun MonthlyRevenueComparisonBadge(
     }
 
     Surface(
-        shape = RoundedCornerShape(6.dp),
+        shape = RoundedCornerShape(SantoyaRadius.xs),
         color = badgeColor.copy(alpha = 0.12f),
         border = BorderStroke(0.8.dp, badgeColor.copy(alpha = 0.35f))
     ) {
@@ -1899,8 +1897,8 @@ private fun MonthlyRevenueComparisonBadge(
             )
             Text(
                 text = badgeText,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                fontWeight = FontWeight.SemiBold,
                 color = badgeColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1923,7 +1921,7 @@ private fun BentoFinancialCard(
 ) {
     HydroBentoCard(
         accentColor = accentColor,
-        cornerRadius = 20.dp,
+        cornerRadius = SantoyaRadius.xl,
         tintAlpha = 0.09f,
         showWaterRipple = true,
         modifier = modifier
@@ -1947,13 +1945,13 @@ private fun BentoFinancialCard(
                     iconContent()
                 }
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm),
                     color = accentColor.copy(alpha = 0.14f)
                 ) {
                     Text(
                         text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.ExtraBold,
+                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
                         color = accentColor,
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                     )
@@ -1966,7 +1964,7 @@ private fun BentoFinancialCard(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -1977,7 +1975,7 @@ private fun BentoFinancialCard(
                 amount = 0.0,
                 customText = amount,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 minFontSize = 11.sp,
                 modifier = Modifier.fillMaxWidth()
@@ -2006,7 +2004,7 @@ private fun BentoFinancialCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(5.dp)
-                    .clip(RoundedCornerShape(3.dp)),
+                    .clip(CircleShape),
                 color = accentColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
@@ -2045,7 +2043,7 @@ private fun FinancialBreakdownRow(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -2064,7 +2062,7 @@ private fun FinancialBreakdownRow(
             amount = 0.0,
             customText = nominalText,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             color = accentColor,
             minFontSize = 11.sp,
             textAlign = TextAlign.End,
@@ -2081,8 +2079,9 @@ private fun EmptyPeriodListCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(SantoyaRadius.lg),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
             modifier = Modifier
@@ -2131,14 +2130,14 @@ private fun PenjualanDesaItemRow(
     }
     val rankGradient = when (rank) {
         1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
+        2 -> listOf(santoyaColors.rankSilver, santoyaColors.rankSilver.copy(alpha = 0.78f))
         3 -> listOf(santoyaColors.rankBronze, AccentAmber)
         else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(SantoyaRadius.md),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(11.dp)) {
@@ -2160,22 +2159,22 @@ private fun PenjualanDesaItemRow(
                         ) {
                             Text(
                                 text = "#$rank",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
+                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                fontWeight = FontWeight.Bold,
+                                color = santoyaColors.onHero
                             )
                         }
                     } else {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
                             color = rankColor.copy(alpha = 0.14f),
                             modifier = Modifier.size(30.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = "#$rank",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.Bold,
                                     color = rankColor
                                 )
                             }
@@ -2186,7 +2185,7 @@ private fun PenjualanDesaItemRow(
                         Text(
                             text = item.desa,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2201,7 +2200,7 @@ private fun PenjualanDesaItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
                     Row(
@@ -2215,8 +2214,8 @@ private fun PenjualanDesaItemRow(
                         )
                         Text(
                             text = "${item.total_galon} Galon",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             maxLines = 1,
                             softWrap = false
@@ -2230,7 +2229,7 @@ private fun PenjualanDesaItemRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .clip(CircleShape),
                 color = rankColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
@@ -2253,14 +2252,14 @@ private fun PenjualanKurirItemRow(
     }
     val rankGradient = when (rank) {
         1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
+        2 -> listOf(santoyaColors.rankSilver, santoyaColors.rankSilver.copy(alpha = 0.78f))
         3 -> listOf(santoyaColors.rankBronze, AccentAmber)
         else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(SantoyaRadius.md),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(11.dp)) {
@@ -2282,22 +2281,22 @@ private fun PenjualanKurirItemRow(
                         ) {
                             Text(
                                 text = "#$rank",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
+                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                fontWeight = FontWeight.Bold,
+                                color = santoyaColors.onHero
                             )
                         }
                     } else {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
                             color = rankColor.copy(alpha = 0.14f),
                             modifier = Modifier.size(30.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text(
                                     text = "#$rank",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.Bold,
                                     color = rankColor
                                 )
                             }
@@ -2308,7 +2307,7 @@ private fun PenjualanKurirItemRow(
                         Text(
                             text = item.nama_kurir,
                             style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -2323,7 +2322,7 @@ private fun PenjualanKurirItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(SantoyaRadius.sm),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
                     Row(
@@ -2337,8 +2336,8 @@ private fun PenjualanKurirItemRow(
                         )
                         Text(
                             text = "${item.total_galon} Galon",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             maxLines = 1,
                             softWrap = false
@@ -2352,7 +2351,7 @@ private fun PenjualanKurirItemRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .clip(RoundedCornerShape(2.dp)),
+                    .clip(CircleShape),
                 color = rankColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )

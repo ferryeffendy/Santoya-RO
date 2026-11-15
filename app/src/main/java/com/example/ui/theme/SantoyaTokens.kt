@@ -50,6 +50,9 @@ object SantoyaSize {
     /** Lingkaran visual di dalam area sentuh 48dp. */
     val iconButtonVisual = 40.dp
 
+    /** Lingkaran tombol aksi standar di TopAppBar (di dalam area sentuh 48dp). */
+    val topBarCircle = 38.dp
+
     /** Ukuran ikon di dalam tombol. */
     val iconGlyph = 20.dp
 }
