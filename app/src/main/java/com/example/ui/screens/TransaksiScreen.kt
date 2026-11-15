@@ -60,6 +60,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -100,15 +101,18 @@ import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.ProdukCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaAdaptiveTabPillRow
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.components.SantoyaSearchBar
 import com.example.ui.components.SantoyaTabPillItem
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
@@ -121,6 +125,8 @@ import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.KomisiCalculator
 import com.example.util.SantoyaReceiptHelper
+import com.example.util.SearchField
+import com.example.util.SearchMatcher
 import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.SantoyaViewModel
 import java.util.Calendar
@@ -326,6 +332,7 @@ fun CatatPenjualanTab(
     }
     var searchQuery by remember { mutableStateOf(initialCustomerName) }
     var isDropdownExpanded by remember { mutableStateOf(false) }
+    var showAllDropdownMatches by remember { mutableStateOf(false) }
 
     LaunchedEffect(selectedPelangganId, pelangganList) {
         val matchedName = pelangganList.find { it.id == selectedPelangganId }?.nama
@@ -336,20 +343,16 @@ fun CatatPenjualanTab(
         }
     }
 
-    val filteredPelanggan = remember(searchQuery, pelangganList, selectedPelanggan) {
+    val activeFilterQuery = remember(searchQuery, selectedPelanggan) {
         if (searchQuery.isBlank() || (selectedPelanggan != null && searchQuery.trim() == selectedPelanggan.nama.trim())) {
-            pelangganList
+            ""
         } else {
-            val q = searchQuery.trim().lowercase()
-            val qDigits = q.filter { it.isDigit() }
-            pelangganList.filter {
-                val hpDigits = it.no_hp.filter { c -> c.isDigit() }
-                it.nama.lowercase().contains(q) ||
-                    it.alamat.lowercase().contains(q) ||
-                    it.no_hp.lowercase().contains(q) ||
-                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
-            }
+            searchQuery
         }
+    }
+
+    val filteredPelanggan = remember(activeFilterQuery, pelangganList, kurirList) {
+        viewModel.getFilteredPelangganForPicker(activeFilterQuery, pelangganList, kurirList)
     }
 
     if (selectedProdukId == null && produkList.isNotEmpty()) {
@@ -531,11 +534,9 @@ fun CatatPenjualanTab(
                     value = searchQuery,
                     onValueChange = { text ->
                         searchQuery = text
+                        showAllDropdownMatches = false
                         isDropdownExpanded = true
-                        val match = pelangganList.find { it.nama.equals(text.trim(), ignoreCase = true) }
-                        if (match != null) {
-                            viewModel.onPelangganSelected(match.id)
-                        } else if (selectedPelanggan != null && selectedPelanggan.nama != text) {
+                        if (selectedPelanggan != null && selectedPelanggan.nama != text) {
                             viewModel.onPelangganSelected(null)
                         }
                     },
@@ -571,6 +572,7 @@ fun CatatPenjualanTab(
                                 IconButton(
                                     onClick = {
                                         searchQuery = ""
+                                        showAllDropdownMatches = false
                                         isDropdownExpanded = true
                                         viewModel.onPelangganSelected(null)
                                     },
@@ -606,7 +608,19 @@ fun CatatPenjualanTab(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(
                         onSearch = {
-                            isDropdownExpanded = false
+                            val trimmed = searchQuery.trim()
+                            val singleOrExact = when {
+                                filteredPelanggan.size == 1 -> filteredPelanggan.first()
+                                trimmed.isNotEmpty() -> filteredPelanggan.firstOrNull {
+                                    it.nama.equals(trimmed, ignoreCase = true)
+                                }
+                                else -> null
+                            }
+                            if (singleOrExact != null) {
+                                searchQuery = singleOrExact.nama
+                                viewModel.onPelangganSelected(singleOrExact.id)
+                                isDropdownExpanded = false
+                            }
                             focusManager.clearFocus()
                             keyboardController?.hide()
                         }
@@ -626,7 +640,7 @@ fun CatatPenjualanTab(
                 ExposedDropdownMenu(
                     expanded = isDropdownExpanded,
                     onDismissRequest = { isDropdownExpanded = false },
-                    modifier = Modifier.heightIn(max = 220.dp)
+                    modifier = Modifier.heightIn(max = 310.dp)
                 ) {
                     if (filteredPelanggan.isEmpty()) {
                         DropdownMenuItem(
@@ -644,9 +658,67 @@ fun CatatPenjualanTab(
                             }
                         )
                     } else {
-                        filteredPelanggan.take(30).forEach { cust ->
+                        val dropdownCap = 60
+                        val isTruncated = !showAllDropdownMatches && filteredPelanggan.size > dropdownCap
+                        val displayedCustomers = if (isTruncated) {
+                            filteredPelanggan.take(dropdownCap)
+                        } else {
+                            filteredPelanggan
+                        }
+
+                        // Ringkasan jumlah hasil pencarian agar pengguna tahu cakupan daftar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = when {
+                                    activeFilterQuery.isBlank() && isTruncated ->
+                                        "Menampilkan $dropdownCap dari ${filteredPelanggan.size} pelanggan"
+                                    activeFilterQuery.isBlank() ->
+                                        "${filteredPelanggan.size} pelanggan tersedia"
+                                    isTruncated ->
+                                        "Menampilkan $dropdownCap teratas dari ${filteredPelanggan.size} cocok"
+                                    else ->
+                                        "${filteredPelanggan.size} pelanggan cocok"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (isTruncated) {
+                                Surface(
+                                    shape = RoundedCornerShape(SantoyaRadius.xs),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(SantoyaRadius.xs))
+                                        .clickable { showAllDropdownMatches = true }
+                                ) {
+                                    Text(
+                                        text = "Lihat semua",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        )
+
+                        displayedCustomers.forEach { cust ->
                             val isSelected = cust.id == selectedPelangganId
                             val custEffectiveKasbon = effectiveKasbonByCustomer[cust.id] ?: cust.sisa_kasbon
+                            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat)
                             DropdownMenuItem(
                                 text = {
                                     Row(
@@ -655,15 +727,16 @@ fun CatatPenjualanTab(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                cust.nama,
+                                            HighlightedSearchText(
+                                                text = cust.nama,
+                                                query = activeFilterQuery,
                                                 style = MaterialTheme.typography.bodyMedium,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             val subDetails = mutableListOf<String>()
-                                            if (cust.alamat.isNotBlank()) subDetails.add(cust.alamat)
+                                            if (cleanAlamat.isNotBlank()) subDetails.add(cleanAlamat)
                                             if (cust.no_hp.isNotBlank()) subDetails.add(cust.no_hp)
                                             if (custEffectiveKasbon > 0) subDetails.add("Kasbon: ${FormatUtils.formatRupiah(custEffectiveKasbon)}")
                                             if (cust.harga_khusus != null && cust.harga_khusus > 0) subDetails.add("Khusus: ${FormatUtils.formatRupiah(cust.harga_khusus)}")
@@ -672,8 +745,9 @@ fun CatatPenjualanTab(
                                                 if (kName != null) subDetails.add("Kurir: $kName")
                                             }
                                             if (subDetails.isNotEmpty()) {
-                                                Text(
-                                                    subDetails.joinToString(" • "),
+                                                HighlightedSearchText(
+                                                    text = subDetails.joinToString(" • "),
+                                                    query = activeFilterQuery,
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = if (custEffectiveKasbon > 0) MaterialTheme.santoyaColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
                                                     maxLines = 1,
@@ -694,6 +768,7 @@ fun CatatPenjualanTab(
                                 onClick = {
                                     searchQuery = cust.nama
                                     isDropdownExpanded = false
+                                    showAllDropdownMatches = false
                                     viewModel.onPelangganSelected(cust.id)
                                     focusManager.clearFocus()
                                     keyboardController?.hide()
@@ -830,7 +905,8 @@ fun CatatPenjualanTab(
                                         cornerRadius = 10.dp,
                                         elevation = 2.dp
                                     ) {
-                                        HydroGalonIcon(
+                                        ProdukCategoryIcon(
+                                            namaProduk = prod.nama_produk,
                                             tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -842,7 +918,8 @@ fun CatatPenjualanTab(
                                         modifier = Modifier.size(34.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            HydroGalonIcon(
+                                            ProdukCategoryIcon(
+                                                namaProduk = prod.nama_produk,
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -2033,40 +2110,36 @@ fun RiwayatTransaksiTab(
         if (searchQuery.isBlank()) {
             byStatusOrDate
         } else {
-            val q = searchQuery.lowercase().trim()
-            val qDigits = q.filter { it.isDigit() }
-            byStatusOrDate.filter { detail ->
+            SearchMatcher.rankAndFilter(byStatusOrDate, searchQuery) { detail ->
                 val isDeletedTx = KaryawanScopeHelper.isDeletedTransaksi(detail.transaksi)
-                val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(detail.transaksi)?.lowercase().orEmpty()
+                val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(detail.transaksi).orEmpty()
                 val isKasbonTx = !isDeletedTx && detail.transaksi.status.equals("Kasbon", ignoreCase = true)
-                val formattedTotal = FormatUtils.formatRupiah(detail.transaksi.total_harga).lowercase()
+                val formattedTotal = FormatUtils.formatRupiah(detail.transaksi.total_harga)
                 val rawTotalStr = detail.transaksi.total_harga.toLong().toString()
-                val formattedDateFull = FormatUtils.formatDate(detail.transaksi.tanggal).lowercase()
-                val formattedDateShort = FormatUtils.formatDateShort(detail.transaksi.tanggal).lowercase()
+                val formattedDateFull = FormatUtils.formatDate(detail.transaksi.tanggal)
+                val formattedDateShort = FormatUtils.formatDateShort(detail.transaksi.tanggal)
                 val galonLabel = "${detail.transaksi.jumlah} galon"
-                val kurirLabel = detail.kurir?.nama?.lowercase() ?: "ambil sendiri"
+                val kurirLabel = detail.kurir?.nama?.takeIf { it.isNotBlank() } ?: "ambil sendiri tanpa kurir"
                 val metodeLabel = when {
                     isDeletedTx -> "dihapus $deletedBy"
-                    isKasbonTx -> "belum dibayar"
-                    else -> detail.transaksi.metode_bayar.lowercase()
+                    isKasbonTx -> "belum dibayar kasbon"
+                    else -> detail.transaksi.metode_bayar
                 }
-                val hpDigits = detail.pelanggan?.no_hp?.filter { it.isDigit() } ?: ""
-
-                (detail.pelanggan?.nama?.lowercase()?.contains(q) == true) ||
-                    (detail.pelanggan?.alamat?.let { KaryawanScopeHelper.cleanPelangganAlamat(it).lowercase().contains(q) } == true) ||
-                    (detail.pelanggan?.no_hp?.lowercase()?.contains(q) == true) ||
-                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits)) ||
-                    kurirLabel.contains(q) ||
-                    (detail.produk?.nama_produk?.lowercase()?.contains(q) == true) ||
-                    metodeLabel.contains(q) ||
-                    detail.transaksi.status.lowercase().contains(q) ||
-                    (isDeletedTx && ("dihapus".contains(q) || deletedBy.contains(q))) ||
-                    formattedTotal.contains(q) ||
-                    (qDigits.isNotEmpty() && rawTotalStr.contains(qDigits)) ||
-                    galonLabel.contains(q) ||
-                    detail.transaksi.jumlah.toString() == q ||
-                    formattedDateFull.contains(q) ||
-                    formattedDateShort.contains(q)
+                val cleanAlamat = detail.pelanggan?.alamat?.let { KaryawanScopeHelper.cleanPelangganAlamat(it) }.orEmpty()
+                listOf(
+                    SearchField(detail.pelanggan?.nama ?: "Pelanggan Umum", weight = 24, isPrimaryName = true),
+                    SearchField(cleanAlamat, weight = 10),
+                    SearchField(detail.pelanggan?.no_hp.orEmpty(), weight = 14, isPhone = true),
+                    SearchField(kurirLabel, weight = 12),
+                    SearchField(detail.produk?.nama_produk.orEmpty(), weight = 10),
+                    SearchField(metodeLabel, weight = 8),
+                    SearchField(detail.transaksi.status, weight = 8),
+                    SearchField(formattedTotal, weight = 8),
+                    SearchField(rawTotalStr, weight = 8),
+                    SearchField(galonLabel, weight = 7),
+                    SearchField(formattedDateFull, weight = 6),
+                    SearchField(formattedDateShort, weight = 6)
+                )
             }
         }
     }
@@ -2104,64 +2177,15 @@ fun RiwayatTransaksiTab(
                 .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = {
+            SantoyaSearchBar(
+                query = searchQuery,
+                onQueryChange = {
                     searchQuery = it
                     showAllHistory = false
                 },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                placeholder = {
-                    Text(
-                        "Cari pelanggan, kurir, atau nominal...",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(
-                            onClick = {
-                                searchQuery = ""
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Bersihkan Pencarian",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(
-                    onSearch = {
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                    }
-                ),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("input_search_transaksi")
+                placeholder = "Cari pelanggan, kurir, atau nominal...",
+                testTag = "input_search_transaksi",
+                resultCount = if (searchQuery.isNotBlank()) filtered.size else null
             )
 
             Row(
@@ -2509,40 +2533,44 @@ fun RiwayatTransaksiTab(
                                     cornerRadius = 12.dp,
                                     elevation = 2.dp
                                 ) {
-                                    HydroGalonIcon(
+                                    ProdukCategoryIcon(
+                                        namaProduk = detail.produk?.nama_produk.orEmpty(),
                                         tint = MaterialTheme.santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
+                                    HighlightedSearchText(
                                         text = detail.pelanggan?.nama ?: "Pelanggan Umum",
+                                        query = searchQuery,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                    Text(
+                                    HighlightedSearchText(
                                         text = "${detail.produk?.nama_produk ?: "Air RO"} • ${detail.transaksi.jumlah} Galon",
+                                        query = searchQuery,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                val resolvedKurirName = detail.kurir?.nama?.takeIf { it.isNotBlank() }
-                                    ?: detail.transaksi.id_kurir?.let { kId ->
-                                        kurirList.find { it.id == kId }?.nama?.takeIf { it.isNotBlank() }
-                                    }
-                                Text(
-                                    text = "Kurir: ${resolvedKurirName ?: "Tanpa Kurir"}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Normal,
-                                    color = if (resolvedKurirName != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                    val resolvedKurirName = detail.kurir?.nama?.takeIf { it.isNotBlank() }
+                                        ?: detail.transaksi.id_kurir?.let { kId ->
+                                            kurirList.find { it.id == kId }?.nama?.takeIf { it.isNotBlank() }
+                                        }
+                                    HighlightedSearchText(
+                                        text = "Kurir: ${resolvedKurirName ?: "Tanpa Kurir"}",
+                                        query = searchQuery,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Normal,
+                                        color = if (resolvedKurirName != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
                                 }
                             }
 

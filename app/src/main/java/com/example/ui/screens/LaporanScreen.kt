@@ -1,6 +1,9 @@
 package com.example.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -88,9 +92,12 @@ import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.HydroReportChartIcon
+import com.example.ui.components.PengeluaranCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.resolvePengeluaranCategoryColor
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
+import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
@@ -104,11 +111,16 @@ import com.example.ui.theme.HeroGradientStart
 import com.example.ui.theme.SantoyaNavyBorder
 import com.example.ui.theme.SantoyaNavyPanel
 import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.PdfExporter
+import com.example.util.RankingEntryUi
+import com.example.util.RankingMetricsHelper
+import com.example.util.RankingRawEntry
+import com.example.util.RankingSortMode
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -245,6 +257,7 @@ fun LaporanScreen(
     val showMonthlyComparison = !isCustomDateRange && selectedPeriode == LaporanPeriode.BULAN_INI
 
     var showAllRanking by remember { mutableStateOf(false) }
+    var rankingSortMode by remember { mutableStateOf(RankingSortMode.GALON) }
     var showAllDetails by remember { mutableStateOf(false) }
 
     // Smart Grouping for Penjualan per Desa / Wilayah (normalizes house numbers like "Jl. Raya Sukamaju No. 12" -> "Sukamaju")
@@ -272,6 +285,34 @@ fun LaporanScreen(
                     total_pendapatan = list.sumOf { it.transaksi.total_harga }
                 )
             }.sortedByDescending { it.total_galon }
+    }
+
+    val rankedDesaEntries = remember(penjualanDesaList, rankingSortMode) {
+        RankingMetricsHelper.buildRankedEntries(
+            entries = penjualanDesaList.map {
+                RankingRawEntry(
+                    title = it.desa,
+                    totalGalon = it.total_galon,
+                    totalTransaksi = it.total_transaksi,
+                    totalPendapatan = it.total_pendapatan
+                )
+            },
+            sortMode = rankingSortMode
+        )
+    }
+
+    val rankedKurirEntries = remember(penjualanKurirList, rankingSortMode) {
+        RankingMetricsHelper.buildRankedEntries(
+            entries = penjualanKurirList.map {
+                RankingRawEntry(
+                    title = it.nama_kurir,
+                    totalGalon = it.total_galon,
+                    totalTransaksi = it.total_transaksi,
+                    totalPendapatan = it.total_pendapatan
+                )
+            },
+            sortMode = rankingSortMode
+        )
     }
 
     // Run-Rate Proyeksi Bulan Ini
@@ -1181,6 +1222,10 @@ fun LaporanScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
+                        val activeEntries = if (rankingTabIndex == 0) rankedDesaEntries else rankedKurirEntries
+                        val activityUnit = if (rankingTabIndex == 0) "Transaksi" else "Kirim"
+                        val unitCategoryLabel = if (rankingTabIndex == 0) "Desa" else "Kurir"
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1191,7 +1236,7 @@ fun LaporanScreen(
                                     rankingTabIndex = 0
                                     showAllRanking = false
                                 },
-                                label = { Text("Desa (${penjualanDesaList.size})", maxLines = 1) },
+                                label = { Text("Desa (${rankedDesaEntries.size})", maxLines = 1) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Outlined.LocationOn,
@@ -1201,7 +1246,7 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(34.dp),
+                                    .heightIn(min = 40.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1214,7 +1259,7 @@ fun LaporanScreen(
                                     rankingTabIndex = 1
                                     showAllRanking = false
                                 },
-                                label = { Text("Kurir (${penjualanKurirList.size})", maxLines = 1) },
+                                label = { Text("Kurir (${rankedKurirEntries.size})", maxLines = 1) },
                                 leadingIcon = {
                                     HydroCourierWaveIcon(
                                         tint = if (rankingTabIndex == 1) {
@@ -1227,7 +1272,7 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(34.dp),
+                                    .heightIn(min = 40.dp),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1235,96 +1280,148 @@ fun LaporanScreen(
                                 )
                             )
                         }
-                        Spacer(modifier = Modifier.height(10.dp))
-                        if (rankingTabIndex == 0) {
-                            if (penjualanDesaList.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
-                                    contentAlignment = Alignment.Center
+
+                        if (activeEntries.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Urutkan:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "Belum ada transaksi di periode ini",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                }
-                            } else {
-                                val maxGalonDesa = (penjualanDesaList.maxOfOrNull { it.total_galon } ?: 1).coerceAtLeast(1)
-                                val displayedDesa = if (showAllRanking) penjualanDesaList else penjualanDesaList.take(5)
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    displayedDesa.forEachIndexed { index, item ->
-                                        PenjualanDesaItemRow(
-                                            rank = index + 1,
-                                            item = item,
-                                            maxGalon = maxGalonDesa
-                                        )
-                                    }
-                                    if (penjualanDesaList.size > 5) {
-                                            OutlinedButton(
-                                            onClick = { showAllRanking = !showAllRanking },
-                                            shape = RoundedCornerShape(SantoyaRadius.sm),
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(36.dp)
-                                        ) {
-                                            Text(
-                                                text = if (showAllRanking) {
-                                                    "Tampilkan 5 Teratas"
+                                    val isGalonSort = rankingSortMode == RankingSortMode.GALON
+                                    SantoyaFilterPill(
+                                        label = "Galon",
+                                        selected = isGalonSort,
+                                        onClick = { rankingSortMode = RankingSortMode.GALON },
+                                        leadingIconContent = {
+                                            HydroGalonIcon(
+                                                tint = if (isGalonSort) {
+                                                    MaterialTheme.colorScheme.onPrimaryContainer
                                                 } else {
-                                                    "Lihat Semua (${penjualanDesaList.size})"
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
                                                 },
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold
+                                                modifier = Modifier.size(14.dp)
                                             )
-                                        }
-                                    }
+                                        },
+                                        modifier = Modifier.testTag("chip_sort_ranking_galon")
+                                    )
+                                    val isOmzetSort = rankingSortMode == RankingSortMode.OMZET
+                                    SantoyaFilterPill(
+                                        label = "Omzet",
+                                        selected = isOmzetSort,
+                                        onClick = { rankingSortMode = RankingSortMode.OMZET },
+                                        leadingIconContent = {
+                                            HydroReportChartIcon(
+                                                tint = if (isOmzetSort) {
+                                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        },
+                                        modifier = Modifier.testTag("chip_sort_ranking_omzet")
+                                    )
                                 }
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        if (activeEntries.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Belum ada transaksi di periode ini",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
                         } else {
-                            if (penjualanKurirList.isEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 16.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Belum ada transaksi di periode ini",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.outline
+                            val displayedEntries = if (showAllRanking) activeEntries else activeEntries.take(5)
+                            Column(
+                                modifier = Modifier.animateContentSize(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                displayedEntries.forEachIndexed { index, entry ->
+                                    SalesRankingItemCard(
+                                        rank = index + 1,
+                                        entry = entry,
+                                        activityUnit = activityUnit,
+                                        sortMode = rankingSortMode
                                     )
                                 }
-                            } else {
-                                val maxGalonKurir = (penjualanKurirList.maxOfOrNull { it.total_galon } ?: 1).coerceAtLeast(1)
-                                val displayedKurir = if (showAllRanking) penjualanKurirList else penjualanKurirList.take(5)
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    displayedKurir.forEachIndexed { index, item ->
-                                        PenjualanKurirItemRow(
-                                            rank = index + 1,
-                                            item = item,
-                                            maxGalon = maxGalonKurir
-                                        )
-                                    }
-                                    if (penjualanKurirList.size > 5) {
-                                        OutlinedButton(
-                                            onClick = { showAllRanking = !showAllRanking },
-                                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                                if (showAllRanking && activeEntries.size > 5) {
+                                    val totalGalonTab = activeEntries.sumOf { it.totalGalon }
+                                    val totalOmzetTab = activeEntries.sumOf { it.totalPendapatan }
+                                    Surface(
+                                        shape = RoundedCornerShape(SantoyaRadius.md),
+                                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                        border = BorderStroke(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .height(36.dp)
+                                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Text(
-                                                text = if (showAllRanking) {
-                                                    "Tampilkan 5 Teratas"
-                                                } else {
-                                                    "Lihat Semua (${penjualanKurirList.size})"
-                                                },
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.SemiBold
+                                                text = "Total ${activeEntries.size} $unitCategoryLabel • ${FormatUtils.formatNumber(totalGalonTab)} Galon",
+                                                style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            SantoyaAdaptiveCurrencyText(
+                                                amount = totalOmzetTab,
+                                                style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                minFontSize = 11.sp,
+                                                textAlign = TextAlign.End
                                             )
                                         }
+                                    }
+                                }
+                                if (activeEntries.size > 5) {
+                                    OutlinedButton(
+                                        onClick = { showAllRanking = !showAllRanking },
+                                        shape = RoundedCornerShape(SantoyaRadius.sm),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = SantoyaSize.touchTarget)
+                                            .testTag("btn_toggle_all_ranking")
+                                    ) {
+                                        Text(
+                                            text = if (showAllRanking) {
+                                                "Tampilkan 5 Teratas"
+                                            } else {
+                                                "Lihat Semua (${activeEntries.size})"
+                                            },
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
                                     }
                                 }
                             }
@@ -1717,8 +1814,12 @@ fun LaporanScreen(
                 } else {
                     val displayedExp = if (showAllDetails) filteredExp else filteredExp.take(15)
                     items(displayedExp, key = { it.id }) { pengeluaran ->
+                        val catColor = resolvePengeluaranCategoryColor(
+                            kategori = pengeluaran.kategori,
+                            namaItem = pengeluaran.nama_item
+                        )
                         HydroBentoCard(
-                            accentColor = lossColor,
+                            accentColor = catColor,
                             cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.06f,
                             showWaterRipple = false,
@@ -1736,12 +1837,14 @@ fun LaporanScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     HydroGradientBadge(
-                                        gradientColors = listOf(lossColor, AccentRose),
+                                        gradientColors = listOf(catColor, AccentRose),
                                         size = 36.dp,
                                         cornerRadius = 11.dp,
                                         elevation = 2.dp
                                     ) {
-                                        HydroExpenseFlowIcon(
+                                        PengeluaranCategoryIcon(
+                                            kategori = pengeluaran.kategori,
+                                            namaItem = pengeluaran.nama_item,
                                             tint = MaterialTheme.santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -2116,10 +2219,11 @@ private fun EmptyPeriodListCard(
 }
 
 @Composable
-private fun PenjualanDesaItemRow(
+private fun SalesRankingItemCard(
     rank: Int,
-    item: PenjualanDesaItem,
-    maxGalon: Int
+    entry: RankingEntryUi,
+    activityUnit: String,
+    sortMode: RankingSortMode
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
     val rankColor = when (rank) {
@@ -2134,135 +2238,23 @@ private fun PenjualanDesaItemRow(
         3 -> listOf(santoyaColors.rankBronze, AccentAmber)
         else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
     }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(SantoyaRadius.md),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(11.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (rank <= 3) {
-                        HydroGradientBadge(
-                            gradientColors = rankGradient,
-                            size = 30.dp,
-                            cornerRadius = 9.dp,
-                            elevation = 2.dp
-                        ) {
-                            Text(
-                                text = "#$rank",
-                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                fontWeight = FontWeight.Bold,
-                                color = santoyaColors.onHero
-                            )
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.sm),
-                            color = rankColor.copy(alpha = 0.14f),
-                            modifier = Modifier.size(30.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "#$rank",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                    fontWeight = FontWeight.Bold,
-                                    color = rankColor
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.desa,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "${item.total_transaksi} Transaksi • Omzet ${FormatUtils.formatRupiah(item.total_pendapatan)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        HydroGalonIcon(
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "${item.total_galon} Galon",
-                            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { (item.total_galon.toFloat() / maxGalon.toFloat()).coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(CircleShape),
-                color = rankColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
+    val animatedProgress by animateFloatAsState(
+        targetValue = entry.progressFraction,
+        animationSpec = tween(durationMillis = 260),
+        label = "ranking_progress_anim"
+    )
+    val shareText = remember(entry.omzetSharePercent) {
+        RankingMetricsHelper.formatOmzetSharePercent(entry.omzetSharePercent)
     }
-}
 
-@Composable
-private fun PenjualanKurirItemRow(
-    rank: Int,
-    item: PenjualanKurirItem,
-    maxGalon: Int
-) {
-    val santoyaColors = MaterialTheme.santoyaColors
-    val rankColor = when (rank) {
-        1 -> santoyaColors.rankGold
-        2 -> santoyaColors.rankSilver
-        3 -> santoyaColors.rankBronze
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val rankGradient = when (rank) {
-        1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, santoyaColors.rankSilver.copy(alpha = 0.78f))
-        3 -> listOf(santoyaColors.rankBronze, AccentAmber)
-        else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
-    }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
         shape = RoundedCornerShape(SantoyaRadius.md),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(11.dp)) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            // Baris 1: Lencana peringkat + Nama lengkap + Pil volume Galon
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2303,27 +2295,24 @@ private fun PenjualanKurirItemRow(
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = item.nama_kurir,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            text = "${item.total_transaksi} Kirim • Omzet ${FormatUtils.formatRupiah(item.total_pendapatan)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                    Text(
+                        text = entry.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
                     shape = RoundedCornerShape(SantoyaRadius.sm),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                    color = if (sortMode == RankingSortMode.GALON) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    }
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -2331,23 +2320,63 @@ private fun PenjualanKurirItemRow(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         HydroGalonIcon(
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = if (sortMode == RankingSortMode.GALON) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                             modifier = Modifier.size(13.dp)
                         )
                         Text(
-                            text = "${item.total_galon} Galon",
+                            text = "${FormatUtils.formatNumber(entry.totalGalon)} Galon",
                             style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            color = if (sortMode == RankingSortMode.GALON) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                             maxLines = 1,
                             softWrap = false
                         )
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Baris 2: Baris penuh khusus Transaksi + Porsi Kontribusi (kiri) dan Omzet Utuh (kanan)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${FormatUtils.formatNumber(entry.totalTransaksi)} $activityUnit • $shareText",
+                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                SantoyaAdaptiveCurrencyText(
+                    amount = entry.totalPendapatan,
+                    style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.Bold,
+                    color = if (sortMode == RankingSortMode.OMZET) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                    minFontSize = 11.sp,
+                    textAlign = TextAlign.End
+                )
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
             LinearProgressIndicator(
-                progress = { (item.total_galon.toFloat() / maxGalon.toFloat()).coerceIn(0f, 1f) },
+                progress = { animatedProgress },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(4.dp)

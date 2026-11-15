@@ -92,14 +92,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.Pengeluaran
+import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroExpenseFlowIcon
 import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.PengeluaranCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.resolvePengeluaranCategoryColor
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaFormBottomSheet
+import com.example.ui.components.SantoyaSearchBar
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentRose
@@ -108,6 +112,8 @@ import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
+import com.example.util.SearchField
+import com.example.util.SearchMatcher
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
 import java.util.Calendar
@@ -186,25 +192,26 @@ fun PengeluaranScreen(
     }
 
     val periodAndSearchFilteredList = remember(selectedDateFilter, startTime, endTime, searchQuery, displayList) {
-        displayList.filter { item ->
-            val matchDate = selectedDateFilter == PengeluaranDateFilter.SEMUA || item.tanggal in startTime..endTime
-            val q = searchQuery.lowercase().trim()
-            val qDigits = q.filter { it.isDigit() }
-            val matchSearch = if (q.isBlank()) {
-                true
-            } else {
-                val nominalFormatted = FormatUtils.formatRupiah(item.nominal).lowercase()
+        val dateFiltered = displayList.filter { item ->
+            selectedDateFilter == PengeluaranDateFilter.SEMUA || item.tanggal in startTime..endTime
+        }
+        if (searchQuery.isBlank()) {
+            dateFiltered
+        } else {
+            SearchMatcher.rankAndFilter(dateFiltered, searchQuery) { item ->
+                val nominalFormatted = FormatUtils.formatRupiah(item.nominal)
                 val nominalDigits = item.nominal.toLong().toString()
-                val dateFull = FormatUtils.formatDateTime(item.tanggal).lowercase()
-                val dateShort = FormatUtils.formatDateShort(item.tanggal).lowercase()
-                item.nama_item.lowercase().contains(q) ||
-                    item.kategori.lowercase().contains(q) ||
-                    nominalFormatted.contains(q) ||
-                    (qDigits.isNotEmpty() && nominalDigits.contains(qDigits)) ||
-                    dateFull.contains(q) ||
-                    dateShort.contains(q)
+                val dateFull = FormatUtils.formatDateTime(item.tanggal)
+                val dateShort = FormatUtils.formatDateShort(item.tanggal)
+                listOf(
+                    SearchField(item.nama_item, weight = 24, isPrimaryName = true),
+                    SearchField(item.kategori, weight = 14),
+                    SearchField(nominalFormatted, weight = 10),
+                    SearchField(nominalDigits, weight = 10),
+                    SearchField(dateFull, weight = 6),
+                    SearchField(dateShort, weight = 6)
+                )
             }
-            matchDate && matchSearch
         }
     }
 
@@ -285,60 +292,12 @@ fun PengeluaranScreen(
                         .padding(horizontal = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = {
-                        Text(
-                            text = "Cari pengeluaran, kategori, nominal...",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(19.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    searchQuery = ""
-                                    focusManager.clearFocus()
-                                },
-                                modifier = Modifier.sizeIn(minWidth = SantoyaSize.touchTarget, minHeight = SantoyaSize.touchTarget)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Clear,
-                                    contentDescription = "Bersihkan pencarian",
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Text,
-                        imeAction = ImeAction.Search
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onSearch = {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        }
-                    ),
-                    singleLine = true,
-                    shape = RoundedCornerShape(SantoyaRadius.md),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("input_search_pengeluaran")
+                SantoyaSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    placeholder = "Cari pengeluaran, kategori, nominal...",
+                    testTag = "input_search_pengeluaran",
+                    resultCount = if (searchQuery.isNotBlank()) periodAndSearchFilteredList.size else null
                 )
 
                 PengeluaranDateFilterRow(
@@ -499,20 +458,40 @@ fun PengeluaranScreen(
                                     )
                                     categoryBreakdown.forEach { (cat, nominal) ->
                                         val pct = if (totalPengeluaran > 0) ((nominal / totalPengeluaran) * 100).toInt() else 0
+                                        val catColor = resolvePengeluaranCategoryColor(cat)
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Text(
-                                                text = "$cat ($pct%)",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
                                                 modifier = Modifier.weight(1f)
-                                            )
+                                            ) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(SantoyaRadius.xs),
+                                                    color = catColor.copy(alpha = 0.14f),
+                                                    modifier = Modifier.size(22.dp)
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center) {
+                                                        PengeluaranCategoryIcon(
+                                                            kategori = cat,
+                                                            tint = catColor,
+                                                            modifier = Modifier.size(13.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "$cat ($pct%)",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                            }
                                             Spacer(modifier = Modifier.width(8.dp))
                                             SantoyaAdaptiveCurrencyText(
                                                 amount = nominal,
@@ -562,16 +541,10 @@ fun PengeluaranScreen(
                         }
                     } else {
                         items(filteredList, key = { it.id }) { item ->
-                            val santoyaColors = MaterialTheme.santoyaColors
-                            val kategoriColor = when (item.kategori.lowercase()) {
-                                "listrik & air", "bahan baku" -> santoyaColors.info
-                                "filter & membran" -> MaterialTheme.colorScheme.primary
-                                "tutup & tisu galon" -> santoyaColors.success
-                                "bensin & transport" -> santoyaColors.warning
-                                "perawatan" -> MaterialTheme.colorScheme.tertiary
-                                "operasional" -> MaterialTheme.colorScheme.secondary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            val kategoriColor = resolvePengeluaranCategoryColor(
+                                kategori = item.kategori,
+                                namaItem = item.nama_item
+                            )
 
                             HydroBentoCard(
                                 accentColor = kategoriColor,
@@ -603,16 +576,19 @@ fun PengeluaranScreen(
                                                 modifier = Modifier.size(36.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
-                                                    HydroExpenseFlowIcon(
+                                                    PengeluaranCategoryIcon(
+                                                        kategori = item.kategori,
+                                                        namaItem = item.nama_item,
                                                         tint = kategoriColor,
-                                                        leafAccent = MaterialTheme.colorScheme.primary,
+                                                        accentColor = kategoriColor,
                                                         modifier = Modifier.size(20.dp)
                                                     )
                                                 }
                                             }
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
+                                            HighlightedSearchText(
                                                 text = item.nama_item,
+                                                query = searchQuery,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
@@ -659,8 +635,9 @@ fun PengeluaranScreen(
                                             color = kategoriColor.copy(alpha = 0.14f),
                                             modifier = Modifier.align(Alignment.CenterVertically)
                                         ) {
-                                            Text(
+                                            HighlightedSearchText(
                                                 text = item.kategori,
+                                                query = searchQuery,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = kategoriColor,
@@ -787,11 +764,22 @@ fun PengeluaranScreen(
             ) {
                 kategoriOptions.forEach { kat ->
                     val isSelected = selectedKategori.equals(kat, ignoreCase = true)
+                    val katColor = resolvePengeluaranCategoryColor(kat)
                     SantoyaFilterPill(
                         label = kat,
                         selected = isSelected,
                         onClick = { selectedKategori = kat },
-                        leadingIcon = if (isSelected) Icons.Outlined.Check else null
+                        selectedContainerColor = katColor.copy(alpha = 0.15f),
+                        selectedContentColor = katColor,
+                        selectedBorderColor = katColor.copy(alpha = 0.55f),
+                        leadingIconContent = {
+                            PengeluaranCategoryIcon(
+                                kategori = kat,
+                                tint = if (isSelected) katColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                accentColor = if (isSelected) katColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                     )
                 }
             }
@@ -1131,15 +1119,10 @@ private fun PengeluaranCategoryFilterRow(
 
     @Composable
     fun resolveCategoryAccent(category: String): Color {
-        return when (category.lowercase()) {
-            "semua" -> MaterialTheme.colorScheme.primary
-            "listrik & air" -> santoyaColors.info
-            "filter & membran" -> MaterialTheme.colorScheme.primary
-            "tutup & tisu galon" -> santoyaColors.success
-            "bensin & transport" -> santoyaColors.warning
-            "perawatan" -> MaterialTheme.colorScheme.tertiary
-            "operasional" -> MaterialTheme.colorScheme.secondary
-            else -> MaterialTheme.colorScheme.onSurfaceVariant
+        return if (category.equals("Semua", ignoreCase = true)) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            resolvePengeluaranCategoryColor(category)
         }
     }
 
@@ -1212,10 +1195,24 @@ private fun PengeluaranCategoryFilterRow(
                     modifier = Modifier.heightIn(min = 36.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        if (isAll) {
+                            HydroExpenseFlowIcon(
+                                tint = contentColor,
+                                leafAccent = contentColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        } else {
+                            PengeluaranCategoryIcon(
+                                kategori = cat,
+                                tint = contentColor,
+                                accentColor = contentColor,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        }
                         Text(
                             text = cat,
                             style = MaterialTheme.typography.labelMedium,

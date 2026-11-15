@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.entity.Produk
 import com.example.ui.components.HydroGalonIcon
+import com.example.ui.components.ProdukCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
@@ -185,7 +186,8 @@ fun ProdukScreen(
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        HydroGalonIcon(
+                                        ProdukCategoryIcon(
+                                            namaProduk = produk.nama_produk,
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(22.dp)
                                         )
@@ -274,7 +276,8 @@ fun ProdukScreen(
             title = if (target == null) "Tambah Produk" else "Edit Produk",
             subtitle = "Atur nama dan harga jual per galon",
             headerIconContent = {
-                HydroGalonIcon(
+                ProdukCategoryIcon(
+                    namaProduk = nama,
                     tint = MaterialTheme.santoyaColors.onHero,
                     modifier = Modifier.size(21.dp)
                 )

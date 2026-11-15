@@ -129,3 +129,19 @@ tasks.withType<Test> {
     events("passed", "failed", "skipped")
   }
 }
+
+val googleServicesFile = file("google-services.json")
+val googleServicesBackup = rootProject.file("gradle/firebase-google-services.json")
+if (!googleServicesFile.exists() && googleServicesBackup.exists()) {
+  googleServicesBackup.copyTo(googleServicesFile, overwrite = true)
+}
+tasks.matching { it.name.contains("GoogleServices") }.configureEach {
+  val targetFile = project.file("google-services.json")
+  val backupFile = project.rootProject.file("gradle/firebase-google-services.json")
+  doFirst {
+    if (!targetFile.exists() && backupFile.exists()) {
+      backupFile.copyTo(targetFile, overwrite = true)
+    }
+  }
+}
+

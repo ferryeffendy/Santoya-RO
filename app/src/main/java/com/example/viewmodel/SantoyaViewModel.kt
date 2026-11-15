@@ -22,6 +22,8 @@ import com.example.util.PerawatanEvaluation
 import com.example.util.PerawatanScheduler
 import com.example.util.RealtimeSyncEngine
 import com.example.util.RealtimeSyncState
+import com.example.util.SearchField
+import com.example.util.SearchMatcher
 import com.example.util.SyncConnectionStatus
 import com.example.util.SyncSummary
 import com.google.firebase.Firebase
@@ -1118,71 +1120,105 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun getFilteredPelangganUiModels(query: String, list: List<PelangganUiModel>): List<PelangganUiModel> {
-        val q = query.trim().lowercase()
-        if (q.isBlank()) return list
-        return list.filter {
-            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(it.pelanggan.alamat)
-            val deletedBy = KaryawanScopeHelper.extractDeletedByPelanggan(it.pelanggan).orEmpty()
-            it.pelanggan.nama.lowercase().contains(q) ||
-                cleanAlamat.lowercase().contains(q) ||
-                deletedBy.lowercase().contains(q) ||
-                it.pelanggan.no_hp.lowercase().contains(q)
+    /**
+     * Menyaring dan mengurutkan daftar [PelangganUiModel] berdasarkan relevansi kata kunci [query].
+     */
+    fun getFilteredPelangganUiModels(
+        query: String,
+        list: List<PelangganUiModel>,
+        kurirList: List<Kurir> = emptyList()
+    ): List<PelangganUiModel> {
+        if (query.isBlank()) return list
+        val kurirById = if (kurirList.isEmpty()) emptyMap() else kurirList.associate { it.id to it.nama }
+        return SearchMatcher.rankAndFilter(list, query) { item ->
+            val p = item.pelanggan
+            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(p.alamat)
+            val deletedBy = KaryawanScopeHelper.extractDeletedByPelanggan(p).orEmpty()
+            val kurirName = p.id_kurir_langganan?.let { kurirById[it] }.orEmpty()
+            listOf(
+                SearchField(p.nama, weight = 24, isPrimaryName = true),
+                SearchField(cleanAlamat, weight = 10),
+                SearchField(p.no_hp, weight = 14, isPhone = true),
+                SearchField(kurirName, weight = 6),
+                SearchField(deletedBy, weight = 5)
+            )
         }
     }
 
+    /**
+     * Menyaring dan mengurutkan daftar pelanggan untuk dropdown pemilih di layar Transaksi.
+     */
+    fun getFilteredPelangganForPicker(
+        query: String,
+        pelangganList: List<Pelanggan>,
+        kurirList: List<Kurir> = emptyList()
+    ): List<Pelanggan> {
+        val sortedBase = pelangganList.sortedBy { it.nama.lowercase() }
+        if (query.isBlank()) return sortedBase
+        val kurirById = if (kurirList.isEmpty()) emptyMap() else kurirList.associate { it.id to it.nama }
+        return SearchMatcher.rankAndFilter(sortedBase, query) { p ->
+            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(p.alamat)
+            val kurirName = p.id_kurir_langganan?.let { kurirById[it] }.orEmpty()
+            listOf(
+                SearchField(p.nama, weight = 24, isPrimaryName = true),
+                SearchField(cleanAlamat, weight = 10),
+                SearchField(p.no_hp, weight = 14, isPhone = true),
+                SearchField(kurirName, weight = 6)
+            )
+        }
+    }
+
+    /**
+     * Menyaring dan mengurutkan daftar pelanggan kasbon sesuai [sortOption] dan relevansi [query].
+     */
     fun getSortedKasbonPelanggan(
         pelangganList: List<Pelanggan>,
         sortOption: KasbonSortOption,
         query: String,
         transaksiList: List<TransaksiDetail>
     ): List<Pelanggan> {
-        val q = query.trim().lowercase()
-        val qDigits = q.filter { it.isDigit() }
-        val filtered = pelangganList
+        val activeKasbon = pelangganList
             .filter { !KaryawanScopeHelper.isSoftDeletedPelanggan(it) && it.sisa_kasbon > 0 }
-            .filter { p ->
-                if (q.isBlank()) true
-                else {
-                    val hpDigits = p.no_hp.filter { it.isDigit() }
-                    val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(p.alamat)
-                    p.nama.lowercase().contains(q) ||
-                        cleanAlamat.lowercase().contains(q) ||
-                        p.no_hp.lowercase().contains(q) ||
-                        (qDigits.isNotEmpty() && hpDigits.contains(qDigits)) ||
-                        p.sisa_kasbon.toLong().toString().contains(q)
+
+        val baseSorted = if (sortOption == KasbonSortOption.TERBANYAK) {
+            activeKasbon.sortedByDescending { it.sisa_kasbon }
+        } else {
+            val minDateByCust = HashMap<Int, Long>()
+            val maxDateByCust = HashMap<Int, Long>()
+            for (detail in transaksiList) {
+                val tx = detail.transaksi
+                if (!KaryawanScopeHelper.isDeletedTransaksi(tx) && tx.status.equals("Kasbon", ignoreCase = true)) {
+                    val cid = tx.id_pelanggan ?: continue
+                    val currentMin = minDateByCust[cid]
+                    if (currentMin == null || tx.tanggal < currentMin) {
+                        minDateByCust[cid] = tx.tanggal
+                    }
+                    val currentMax = maxDateByCust[cid]
+                    if (currentMax == null || tx.tanggal > currentMax) {
+                        maxDateByCust[cid] = tx.tanggal
+                    }
                 }
             }
-
-        if (sortOption == KasbonSortOption.TERBANYAK) {
-            return filtered.sortedByDescending { it.sisa_kasbon }
-        }
-
-        val minDateByCust = HashMap<Int, Long>()
-        val maxDateByCust = HashMap<Int, Long>()
-        for (detail in transaksiList) {
-            val tx = detail.transaksi
-            if (!KaryawanScopeHelper.isDeletedTransaksi(tx) && tx.status.equals("Kasbon", ignoreCase = true)) {
-                val cid = tx.id_pelanggan ?: continue
-                val currentMin = minDateByCust[cid]
-                if (currentMin == null || tx.tanggal < currentMin) {
-                    minDateByCust[cid] = tx.tanggal
-                }
-                val currentMax = maxDateByCust[cid]
-                if (currentMax == null || tx.tanggal > currentMax) {
-                    maxDateByCust[cid] = tx.tanggal
-                }
+            when (sortOption) {
+                KasbonSortOption.TERBANYAK -> activeKasbon.sortedByDescending { it.sisa_kasbon }
+                KasbonSortOption.TERLAMA -> activeKasbon.sortedBy { p -> minDateByCust[p.id] ?: Long.MAX_VALUE }
+                KasbonSortOption.TERBARU -> activeKasbon.sortedByDescending { p -> maxDateByCust[p.id] ?: 0L }
             }
         }
 
-        return when (sortOption) {
-            KasbonSortOption.TERBANYAK -> filtered.sortedByDescending { it.sisa_kasbon }
-            KasbonSortOption.TERLAMA -> {
-                filtered.sortedBy { p -> minDateByCust[p.id] ?: Long.MAX_VALUE }
-            }
-            KasbonSortOption.TERBARU -> {
-                filtered.sortedByDescending { p -> maxDateByCust[p.id] ?: 0L }
-            }
+        if (query.isBlank()) return baseSorted
+
+        return SearchMatcher.rankAndFilter(baseSorted, query) { p ->
+            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(p.alamat)
+            val nominalFormatted = FormatUtils.formatRupiah(p.sisa_kasbon)
+            val nominalRaw = p.sisa_kasbon.toLong().toString()
+            listOf(
+                SearchField(p.nama, weight = 24, isPrimaryName = true),
+                SearchField(cleanAlamat, weight = 10),
+                SearchField(p.no_hp, weight = 14, isPhone = true),
+                SearchField(nominalFormatted, weight = 8),
+                SearchField(nominalRaw, weight = 8)
+            )
         }
     }
 

@@ -34,16 +34,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
@@ -88,6 +86,8 @@ import com.example.data.entity.PerawatanItem
 import com.example.data.entity.PerawatanLog
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.HydroMaintenanceWrenchIcon
+import com.example.ui.components.PerawatanComponentIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
@@ -456,12 +456,19 @@ private fun PerawatanSummaryBanner(
                     cornerRadius = SantoyaRadius.md,
                     elevation = 0.dp
                 ) {
-                    Icon(
-                        imageVector = if (overdueCount > 0) Icons.Outlined.WarningAmber else Icons.Outlined.Build,
-                        contentDescription = null,
-                        tint = MaterialTheme.santoyaColors.onHero,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (overdueCount > 0) {
+                        Icon(
+                            imageVector = Icons.Outlined.WarningAmber,
+                            contentDescription = null,
+                            tint = MaterialTheme.santoyaColors.onHero,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    } else {
+                        HydroMaintenanceWrenchIcon(
+                            tint = MaterialTheme.santoyaColors.onHero,
+                            modifier = Modifier.size(21.dp)
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -625,11 +632,12 @@ private fun PerawatanScheduleCard(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Outlined.Build,
-                                contentDescription = null,
+                            PerawatanComponentIcon(
+                                syncId = item.syncId,
+                                nama = item.nama,
                                 tint = statusColor,
-                                modifier = Modifier.size(20.dp)
+                                accentColor = statusColor,
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
@@ -790,11 +798,12 @@ private fun PerawatanHistoryCard(
                         modifier = Modifier.size(36.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Outlined.EventAvailable,
-                                contentDescription = null,
+                            PerawatanComponentIcon(
+                                syncId = "",
+                                nama = log.namaPerawatan,
                                 tint = accent,
-                                modifier = Modifier.size(18.dp)
+                                accentColor = accent,
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     }
@@ -849,7 +858,7 @@ private fun PerawatanHistoryCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Outlined.ReceiptLong,
+                            imageVector = Icons.AutoMirrored.Outlined.ReceiptLong,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onTertiaryContainer,
                             modifier = Modifier.size(13.dp)
@@ -925,11 +934,11 @@ private fun PerawatanFormBottomSheet(
         subtitle = "Atur komponen mesin RO dan interval pengingat",
         headerAccent = MaterialTheme.colorScheme.primary,
         headerIconContent = {
-            Icon(
-                imageVector = Icons.Outlined.Build,
-                contentDescription = null,
+            PerawatanComponentIcon(
+                syncId = initialItem?.syncId.orEmpty(),
+                nama = nama,
                 tint = MaterialTheme.santoyaColors.onHero,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(21.dp)
             )
         },
         confirmLabel = if (initialItem == null) "Tambah" else "Simpan",

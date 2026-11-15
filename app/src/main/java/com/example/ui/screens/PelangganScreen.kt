@@ -102,6 +102,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroCustomerDropIcon
 import com.example.ui.components.HydroExpenseFlowIcon
@@ -114,6 +115,7 @@ import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaFormBottomSheet
+import com.example.ui.components.SantoyaSearchBar
 import com.example.ui.components.SantoyaTabPillItem
 import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.bringIntoViewOnFocus
@@ -129,6 +131,8 @@ import com.example.util.CrmOrderStatus
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
+import com.example.util.SearchField
+import com.example.util.SearchMatcher
 import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.KasbonSortOption
 import com.example.viewmodel.SantoyaScreen
@@ -555,66 +559,16 @@ private fun CompactPelangganSearchBar(
     onQueryChange: (String) -> Unit,
     placeholder: String,
     testTag: String,
+    resultCount: Int? = null,
     modifier: Modifier = Modifier
 ) {
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-
-    OutlinedTextField(
-        value = query,
-        onValueChange = onQueryChange,
-        placeholder = {
-            Text(
-                text = placeholder,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Outlined.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(19.dp)
-            )
-        },
-        trailingIcon = {
-            if (query.isNotEmpty()) {
-                IconButton(
-                    onClick = {
-                        onQueryChange("")
-                        focusManager.clearFocus()
-                    },
-                    modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 40.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Clear,
-                        contentDescription = "Bersihkan pencarian",
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        },
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Text,
-            imeAction = ImeAction.Search
-        ),
-        keyboardActions = KeyboardActions(
-            onSearch = {
-                focusManager.clearFocus()
-                keyboardController?.hide()
-            }
-        ),
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surface,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surface
-        ),
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .testTag(testTag)
+    SantoyaSearchBar(
+        query = query,
+        onQueryChange = onQueryChange,
+        placeholder = placeholder,
+        testTag = testTag,
+        resultCount = resultCount,
+        modifier = modifier.padding(horizontal = 12.dp, vertical = 6.dp)
     )
 }
 
@@ -662,8 +616,8 @@ private fun SemuaPelangganTab(
     }
 
     val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsState()
-    val filtered = remember(searchQuery, baseModels) {
-        viewModel.getFilteredPelangganUiModels(searchQuery, baseModels)
+    val filtered = remember(searchQuery, baseModels, kurirList) {
+        viewModel.getFilteredPelangganUiModels(searchQuery, baseModels, kurirList)
     }
     val unpaidTxByCustomer = remember(transaksiList) {
         transaksiList
@@ -681,7 +635,8 @@ private fun SemuaPelangganTab(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
             placeholder = "Cari nama, alamat, atau No. HP...",
-            testTag = "input_search_pelanggan"
+            testTag = "input_search_pelanggan",
+            resultCount = if (searchQuery.isNotBlank()) filtered.size else null
         )
 
         if (!isKaryawan && deletedModels.isNotEmpty()) {
@@ -759,6 +714,7 @@ private fun SemuaPelangganTab(
                         PelangganItemCard(
                             pelangganUiModel = item,
                             kurirList = kurirList,
+                            searchQuery = searchQuery,
                             isSoftDeleted = isSoftDeleted,
                             deletedBy = deletedBy,
                             onEdit = { onEdit(item.pelanggan) },
@@ -813,8 +769,8 @@ private fun JadwalPelangganTab(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     var searchQuery by remember { mutableStateOf("") }
-    val filtered = remember(searchQuery, jadwalUiModels) {
-        viewModel.getFilteredPelangganUiModels(searchQuery, jadwalUiModels)
+    val filtered = remember(searchQuery, jadwalUiModels, kurirList) {
+        viewModel.getFilteredPelangganUiModels(searchQuery, jadwalUiModels, kurirList)
     }
 
     if (jadwalUiModels.isEmpty()) {
@@ -829,7 +785,8 @@ private fun JadwalPelangganTab(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
                 placeholder = "Cari pelanggan yang jatuh tempo...",
-                testTag = "input_search_jadwal_pelanggan"
+                testTag = "input_search_jadwal_pelanggan",
+                resultCount = if (searchQuery.isNotBlank()) filtered.size else null
             )
 
             if (filtered.isEmpty()) {
@@ -856,6 +813,7 @@ private fun JadwalPelangganTab(
                             PelangganItemCard(
                                 pelangganUiModel = item,
                                 kurirList = kurirList,
+                                searchQuery = searchQuery,
                                 onEdit = { onEdit(item.pelanggan) },
                                 onDelete = { onDelete(item.pelanggan) },
                                 onBayarKasbon = { onBayarKasbon(item.pelanggan) },
@@ -906,6 +864,7 @@ private fun JadwalPelangganTab(
 private fun PelangganItemCard(
     pelangganUiModel: com.example.viewmodel.PelangganUiModel,
     kurirList: List<Kurir> = emptyList(),
+    searchQuery: String = "",
     isSoftDeleted: Boolean = false,
     deletedBy: String? = null,
     onEdit: () -> Unit,
@@ -990,20 +949,32 @@ private fun PelangganItemCard(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
+                        HighlightedSearchText(
                             text = pelanggan.nama,
+                            query = searchQuery,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = if (pelanggan.no_hp.isNotBlank()) pelanggan.no_hp else "Tanpa No. HP",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        if (pelanggan.no_hp.isNotBlank()) {
+                            HighlightedSearchText(
+                                text = pelanggan.no_hp,
+                                query = searchQuery,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else {
+                            Text(
+                                text = "Tanpa No. HP",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
 
@@ -1049,8 +1020,9 @@ private fun PelangganItemCard(
             }
 
             if (cleanAlamat.isNotBlank()) {
-                Text(
+                HighlightedSearchText(
                     text = cleanAlamat,
+                    query = searchQuery,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
@@ -1453,7 +1425,8 @@ private fun KasbonPelangganTab(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
             placeholder = "Cari nama, No. HP, atau nominal kasbon...",
-            testTag = "input_search_kasbon"
+            testTag = "input_search_kasbon",
+            resultCount = if (searchQuery.isNotBlank()) sortedKasbon.size else null
         )
 
         Row(
@@ -1609,16 +1582,18 @@ private fun KasbonPelangganTab(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
+                                        HighlightedSearchText(
                                             text = cust.nama,
+                                            query = searchQuery,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        Text(
+                                        HighlightedSearchText(
                                             text = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat)
                                                 .ifBlank { cust.no_hp.ifBlank { "Tanpa keterangan" } },
+                                            query = searchQuery,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             maxLines = 1,
@@ -1824,25 +1799,23 @@ private fun TopRankingTab(
                 Pair(list.size, list.sumOf { it.transaksi.total_harga })
             }
     }
-    val filteredRanking = remember(ranking, searchQuery) {
+    val indexedRanking = remember(ranking) {
+        ranking.mapIndexed { idx, pair -> Triple(idx + 1, pair.first, pair.second) }
+    }
+    val filteredRanking = remember(indexedRanking, searchQuery) {
         if (searchQuery.isBlank()) {
-            ranking.mapIndexed { idx, pair -> Triple(idx + 1, pair.first, pair.second) }
+            indexedRanking
         } else {
-            val q = searchQuery.lowercase().trim()
-            val qDigits = q.filter { it.isDigit() }
-            ranking.mapIndexedNotNull { idx, pair ->
-                val cust = pair.first
-                val hpDigits = cust.no_hp.filter { it.isDigit() }
-                val matchPhone = cust.no_hp.lowercase().contains(q) ||
-                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
-                val matchGalon = "${pair.second} galon".contains(q) || pair.second.toString() == q
-                if (cust.nama.lowercase().contains(q) ||
-                    cust.alamat.lowercase().contains(q) ||
-                    matchPhone ||
-                    matchGalon
-                ) {
-                    Triple(idx + 1, cust, pair.second)
-                } else null
+            SearchMatcher.rankAndFilter(indexedRanking, searchQuery) { triple ->
+                val cust = triple.second
+                val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat)
+                listOf(
+                    SearchField(cust.nama, weight = 24, isPrimaryName = true),
+                    SearchField(cleanAlamat, weight = 10),
+                    SearchField(cust.no_hp, weight = 14, isPhone = true),
+                    SearchField("${triple.third} galon", weight = 6),
+                    SearchField("${triple.third} gln", weight = 6)
+                )
             }
         }
     }
@@ -1859,7 +1832,8 @@ private fun TopRankingTab(
                 query = searchQuery,
                 onQueryChange = { searchQuery = it },
                 placeholder = "Cari nama atau No. HP...",
-                testTag = "input_search_ranking"
+                testTag = "input_search_ranking",
+                resultCount = if (searchQuery.isNotBlank()) filteredRanking.size else null
             )
 
             if (filteredRanking.isEmpty()) {
@@ -1961,15 +1935,17 @@ private fun TopRankingTab(
                                         }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(
+                                            HighlightedSearchText(
                                                 text = cust.nama,
+                                                query = searchQuery,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
-                                            Text(
+                                            HighlightedSearchText(
                                                 text = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat).ifBlank { "Pelanggan Santoya" },
+                                                query = searchQuery,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,
@@ -2043,15 +2019,13 @@ private fun PasifPelangganTab(
     val filteredPasif = remember(pasifList, searchQuery) {
         if (searchQuery.isBlank()) pasifList
         else {
-            val q = searchQuery.lowercase().trim()
-            val qDigits = q.filter { it.isDigit() }
-            pasifList.filter { (cust, _) ->
-                val hpDigits = cust.no_hp.filter { it.isDigit() }
-                val matchPhone = cust.no_hp.lowercase().contains(q) ||
-                    (qDigits.isNotEmpty() && hpDigits.contains(qDigits))
-                cust.nama.lowercase().contains(q) ||
-                    cust.alamat.lowercase().contains(q) ||
-                    matchPhone
+            SearchMatcher.rankAndFilter(pasifList, searchQuery) { (cust, _) ->
+                val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat)
+                listOf(
+                    SearchField(cust.nama, weight = 24, isPrimaryName = true),
+                    SearchField(cleanAlamat, weight = 10),
+                    SearchField(cust.no_hp, weight = 14, isPhone = true)
+                )
             }
         }
     }
@@ -2061,7 +2035,8 @@ private fun PasifPelangganTab(
             query = searchQuery,
             onQueryChange = { searchQuery = it },
             placeholder = "Cari pelanggan lama...",
-            testTag = "input_search_pasif"
+            testTag = "input_search_pasif",
+            resultCount = if (searchQuery.isNotBlank()) filteredPasif.size else null
         )
 
         Surface(
@@ -2160,8 +2135,9 @@ private fun PasifPelangganTab(
                                     }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Text(
+                                        HighlightedSearchText(
                                             text = cust.nama,
+                                            query = searchQuery,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
@@ -2169,8 +2145,9 @@ private fun PasifPelangganTab(
                                         )
                                         val cleanAddr = KaryawanScopeHelper.cleanPelangganAlamat(cust.alamat)
                                         if (cleanAddr.isNotBlank()) {
-                                            Text(
+                                            HighlightedSearchText(
                                                 text = cleanAddr,
+                                                query = searchQuery,
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 maxLines = 1,

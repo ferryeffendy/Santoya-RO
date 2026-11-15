@@ -66,8 +66,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
+import com.example.ui.components.SantoyaSearchBar
 import com.example.ui.components.SantoyaTopBarIconButton
 import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize
@@ -76,6 +78,8 @@ import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.SantoyaReceiptHelper
+import com.example.util.SearchField
+import com.example.util.SearchMatcher
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
 
@@ -147,14 +151,21 @@ fun RiwayatScreen(
         if (searchQuery.isBlank()) {
             effectiveTransaksiList
         } else {
-            val query = searchQuery.trim().lowercase()
-            effectiveTransaksiList.filter { item ->
-                (item.pelanggan?.nama?.lowercase()?.contains(query) == true) ||
-                    (item.produk?.nama_produk?.lowercase()?.contains(query) == true) ||
-                    (item.kurir?.nama?.lowercase()?.contains(query) == true) ||
-                    item.transaksi.status.lowercase().contains(query) ||
-                    item.transaksi.metode_bayar.lowercase().contains(query) ||
-                    item.transaksi.id.toString() == query
+            SearchMatcher.rankAndFilter(effectiveTransaksiList, searchQuery) { item ->
+                val cleanAlamat = item.pelanggan?.alamat?.let { KaryawanScopeHelper.cleanPelangganAlamat(it) }.orEmpty()
+                listOf(
+                    SearchField(item.pelanggan?.nama ?: "Pelanggan Umum", weight = 24, isPrimaryName = true),
+                    SearchField(cleanAlamat, weight = 10),
+                    SearchField(item.pelanggan?.no_hp.orEmpty(), weight = 14, isPhone = true),
+                    SearchField(item.produk?.nama_produk.orEmpty(), weight = 10),
+                    SearchField(item.kurir?.nama.orEmpty(), weight = 12),
+                    SearchField(item.transaksi.status, weight = 8),
+                    SearchField(item.transaksi.metode_bayar, weight = 8),
+                    SearchField("#TRX-${item.transaksi.id}", weight = 10),
+                    SearchField(FormatUtils.formatRupiah(item.transaksi.total_harga), weight = 8),
+                    SearchField(item.transaksi.total_harga.toLong().toString(), weight = 8),
+                    SearchField(FormatUtils.formatDate(item.transaksi.tanggal), weight = 6)
+                )
             }
         }
     }
@@ -207,35 +218,16 @@ fun RiwayatScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = SantoyaSpacing.pageHorizontal, vertical = SantoyaSpacing.sm)
-                    .testTag("input_search_riwayat"),
-                placeholder = { Text("Cari nota, pelanggan, kurir, produk...") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Bersihkan",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(SantoyaRadius.md)
+            SantoyaSearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                placeholder = "Cari nota, pelanggan, kurir, produk...",
+                testTag = "input_search_riwayat",
+                resultCount = if (searchQuery.isNotBlank()) filteredList.size else null,
+                modifier = Modifier.padding(
+                    horizontal = SantoyaSpacing.pageHorizontal,
+                    vertical = SantoyaSpacing.sm
+                )
             )
 
             if (filteredList.isEmpty()) {
@@ -289,6 +281,7 @@ fun RiwayatScreen(
                             totalHarga = trx.total_harga,
                             metodeBayar = trx.metode_bayar,
                             status = trx.status,
+                            searchQuery = searchQuery,
                             onPrint = { printReceipt(receiptText) },
                             onShare = {
                                 SantoyaReceiptHelper.shareReceiptImage(
@@ -420,7 +413,8 @@ fun RiwayatTransaksiCard(
     onShare: () -> Unit,
     onTandaiLunas: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    searchQuery: String = ""
 ) {
     val isLunas = status.equals("Lunas", ignoreCase = true)
     val santoyaColors = MaterialTheme.santoyaColors
@@ -461,8 +455,9 @@ fun RiwayatTransaksiCard(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(
+                        HighlightedSearchText(
                             text = namaPelanggan,
+                            query = searchQuery,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -514,15 +509,17 @@ fun RiwayatTransaksiCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
+                    HighlightedSearchText(
                         text = "$namaProduk x $jumlah (${FormatUtils.formatRupiah(hargaSatuan)})",
+                        query = searchQuery,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
+                    HighlightedSearchText(
                         text = "${FormatUtils.formatMetodeBayarLabel(metodeBayar)} • Kurir: $namaKurir",
+                        query = searchQuery,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

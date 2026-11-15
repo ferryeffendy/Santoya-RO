@@ -87,8 +87,10 @@ import com.example.ui.components.HydroCustomerDropIcon
 import com.example.ui.components.HydroExpenseFlowIcon
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.HydroMaintenanceWrenchIcon
 import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.HydroReportChartIcon
+import com.example.ui.components.PerawatanComponentIcon
 import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
@@ -1169,11 +1171,9 @@ fun DashboardScreen(
                                         size = 38.dp,
                                         cornerRadius = SantoyaRadius.md
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Build,
-                                            contentDescription = null,
+                                        HydroMaintenanceWrenchIcon(
                                             tint = santoyaColors.onHero,
-                                            modifier = Modifier.size(19.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
@@ -1234,20 +1234,34 @@ fun DashboardScreen(
                                     val isLate = eval.status == PerawatanStatus.TERLAMBAT
                                     val pillBg = if (isLate) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
                                     val pillFg = if (isLate) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
+                                    val rowIconTint = if (isLate) MaterialTheme.colorScheme.error else santoyaColors.warning
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = "• ${eval.item.nama}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Normal,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
                                             modifier = Modifier.weight(1f)
-                                        )
+                                        ) {
+                                            PerawatanComponentIcon(
+                                                syncId = eval.item.syncId,
+                                                nama = eval.item.nama,
+                                                tint = rowIconTint,
+                                                accentColor = rowIconTint,
+                                                modifier = Modifier.size(15.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = eval.item.nama,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Medium,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Surface(
                                             shape = RoundedCornerShape(SantoyaRadius.xs),

@@ -70,6 +70,7 @@ import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.HydroCourierWaveIcon
 import com.example.ui.components.HydroGalonIcon
+import com.example.ui.components.HydroMaintenanceWrenchIcon
 import com.example.ui.components.ImportJsonDialog
 import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.theme.SantoyaRadius
@@ -265,10 +266,15 @@ fun SettingsScreen(
                     SettingsMenuRow(
                         title = "Jadwal Perawatan RO",
                         subtitle = perawatanSubtitle,
-                        icon = Icons.Outlined.Build,
                         iconColor = MaterialTheme.colorScheme.primary,
                         onClick = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
-                        modifier = Modifier.testTag("menu_jadwal_perawatan")
+                        modifier = Modifier.testTag("menu_jadwal_perawatan"),
+                        iconContent = {
+                            HydroMaintenanceWrenchIcon(
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     )
                 }
             }

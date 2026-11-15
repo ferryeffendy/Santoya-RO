@@ -1152,6 +1152,7 @@ fun SantoyaFilterPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null,
+    leadingIconContent: (@Composable () -> Unit)? = null,
     selectedContainerColor: Color = MaterialTheme.colorScheme.primaryContainer,
     selectedContentColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
     selectedBorderColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
@@ -1188,7 +1189,10 @@ fun SantoyaFilterPill(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
             ) {
-                if (leadingIcon != null) {
+                if (leadingIconContent != null) {
+                    leadingIconContent()
+                    Spacer(modifier = Modifier.width(5.dp))
+                } else if (leadingIcon != null) {
                     Icon(
                         imageVector = leadingIcon,
                         contentDescription = null,
