@@ -449,7 +449,7 @@ fun CatatPenjualanTab(
                         if (!isToday) {
                             val santoyaColors = MaterialTheme.santoyaColors
                             Surface(
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 color = santoyaColors.warningContainer,
                                 modifier = Modifier.clickable {
                                     viewModel.setTxTanggal(System.currentTimeMillis())
@@ -466,7 +466,7 @@ fun CatatPenjualanTab(
                             }
                         }
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
                         ) {
@@ -711,7 +711,7 @@ fun CatatPenjualanTab(
                 val selectedEffectiveKasbon = effectiveKasbonByCustomer[selectedPelanggan.id] ?: selectedPelanggan.sisa_kasbon
                 if (selectedPelanggan.harga_khusus != null || selectedPelanggan.id_kurir_langganan != null) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -753,7 +753,7 @@ fun CatatPenjualanTab(
                 if (selectedEffectiveKasbon > 0) {
                     val santoyaColors = MaterialTheme.santoyaColors
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = santoyaColors.warningContainer.copy(alpha = 0.7f),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2313,7 +2313,7 @@ fun RiwayatTransaksiTab(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = santoyaColors.successContainer.copy(alpha = 0.75f),
                                         border = BorderStroke(1.dp, santoyaColors.success.copy(alpha = 0.25f)),
                                         modifier = Modifier.weight(1f)
@@ -2341,7 +2341,7 @@ fun RiwayatTransaksiTab(
                                         }
                                     }
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = santoyaColors.warningContainer.copy(alpha = 0.75f),
                                         border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.25f)),
                                         modifier = Modifier.weight(1f)
@@ -2458,7 +2458,7 @@ fun RiwayatTransaksiTab(
                             Spacer(modifier = Modifier.width(8.dp))
                             if (isDeletedTx) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = MaterialTheme.colorScheme.errorContainer,
                                     modifier = Modifier.widthIn(max = 175.dp)
                                 ) {
@@ -2474,7 +2474,7 @@ fun RiwayatTransaksiTab(
                                 }
                             } else {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
                                 ) {
                                     Text(
@@ -2576,7 +2576,7 @@ fun RiwayatTransaksiTab(
                                     fontWeight = FontWeight.Medium,
                                     color = when {
                                         isDeletedTx -> MaterialTheme.colorScheme.error
-                                        isKasbon -> Color(0xFFB45309)
+                                        isKasbon -> MaterialTheme.santoyaColors.warning
                                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                                     },
                                     textAlign = TextAlign.End,
@@ -2596,7 +2596,7 @@ fun RiwayatTransaksiTab(
                             ) {
                                 OutlinedButton(
                                     onClick = { viewModel.restoreTransaksi(detail.transaksi) },
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                                     modifier = Modifier.height(32.dp)
                                 ) {
@@ -2641,9 +2641,9 @@ fun RiwayatTransaksiTab(
                             ) {
                                 if (isKasbon) {
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color(0xFF10B981).copy(alpha = 0.16f),
-                                        border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.santoyaColors.success.copy(alpha = 0.16f),
+                                        border = BorderStroke(1.dp, MaterialTheme.santoyaColors.success.copy(alpha = 0.4f)),
                                         modifier = Modifier.clickable {
                                             markingLunasTransaksi = detail
                                         }
@@ -2655,7 +2655,7 @@ fun RiwayatTransaksiTab(
                                             Icon(
                                                 imageVector = Icons.Outlined.Check,
                                                 contentDescription = "Tandai Lunas",
-                                                tint = Color(0xFF047857),
+                                                tint = MaterialTheme.santoyaColors.onSuccessContainer,
                                                 modifier = Modifier.size(14.dp)
                                             )
                                             Spacer(modifier = Modifier.width(4.dp))
@@ -2663,7 +2663,7 @@ fun RiwayatTransaksiTab(
                                                 text = "Lunasi Nota",
                                                 style = MaterialTheme.typography.labelMedium,
                                                 fontWeight = FontWeight.Bold,
-                                                color = Color(0xFF047857),
+                                                color = MaterialTheme.santoyaColors.onSuccessContainer,
                                                 maxLines = 1,
                                                 softWrap = false
                                             )
@@ -2679,7 +2679,7 @@ fun RiwayatTransaksiTab(
                                 ) {
                                     IconButton(
                                         onClick = { editingTransaksi = detail },
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Edit,
@@ -2704,7 +2704,7 @@ fun RiwayatTransaksiTab(
                                                 )
                                             )
                                         },
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Print,
@@ -2726,7 +2726,7 @@ fun RiwayatTransaksiTab(
                                                 phoneNumber = detail.pelanggan?.no_hp
                                             )
                                         },
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Share,
@@ -2738,7 +2738,7 @@ fun RiwayatTransaksiTab(
 
                                     IconButton(
                                         onClick = { deletingTransaksi = detail },
-                                        modifier = Modifier.size(40.dp)
+                                        modifier = Modifier.size(48.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.Delete,
@@ -2781,7 +2781,7 @@ fun RiwayatTransaksiTab(
         val target = markingLunasTransaksi!!
         AlertDialog(
             onDismissRequest = { markingLunasTransaksi = null },
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(16.dp),
             title = {
                 Text(
                     text = "Tandai Nota Lunas?",
@@ -2803,9 +2803,9 @@ fun RiwayatTransaksiTab(
                         markingLunasTransaksi = null
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF059669)
+                        containerColor = MaterialTheme.santoyaColors.success
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
                         "Tandai Lunas",
@@ -2818,7 +2818,7 @@ fun RiwayatTransaksiTab(
             dismissButton = {
                 OutlinedButton(
                     onClick = { markingLunasTransaksi = null },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
                         "Batal",
@@ -2836,7 +2836,7 @@ fun RiwayatTransaksiTab(
         val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(target.transaksi) ?: "Karyawan"
         AlertDialog(
             onDismissRequest = { deletingTransaksi = null },
-            shape = RoundedCornerShape(18.dp),
+            shape = RoundedCornerShape(16.dp),
             title = {
                 Text(
                     text = if (isAuditDeleted) "Hapus Permanen Transaksi?" else "Hapus Transaksi?",
@@ -2874,7 +2874,7 @@ fun RiwayatTransaksiTab(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
                         if (isAuditDeleted) "Hapus Permanen" else "Hapus",
@@ -2887,7 +2887,7 @@ fun RiwayatTransaksiTab(
             dismissButton = {
                 OutlinedButton(
                     onClick = { deletingTransaksi = null },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
                         "Batal",
@@ -3308,7 +3308,7 @@ fun RiwayatTransaksiTab(
                     text = "Sisa Kasbon: ${FormatUtils.formatRupiah(editSisaPreview.toDouble())}",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFB45309)
+                    color = MaterialTheme.santoyaColors.warning
                 )
             }
 

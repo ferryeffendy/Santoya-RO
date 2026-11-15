@@ -208,6 +208,7 @@ fun MyApplicationTheme(
         MaterialTheme(
             colorScheme = colorScheme,
             typography = Typography,
+            shapes = SantoyaShapes,
             content = content
         )
     }

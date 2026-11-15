@@ -141,8 +141,8 @@ fun KurirScreen(
         ) {
             item {
                 SantoyaSectionBanner(
-                    title = "Karyawan & Komisi",
-                    subtitle = "Atur akun kurir & tarif komisi",
+                    title = "Tim Pengantar",
+                    subtitle = "Akun aktif & komisi per galon",
                     badgeText = "${displayKurirList.size} Karyawan",
                     accentColor = MaterialTheme.colorScheme.secondary,
                     onAccentColor = MaterialTheme.colorScheme.onSecondary,
@@ -181,7 +181,7 @@ fun KurirScreen(
                     val colors = MaterialTheme.santoyaColors
 
                     Card(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -246,7 +246,7 @@ fun KurirScreen(
                                     IconButton(
                                         onClick = { editingKurir = kurir },
                                         modifier = Modifier
-                                            .size(42.dp)
+                                            .size(48.dp)
                                             .testTag("btn_edit_kurir_${kurir.id}")
                                     ) {
                                         Icon(
@@ -259,7 +259,7 @@ fun KurirScreen(
                                     IconButton(
                                         onClick = { kurirToDelete = kurir },
                                         modifier = Modifier
-                                            .size(42.dp)
+                                            .size(48.dp)
                                             .testTag("btn_delete_kurir_${kurir.id}")
                                     ) {
                                         Icon(
@@ -311,7 +311,7 @@ fun KurirScreen(
                                 val isActive = kurir.akses_aktif
                                 val displayEmail = if (kurir.email.contains("@")) kurir.email else "${kurir.email}@gmail.com"
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = if (isActive) colors.successContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
                                     border = BorderStroke(
                                         1.dp,
@@ -422,7 +422,7 @@ fun KurirScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Hapus")
                 }

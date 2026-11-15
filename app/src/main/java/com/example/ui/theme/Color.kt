@@ -3,13 +3,14 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Santoya RO Brand-Aligned Logo Palette — Light Mode
-// Derived directly from the Santoya RO Water Droplet (#3B93E6), Leaf Green (#52A760), and Deep Hydro Navy (#0A2E5C)
-val PrimaryLight = Color(0xFF3B93E6)
+// Warna aksen logo tetap #3B93E6 / #52A760, tetapi warna teks & tombol dibuat
+// lebih pekat agar kontrasnya lolos standar aksesibilitas (WCAG AA).
+val PrimaryLight = Color(0xFF1B6FC0)
 val OnPrimaryLight = Color(0xFFFFFFFF)
 val PrimaryContainerLight = Color(0xFFE8F3FC)
 val OnPrimaryContainerLight = Color(0xFF0A2E5C)
 
-val SecondaryLight = Color(0xFF52A760)
+val SecondaryLight = Color(0xFF2F7D3C)
 val OnSecondaryLight = Color(0xFFFFFFFF)
 val SecondaryContainerLight = Color(0xFFE9F6EC)
 val OnSecondaryContainerLight = Color(0xFF1B4B27)
@@ -64,17 +65,17 @@ val OutlineDark = Color(0xFF234775)
 val OutlineVariantDark = Color(0xFF17355E)
 
 // Semantic Status Tokens — Light Mode (Aligned with Leaf Green & Hydro Blue)
-val SuccessLight = Color(0xFF3E964D)
+val SuccessLight = Color(0xFF2F7D3C)
 val OnSuccessLight = Color(0xFFFFFFFF)
 val SuccessContainerLight = Color(0xFFE9F6EC)
 val OnSuccessContainerLight = Color(0xFF16421F)
 
-val WarningLight = Color(0xFFC87A19)
+val WarningLight = Color(0xFF9A5A0B)
 val OnWarningLight = Color(0xFFFFFFFF)
 val WarningContainerLight = Color(0xFFFEF4E6)
 val OnWarningContainerLight = Color(0xFF6B3D05)
 
-val InfoLight = Color(0xFF2882D6)
+val InfoLight = Color(0xFF1E6DB8)
 val OnInfoLight = Color(0xFFFFFFFF)
 val InfoContainerLight = Color(0xFFE8F3FC)
 val OnInfoContainerLight = Color(0xFF0A2E5C)
@@ -101,6 +102,7 @@ val RankGoldContainer = Color(0xFFFEF4E6)
 val OnRankGold = Color(0xFF4A2B00)
 
 val RankSilver = Color(0xFF5A738E)
+val RankSilverLight = Color(0xFF94A3B8)
 val RankSilverContainer = Color(0xFFE8F1F8)
 val OnRankSilver = Color(0xFF0A2E5C)
 
@@ -116,6 +118,7 @@ val HeroGradientEnd = Color(0xFF1E78CC)
 val HeroDeficitStart = Color(0xFF8C2633)
 val HeroDeficitMid = Color(0xFF8C2633)
 val HeroDeficitEnd = Color(0xFF8C2633)
+val HeroDeficitPanel = Color(0xFF6E1B26)
 
 val HeroGlowCyan = Color(0xFF3B93E6)
 val HeroGlowCyanSoft = Color(0xFFD6ECFF)

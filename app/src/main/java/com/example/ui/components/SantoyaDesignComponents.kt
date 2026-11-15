@@ -84,10 +84,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.AccentCyan
+import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.RealtimeSyncState
@@ -265,7 +267,7 @@ fun SantoyaSyncInfoBottomSheet(
         onConfirm = onSyncNow
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             color = statusBg,
             border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
             modifier = Modifier.fillMaxWidth()
@@ -870,7 +872,8 @@ fun SantoyaAdaptiveCurrencyText(
             fontSize = scaledFontSize,
             fontWeight = fontWeight ?: style.fontWeight ?: FontWeight.Bold,
             color = color,
-            textAlign = textAlign
+            textAlign = textAlign,
+            fontFeatureSettings = "tnum"
         ),
         maxLines = maxLines,
         softWrap = false,
@@ -923,7 +926,7 @@ fun SantoyaLoadingSkeleton(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
+            shape = RoundedCornerShape(12.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)),
             modifier = Modifier.fillMaxWidth()
@@ -989,7 +992,7 @@ fun SantoyaLoadingSkeleton(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = pulseAlpha * 0.75f),
                         modifier = Modifier
                             .width(68.dp)
@@ -1056,9 +1059,51 @@ fun SantoyaBusyStatusBanner(
 }
 
 /**
+ * Tombol ikon standar Santoya RO.
+ *
+ * Area sentuh selalu 48dp (nyaman untuk jempol), sedangkan lingkaran warnanya
+ * boleh lebih kecil agar tampilan tetap ringkas dan rapi.
+ */
+@Composable
+fun SantoyaIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    enabled: Boolean = true,
+    visualSize: Dp = SantoyaSize.iconButtonVisual,
+    glyphSize: Dp = SantoyaSize.iconGlyph
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(SantoyaSize.touchTarget)
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            modifier = Modifier.size(visualSize)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = tint,
+                    modifier = Modifier.size(glyphSize)
+                )
+            }
+        }
+    }
+}
+
+/**
  * Compact adaptive filter pill without Material 3 FilterChip's 48.dp minimum vertical
  * layout bloat, ensuring multi-row FlowRows and single-row filter bars stay tight and
  * balanced across all Android screen widths.
+ *
+ * Area sentuh tetap 48dp meskipun bentuk visual pilnya lebih pendek.
  */
 @Composable
 fun SantoyaFilterPill(
@@ -1081,42 +1126,47 @@ fun SantoyaFilterPill(
     val contentColor = if (selected) selectedContentColor else unselectedContentColor
     val borderColor = if (selected) selectedBorderColor else unselectedBorderColor
 
-    Surface(
-        shape = shape,
-        color = containerColor,
-        border = BorderStroke(1.dp, borderColor),
+    Box(
         modifier = modifier
-            .heightIn(min = 34.dp)
+            .heightIn(min = SantoyaSize.touchTarget)
             .clip(shape)
             .semantics {
                 this.selected = selected
                 this.role = Role.RadioButton
             }
-            .clickable(onClick = onClick)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Row(
-            modifier = Modifier.padding(contentPadding),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
+        Surface(
+            shape = shape,
+            color = containerColor,
+            border = BorderStroke(1.dp, borderColor),
+            modifier = Modifier.heightIn(min = 34.dp)
         ) {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(14.dp)
+            Row(
+                modifier = Modifier.padding(contentPadding),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
+            ) {
+                if (leadingIcon != null) {
+                    Icon(
+                        imageVector = leadingIcon,
+                        contentDescription = null,
+                        tint = contentColor,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = contentColor,
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.width(4.dp))
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                color = contentColor,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

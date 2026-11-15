@@ -132,8 +132,8 @@ fun ProdukScreen(
         ) {
             item {
                 SantoyaSectionBanner(
-                    title = "Produk & Harga",
-                    subtitle = "Atur produk & harga jual",
+                    title = "Daftar Produk",
+                    subtitle = "Harga jual yang dipakai di kasir",
                     badgeText = "${displayList.size} Produk",
                     accentColor = MaterialTheme.colorScheme.primary,
                     onAccentColor = MaterialTheme.colorScheme.onPrimary,
@@ -161,7 +161,7 @@ fun ProdukScreen(
             } else {
                 items(displayList, key = { it.id }) { produk ->
                     Card(
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -215,7 +215,7 @@ fun ProdukScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(
                                     onClick = { editingProduk = produk },
-                                    modifier = Modifier.size(42.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Edit,
@@ -226,7 +226,7 @@ fun ProdukScreen(
                                 }
                                 IconButton(
                                     onClick = { produkToDelete = produk },
-                                    modifier = Modifier.size(42.dp)
+                                    modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.Delete,
@@ -369,7 +369,7 @@ fun ProdukScreen(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -409,7 +409,7 @@ fun ProdukScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Delete,

@@ -236,7 +236,7 @@ fun AuthScreen(
                                 )
                             },
                             enabled = !isLoading,
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -273,7 +273,7 @@ fun AuthScreen(
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Surface(
-                                            shape = RoundedCornerShape(8.dp),
+                                            shape = RoundedCornerShape(10.dp),
                                             color = Color.White,
                                             modifier = Modifier.size(30.dp)
                                         ) {

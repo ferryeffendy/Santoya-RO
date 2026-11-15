@@ -296,7 +296,7 @@ fun ReceiptDialog(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
+                IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
                     Icon(imageVector = Icons.Outlined.Close, contentDescription = "Tutup")
                 }
             }
@@ -420,7 +420,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
     val isLunas = receipt.statusNota.contains("LUNAS", ignoreCase = true)
 
     Card(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),

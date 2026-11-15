@@ -415,7 +415,7 @@ fun DashboardScreen(
             // 1. Solid Deep Hydro Navy Hero Card (Zero Gradient, Zero Glassmorphism, Organic Logo Curve)
             item {
                 Card(
-                    shape = RoundedCornerShape(22.dp),
+                    shape = RoundedCornerShape(20.dp),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     colors = CardDefaults.cardColors(containerColor = SantoyaNavy),
                     border = BorderStroke(1.dp, SantoyaNavyBorder),
@@ -1448,7 +1448,7 @@ fun DashboardScreen(
                     )
                     if (effectiveTransaksiList.isNotEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
                             modifier = Modifier.pressClickEffect(onClick = {
@@ -1754,7 +1754,7 @@ private fun EditorialPrimaryWideBentoCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(15.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = Color.White,
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
                     modifier = Modifier.size(48.dp)
@@ -1905,7 +1905,7 @@ private fun EditorialFullBannerBentoCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(13.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = iconContainerColor,
                     border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
                     modifier = Modifier.size(42.dp)
