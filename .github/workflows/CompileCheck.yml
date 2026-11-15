@@ -71,3 +71,11 @@ jobs:
 
       - name: Build debug untuk validasi
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Unit test terpilih
+        run: |
+          ./gradlew testDebugUnitTest \
+            --tests "com.example.KaryawanScopeUnitTest" \
+            --tests "com.example.ExampleRobolectricTest" \
+            --tests "com.example.data.repository.OfflineSyncQueueUnitTest" \
+            --stacktrace
