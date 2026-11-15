@@ -257,7 +257,7 @@ fun RiwayatScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredList, key = { it.transaksi.id }) { item ->
@@ -358,7 +358,7 @@ fun RiwayatScreen(
                                         Toast.makeText(context, status, Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
                             Row(
@@ -557,7 +557,7 @@ fun RiwayatTransaksiCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(36.dp),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Check,

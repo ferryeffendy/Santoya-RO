@@ -124,6 +124,7 @@ import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
+import com.example.ui.theme.RankSilverLight
 import com.example.ui.theme.santoyaColors
 import com.example.util.CrmOrderPrediction
 import com.example.util.CrmOrderStatus
@@ -452,7 +453,7 @@ fun PelangganScreen(
                     )
 
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -486,7 +487,7 @@ fun PelangganScreen(
 
                     if (target.sisa_kasbon > 0) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.errorContainer,
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -753,7 +754,7 @@ private fun SemuaPelangganTab(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 92.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 92.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -852,7 +853,7 @@ private fun JadwalPelangganTab(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(columns),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 92.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 92.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -1016,7 +1017,7 @@ private fun PelangganItemCard(
                         if (pelanggan.no_hp.isNotBlank()) {
                             IconButton(
                                 onClick = onCall,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Call,
@@ -1028,7 +1029,7 @@ private fun PelangganItemCard(
                         }
                         IconButton(
                             onClick = onEdit,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Edit,
@@ -1039,7 +1040,7 @@ private fun PelangganItemCard(
                         }
                         IconButton(
                             onClick = onDelete,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Delete,
@@ -1165,7 +1166,7 @@ private fun PelangganItemCard(
                     if (onRestore != null) {
                         OutlinedButton(
                             onClick = onRestore,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             modifier = Modifier
                                 .weight(1f)
@@ -1190,7 +1191,7 @@ private fun PelangganItemCard(
                         onClick = onDelete,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         modifier = Modifier
                             .weight(1f)
@@ -1243,7 +1244,7 @@ private fun PelangganItemCard(
                         if (onPrintKasbon != null) {
                             IconButton(
                                 onClick = onPrintKasbon,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Print,
@@ -1256,7 +1257,7 @@ private fun PelangganItemCard(
                         if (onShareKasbon != null) {
                             IconButton(
                                 onClick = onShareKasbon,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(48.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.Share,
@@ -1270,7 +1271,7 @@ private fun PelangganItemCard(
                             onClick = onBayarKasbon,
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .wrapContentWidth()
                                 .heightIn(min = 38.dp)
@@ -1514,7 +1515,7 @@ private fun KasbonPelangganTab(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 92.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 92.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -1569,7 +1570,7 @@ private fun KasbonPelangganTab(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
                                 ) {
                                     Text(
@@ -1654,7 +1655,7 @@ private fun KasbonPelangganTab(
                                 if (unpaid.isNotEmpty()) {
                                     Surface(
                                         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Column(
@@ -1736,7 +1737,7 @@ private fun KasbonPelangganTab(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
                                     ) {
                                         IconButton(
@@ -1762,7 +1763,7 @@ private fun KasbonPelangganTab(
                                         }
                                     }
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)
                                     ) {
                                         IconButton(
@@ -1783,7 +1784,7 @@ private fun KasbonPelangganTab(
                                     Button(
                                         onClick = { onBayarKasbon(cust) },
                                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                         modifier = Modifier
                                             .weight(1f)
@@ -1882,7 +1883,7 @@ private fun TopRankingTab(
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(columns),
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 92.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 92.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -1901,7 +1902,7 @@ private fun TopRankingTab(
                             }
                             val rankGradient = when (rank) {
                                 1 -> listOf(santoyaColors.rankGold, AccentAmber)
-                                2 -> listOf(santoyaColors.rankSilver, Color(0xFF94A3B8))
+                                2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
                                 3 -> listOf(santoyaColors.rankBronze, AccentAmber)
                                 else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
                             }
@@ -1944,7 +1945,7 @@ private fun TopRankingTab(
                                             }
                                         } else {
                                             Surface(
-                                                shape = RoundedCornerShape(11.dp),
+                                                shape = RoundedCornerShape(12.dp),
                                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                                 modifier = Modifier.defaultMinSize(minWidth = 36.dp, minHeight = 36.dp)
                                             ) {
@@ -1991,7 +1992,7 @@ private fun TopRankingTab(
                                     }
 
                                     Surface(
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
                                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
                                         modifier = Modifier.wrapContentWidth()
@@ -2123,7 +2124,7 @@ private fun PasifPelangganTab(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 92.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 92.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -2217,7 +2218,7 @@ private fun PasifPelangganTab(
                                                 context.startActivity(dialIntent)
                                             }
                                         },
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -2236,7 +2237,7 @@ private fun PasifPelangganTab(
                                 } else {
                                     Surface(
                                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                                        shape = RoundedCornerShape(8.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Text(

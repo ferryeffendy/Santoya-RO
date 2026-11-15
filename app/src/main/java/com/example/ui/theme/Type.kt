@@ -8,44 +8,87 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.aistudio.companion.kzpmrw.R
 
+/**
+ * Plus Jakarta Sans dengan bobot asli (bukan tebal palsu).
+ *
+ * Sebelumnya hanya versi Regular yang dibundel, sehingga semua judul Bold/ExtraBold
+ * digemukkan secara sintetis oleh Android dan hasilnya terlihat kurang rapi.
+ */
 val PlusJakartaSansFontFamily = FontFamily(
-    Font(R.font.plus_jakarta_sans, FontWeight.Normal)
+    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
+    Font(R.font.plus_jakarta_sans_medium, FontWeight.Medium),
+    Font(R.font.plus_jakarta_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.plus_jakarta_sans_bold, FontWeight.Bold),
+    Font(R.font.plus_jakarta_sans_extrabold, FontWeight.ExtraBold),
+    Font(R.font.plus_jakarta_sans_black, FontWeight.Black)
 )
 
+/**
+ * Skala huruf Santoya RO.
+ *
+ * Aturan singkat:
+ * - display/headline  : angka besar & judul utama (dipakai hemat)
+ * - title             : judul kartu dan bagian
+ * - body              : isi bacaan
+ * - label             : tombol, chip, keterangan kecil
+ *
+ * Semua gaya diisi agar tidak ada teks yang jatuh ke font bawaan Android (Roboto).
+ */
 val Typography = Typography(
+    displayLarge = TextStyle(
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 40.sp,
+        lineHeight = 48.sp,
+        letterSpacing = (-1.0).sp
+    ),
+    displayMedium = TextStyle(
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+        letterSpacing = (-0.8).sp
+    ),
     displaySmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.Black,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 32.sp,
-        lineHeight = 38.sp,
-        letterSpacing = (-0.5).sp
+        lineHeight = 40.sp,
+        letterSpacing = (-0.6).sp
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = PlusJakartaSansFontFamily,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
+        letterSpacing = (-0.4).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 26.sp,
+        fontWeight = FontWeight.Bold,
+        fontSize = 24.sp,
         lineHeight = 32.sp,
         letterSpacing = (-0.3).sp
     ),
     headlineSmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.Black,
+        fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
-        letterSpacing = (-0.25).sp
+        letterSpacing = (-0.2).sp
     ),
     titleLarge = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.ExtraBold,
-        fontSize = 19.sp,
-        lineHeight = 25.sp,
-        letterSpacing = (-0.15).sp
+        fontWeight = FontWeight.Bold,
+        fontSize = 20.sp,
+        lineHeight = 28.sp,
+        letterSpacing = (-0.1).sp
     ),
     titleMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
-        lineHeight = 22.sp,
+        lineHeight = 24.sp,
         letterSpacing = 0.sp
     ),
     titleSmall = TextStyle(
@@ -57,7 +100,7 @@ val Typography = Typography(
     ),
     bodyLarge = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
         lineHeight = 22.sp,
         letterSpacing = 0.15.sp
@@ -65,15 +108,15 @@ val Typography = Typography(
     bodyMedium = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.5.sp,
-        lineHeight = 19.sp,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
         letterSpacing = 0.15.sp
     ),
     bodySmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 16.sp,
+        lineHeight = 17.sp,
         letterSpacing = 0.2.sp
     ),
     labelLarge = TextStyle(
@@ -88,7 +131,7 @@ val Typography = Typography(
         fontWeight = FontWeight.SemiBold,
         fontSize = 11.5.sp,
         lineHeight = 16.sp,
-        letterSpacing = 0.25.sp
+        letterSpacing = 0.2.sp
     ),
     labelSmall = TextStyle(
         fontFamily = PlusJakartaSansFontFamily,

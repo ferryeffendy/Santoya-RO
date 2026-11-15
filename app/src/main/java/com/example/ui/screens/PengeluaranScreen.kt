@@ -371,7 +371,7 @@ fun PengeluaranScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 96.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 96.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -441,7 +441,7 @@ fun PengeluaranScreen(
                                 }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.85f)
                                 ) {
                                     Text(
@@ -588,7 +588,7 @@ fun PengeluaranScreen(
                                             modifier = Modifier.weight(1f)
                                         ) {
                                             Surface(
-                                                shape = RoundedCornerShape(11.dp),
+                                                shape = RoundedCornerShape(12.dp),
                                                 color = kategoriColor.copy(alpha = 0.14f),
                                                 modifier = Modifier.size(36.dp)
                                             ) {
@@ -627,7 +627,7 @@ fun PengeluaranScreen(
                                             )
                                             IconButton(
                                                 onClick = { itemToDelete = item },
-                                                modifier = Modifier.size(36.dp)
+                                                modifier = Modifier.size(48.dp)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Outlined.Delete,
@@ -852,7 +852,7 @@ fun PengeluaranScreen(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Hapus")
                 }

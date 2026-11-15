@@ -97,6 +97,7 @@ import com.example.ui.theme.AccentEmerald
 import com.example.ui.theme.AccentRose
 import com.example.ui.theme.HeroDeficitEnd
 import com.example.ui.theme.HeroDeficitMid
+import com.example.ui.theme.HeroDeficitPanel
 import com.example.ui.theme.HeroDeficitStart
 import com.example.ui.theme.HeroGlowAmberSoft
 import com.example.ui.theme.HeroGlowEmeraldSoft
@@ -106,6 +107,7 @@ import com.example.ui.theme.HeroGradientMid
 import com.example.ui.theme.HeroGradientStart
 import com.example.ui.theme.SantoyaNavyBorder
 import com.example.ui.theme.SantoyaNavyPanel
+import com.example.ui.theme.RankSilverLight
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
@@ -577,14 +579,14 @@ fun LaporanScreen(
                 // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Solid Fresh Hydro Blue Style)
                 item {
                     val heroContainerColor = if (isProfit) HeroGradientStart else HeroDeficitStart
-                    val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else Color(0xFF6E1B26)
+                    val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else HeroDeficitPanel
                     val heroBorderColor = if (isProfit) SantoyaNavyBorder else HeroGlowRoseSoft.copy(alpha = 0.45f)
                     val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
                     val formattedMargin = FormatUtils.formatPercent(marginLabaPersen)
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(22.dp),
+                        shape = RoundedCornerShape(20.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                         colors = CardDefaults.cardColors(containerColor = heroContainerColor),
                         border = BorderStroke(1.dp, heroBorderColor)
@@ -1067,7 +1069,7 @@ fun LaporanScreen(
                             Surface(
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -1102,7 +1104,7 @@ fun LaporanScreen(
                             Surface(
                                 color = projectedColor.copy(alpha = 0.12f),
                                 border = BorderStroke(1.dp, projectedColor.copy(alpha = 0.28f)),
-                                shape = RoundedCornerShape(14.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1.18f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -1945,7 +1947,7 @@ private fun BentoFinancialCard(
                     iconContent()
                 }
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = accentColor.copy(alpha = 0.14f)
                 ) {
                     Text(
@@ -2129,14 +2131,14 @@ private fun PenjualanDesaItemRow(
     }
     val rankGradient = when (rank) {
         1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, Color(0xFF94A3B8))
+        2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
         3 -> listOf(santoyaColors.rankBronze, AccentAmber)
         else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(11.dp)) {
@@ -2165,7 +2167,7 @@ private fun PenjualanDesaItemRow(
                         }
                     } else {
                         Surface(
-                            shape = RoundedCornerShape(9.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = rankColor.copy(alpha = 0.14f),
                             modifier = Modifier.size(30.dp)
                         ) {
@@ -2199,7 +2201,7 @@ private fun PenjualanDesaItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
                     Row(
@@ -2251,14 +2253,14 @@ private fun PenjualanKurirItemRow(
     }
     val rankGradient = when (rank) {
         1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, Color(0xFF94A3B8))
+        2 -> listOf(santoyaColors.rankSilver, RankSilverLight)
         3 -> listOf(santoyaColors.rankBronze, AccentAmber)
         else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(11.dp)) {
@@ -2287,7 +2289,7 @@ private fun PenjualanKurirItemRow(
                         }
                     } else {
                         Surface(
-                            shape = RoundedCornerShape(9.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = rankColor.copy(alpha = 0.14f),
                             modifier = Modifier.size(30.dp)
                         ) {
@@ -2321,7 +2323,7 @@ private fun PenjualanKurirItemRow(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
                 ) {
                     Row(

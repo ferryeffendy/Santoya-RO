@@ -178,7 +178,7 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.santoyaColors.success.copy(alpha = 0.12f)
                     ) {
                         Row(
@@ -444,7 +444,7 @@ fun SettingsScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -464,7 +464,7 @@ fun SettingsScreen(
                                 }
 
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -919,7 +919,7 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
