@@ -79,3 +79,35 @@ jobs:
             --tests "com.example.ExampleRobolectricTest" \
             --tests "com.example.data.repository.OfflineSyncQueueUnitTest" \
             --stacktrace
+
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Uji aturan Firestore
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save @firebase/rules-unit-testing firebase-tools
+          cat > firebase.ci.json <<'JSON'
+          {
+            "firestore": { "rules": "firestore.rules" },
+            "emulators": {
+              "firestore": { "host": "127.0.0.1", "port": 8085 },
+              "ui": { "enabled": false }
+            }
+          }
+          JSON
+          npx firebase emulators:exec --config firebase.ci.json --only firestore --project demo-no-project "node --test firestore.test.js"
