@@ -92,7 +92,8 @@ class SantoyaRepository(
 
     suspend fun insertKurir(kurir: Kurir): Long {
         val now = System.currentTimeMillis()
-        val entity = kurir.copy(updatedAt = now)
+        @Suppress("DEPRECATION")
+        val entity = kurir.copy(password = "", updatedAt = now)
         val id = db.withTransaction {
             val insertedId = db.kurirDao().insert(entity)
             enqueueUpsert(SyncCollections.KURIR, entity.syncId, now)
@@ -104,7 +105,8 @@ class SantoyaRepository(
 
     suspend fun updateKurir(kurir: Kurir) {
         val now = System.currentTimeMillis()
-        val entity = kurir.copy(updatedAt = now)
+        @Suppress("DEPRECATION")
+        val entity = kurir.copy(password = "", updatedAt = now)
         db.withTransaction {
             db.kurirDao().update(entity)
             enqueueUpsert(SyncCollections.KURIR, entity.syncId, now)
@@ -115,13 +117,15 @@ class SantoyaRepository(
     suspend fun deleteKurir(kurir: Kurir) {
         val now = System.currentTimeMillis()
         db.withTransaction {
-            val affectedTx = db.transaksiDao().getByKurirIdOnce(kurir.id)
-            db.transaksiDao().clearKurirFromTransaksi(kurir.id, now)
-            affectedTx.forEach { tx ->
-                enqueueUpsert(SyncCollections.TRANSAKSI, tx.syncId, now)
-            }
-            db.kurirDao().delete(kurir)
-            enqueueDelete(SyncCollections.KURIR, kurir.syncId, now)
+            // Nonaktifkan dan sembunyikan kurir, tetapi jangan hapus barisnya
+            // karena transaksi lama masih memakai id_kurir untuk komisi historis.
+            val updated = kurir.copy(
+                akses_aktif = false,
+                isDeleted = true,
+                updatedAt = now
+            )
+            db.kurirDao().update(updated)
+            enqueueUpsert(SyncCollections.KURIR, updated.syncId, now)
         }
         onLocalMutation?.invoke()
     }
@@ -157,8 +161,44 @@ class SantoyaRepository(
     suspend fun deletePelanggan(pelanggan: Pelanggan) {
         val now = System.currentTimeMillis()
         db.withTransaction {
-            db.pelangganDao().delete(pelanggan)
-            enqueueDelete(SyncCollections.PELANGGAN, pelanggan.syncId, now)
+            val latest = db.pelangganDao().getById(pelanggan.id) ?: pelanggan
+            // Selalu soft-delete agar dapat dipulihkan dan aman untuk staf.
+            // Penghapusan permanen hanya lewat aksi eksplisit pemilik.
+            if (!KaryawanScopeHelper.isSoftDeletedPelanggan(latest)) {
+                val updated = latest.copy(
+                    alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(latest.alamat, "Pemilik"),
+                    updatedAt = now
+                )
+                db.pelangganDao().update(updated)
+                enqueueUpsert(SyncCollections.PELANGGAN, updated.syncId, now)
+            }
+        }
+        onLocalMutation?.invoke()
+    }
+
+    /**
+     * Hapus permanen hanya dipakai dari aksi eksplisit "Hapus Permanen".
+     * Riwayat transaksi tetap dipertahankan lewat placeholder di perangkat lain.
+     */
+    suspend fun permanentlyDeletePelanggan(pelanggan: Pelanggan) {
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            val latest = db.pelangganDao().getById(pelanggan.id) ?: pelanggan
+            if (db.transaksiDao().countByPelanggan(latest.id) > 0) {
+                // Tetap simpan baris lokal (tersembunyi) agar relasi transaksi lama
+                // tidak menggantung. Cloud menerima tombstone.
+                if (!KaryawanScopeHelper.isSoftDeletedPelanggan(latest)) {
+                    db.pelangganDao().update(
+                        latest.copy(
+                            alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(latest.alamat, "Pemilik"),
+                            updatedAt = now
+                        )
+                    )
+                }
+            } else {
+                db.pelangganDao().delete(latest)
+            }
+            enqueueDelete(SyncCollections.PELANGGAN, latest.syncId, now)
         }
         onLocalMutation?.invoke()
     }
@@ -472,20 +512,18 @@ class SantoyaRepository(
         val now = System.currentTimeMillis()
         var createdDefaultCustomer = false
         val defaultPelanggan = db.pelangganDao().getBySyncId("pelanggan_umum_tunai")
-            ?: db.pelangganDao().getById(1)
             ?: db.withTransaction {
                 val entity = Pelanggan(
-                    id = 1,
                     nama = "Umum / Tunai",
                     alamat = "-",
                     no_hp = "-",
                     updatedAt = now,
                     syncId = "pelanggan_umum_tunai"
                 )
-                db.pelangganDao().insert(entity)
+                val insertedId = db.pelangganDao().insert(entity)
                 enqueueUpsert(SyncCollections.PELANGGAN, entity.syncId, now)
                 createdDefaultCustomer = true
-                db.pelangganDao().getBySyncId("pelanggan_umum_tunai")!!
+                entity.copy(id = insertedId.toInt())
             }
 
         if (createdDefaultCustomer) {
@@ -749,6 +787,8 @@ class SantoyaRepository(
 
     fun getKasbonLogsByPelanggan(pelangganId: Int): Flow<List<KasbonLog>> =
         db.kasbonLogDao().getByPelangganId(pelangganId)
+
+    val allKasbonLogs: Flow<List<KasbonLog>> = db.kasbonLogDao().getAll()
 
     suspend fun deleteAllLocalData() {
         db.withTransaction {

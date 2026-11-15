@@ -14,10 +14,13 @@ data class Kurir(
     val nama: String = "",
     val komisi_per_galon: Double = 0.0,
     val email: String = "",
+    // Legacy: kolom lama dipertahankan agar migrasi aman, tetapi selalu diisi kosong.
+    @Deprecated("Password tidak lagi dipakai; autentikasi memakai akun Google.")
     val password: String = "",
     val akses_aktif: Boolean = true,
     val skema_komisi: String = "TETAP",
     val aturan_komisi: String = "",
     val updatedAt: Long = System.currentTimeMillis(),
-    val syncId: String = UUID.randomUUID().toString()
+    val syncId: String = UUID.randomUUID().toString(),
+    val isDeleted: Boolean = false
 )

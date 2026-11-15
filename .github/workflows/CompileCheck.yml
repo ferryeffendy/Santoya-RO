@@ -1,0 +1,113 @@
+name: Compile Check
+
+on:
+  push:
+    branches: ["main", "fix/audit-2026-11"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Install Android platform 36
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | head -1)"
+          if [ -z "$SDKMANAGER" ]; then echo "sdkmanager tidak ditemukan"; exit 1; fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Buat google-services.json sementara untuk kompilasi
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "santoya-compile-check",
+              "storage_bucket": "santoya-compile-check.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.companion.kzpmrw"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "000000000000-dummy.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDUMMYDUMMYDUMMYDUMMYDUMMYDUMMY"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+
+      - name: Build debug untuk validasi
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Unit test terpilih
+        run: |
+          ./gradlew testDebugUnitTest \
+            --tests "com.example.KaryawanScopeUnitTest" \
+            --tests "com.example.ExampleRobolectricTest" \
+            --tests "com.example.data.repository.OfflineSyncQueueUnitTest" \
+            --stacktrace
+
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Uji aturan Firestore
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save @firebase/rules-unit-testing firebase-tools
+          cat > firebase.ci.json <<'JSON'
+          {
+            "firestore": { "rules": "firestore.rules" },
+            "emulators": {
+              "firestore": { "host": "127.0.0.1", "port": 8085 },
+              "ui": { "enabled": false }
+            }
+          }
+          JSON
+          npx firebase emulators:exec --config firebase.ci.json --only firestore --project demo-no-project "node --test firestore.test.js"

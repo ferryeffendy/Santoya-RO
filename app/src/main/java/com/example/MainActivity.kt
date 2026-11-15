@@ -62,9 +62,12 @@ import com.example.ui.screens.LaporanScreen
 import com.example.ui.screens.PelangganScreen
 import com.example.ui.screens.PengeluaranScreen
 import com.example.ui.screens.ProdukScreen
+import com.example.ui.screens.RevokedAccessDialog
+import com.example.ui.screens.SessionPreparingDialog
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.TransaksiScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.util.SyncConnectionStatus
 import com.example.util.configureAppCheck
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -130,6 +133,28 @@ class MainActivity : ComponentActivity() {
                         val busyActionMessage by viewModel.busyActionMessage.collectAsStateWithLifecycle()
                         val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
                         var showSyncInfoSheet by remember { mutableStateOf(false) }
+
+                        if (syncState.isSwitchingOwner) {
+                            SessionPreparingDialog()
+                        }
+
+                        // Kunci seluruh UI jika akses karyawan dicabut pemilik.
+                        if (syncState.status == SyncConnectionStatus.REVOKED) {
+                            RevokedAccessDialog(
+                                ownerEmail = syncState.ownerEmail,
+                                onSignOut = {
+                                    coroutineScope.launch {
+                                        viewModel.clearLocalDataForLogout()
+                                        try {
+                                            val credentialManager = CredentialManager.create(this@MainActivity)
+                                            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                                        } catch (_: Exception) {
+                                        }
+                                        Firebase.auth.signOut()
+                                    }
+                                }
+                            )
+                        }
 
                         LaunchedEffect(currentScreen, isKaryawan) {
                             if (isKaryawan && (
@@ -302,7 +327,7 @@ class MainActivity : ComponentActivity() {
                                                     pelangganUiModels = scopedPelangganUiModels,
                                                     onSignOut = {
                                                         coroutineScope.launch {
-                                                            viewModel.stopRealtimeSync()
+                                                            viewModel.clearLocalDataForLogout()
                                                             try {
                                                                 val credentialManager = CredentialManager.create(this@MainActivity)
                                                                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
@@ -386,6 +411,7 @@ class MainActivity : ComponentActivity() {
                                                     kurirList = kurirList,
                                                     onSignOut = {
                                                         coroutineScope.launch {
+                                                            viewModel.clearLocalDataForLogout()
                                                             try {
                                                                 val credentialManager = CredentialManager.create(this@MainActivity)
                                                                 credentialManager.clearCredentialState(ClearCredentialStateRequest())

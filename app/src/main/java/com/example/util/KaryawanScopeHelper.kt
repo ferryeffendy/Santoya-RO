@@ -48,11 +48,19 @@ object KaryawanScopeHelper {
     fun isKaryawanRole(
         syncRole: DepotRole,
         userEmail: String?,
+        ownerEmail: String?,
         kurirList: List<Kurir>
     ): Boolean {
         if (syncRole == DepotRole.STAFF) return true
         val normalizedUser = normalizeEmail(userEmail)
         if (normalizedUser.isBlank()) return false
+
+        // Pemilik depot selalu owner, walaupun emailnya juga terdaftar sebagai kurir.
+        val normalizedOwner = normalizeEmail(ownerEmail)
+        if (normalizedOwner.isNotBlank() && normalizedOwner == normalizedUser) {
+            return false
+        }
+
         return kurirList.any {
             it.akses_aktif && normalizeEmail(it.email) == normalizedUser
         }

@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface KurirDao {
-    @Query("SELECT * FROM kurir ORDER BY nama ASC")
+    @Query("SELECT * FROM kurir WHERE isDeleted = 0 ORDER BY nama ASC")
     fun getAll(): Flow<List<Kurir>>
 
     @Query("SELECT * FROM kurir ORDER BY nama ASC")

@@ -39,28 +39,26 @@ service cloud.firestore {
              (request.auth.token.email.lower() in emailList);
     }
 
+    // Cukup satu get(); jika dokumen tidak ada, evaluasi gagal dan akses ditolak.
     function isDepotOwner(depotId) {
       return isSignedIn() &&
              (
                depotId == 'depot_' + request.auth.uid ||
-               (
-                 exists(/databases/$(database)/documents/depots/$(depotId)) &&
-                 get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid
-               )
+               get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid
              );
     }
 
+    function isDepotMemberData(data) {
+      return data.ownerUid == request.auth.uid ||
+             isVerifiedEmailInList(data.memberEmails);
+    }
+
+    // Satu get() dipakai untuk owner dan daftar member, bukan exists() + get() berulang.
     function isDepotMember(depotId) {
       return isSignedIn() &&
              (
                depotId == 'depot_' + request.auth.uid ||
-               (
-                 exists(/databases/$(database)/documents/depots/$(depotId)) &&
-                 (
-                   get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid ||
-                   isVerifiedEmailInList(get(/databases/$(database)/documents/depots/$(depotId)).data.memberEmails)
-                 )
-               )
+               isDepotMemberData(get(/databases/$(database)/documents/depots/$(depotId)).data)
              );
     }
 

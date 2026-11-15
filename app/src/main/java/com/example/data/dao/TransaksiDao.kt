@@ -32,6 +32,9 @@ interface TransaksiDao {
     @Query("SELECT tanggal FROM transaksi WHERE id_pelanggan = :pelangganId ORDER BY tanggal ASC")
     suspend fun getAllDatesByPelanggan(pelangganId: Int): List<Long>
 
+    @Query("SELECT COUNT(*) FROM transaksi WHERE id_pelanggan = :pelangganId")
+    suspend fun countByPelanggan(pelangganId: Int): Int
+
     @Transaction
     @Query("SELECT * FROM transaksi WHERE id = :id LIMIT 1")
     suspend fun getDetailById(id: Int): TransaksiDetail?

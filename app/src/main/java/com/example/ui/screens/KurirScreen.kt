@@ -363,7 +363,6 @@ fun KurirScreen(
                     nama = nama,
                     komisi = komisi,
                     email = emailGoogle,
-                    password = "",
                     aksesAktif = aksesAktif
                 )
                 showAddDialog = false
@@ -384,7 +383,6 @@ fun KurirScreen(
                         nama = nama,
                         komisi_per_galon = komisi,
                         email = emailGoogle,
-                        password = "",
                         akses_aktif = if (emailGoogle.isBlank()) true else aksesAktif,
                         skema_komisi = "TETAP",
                         aturan_komisi = ""

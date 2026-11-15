@@ -18,6 +18,7 @@ import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.RealtimeSyncEngine
 import com.example.util.RealtimeSyncState
+import com.example.util.SyncConnectionStatus
 import com.example.util.SyncSummary
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
@@ -98,6 +99,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         message: String,
         crossinline block: suspend () -> Unit
     ) {
+        if (realtimeSyncState.value.status == SyncConnectionStatus.REVOKED) {
+            showSnackbar("Akses Anda dicabut. Transaksi baru tidak diizinkan.")
+            return
+        }
         if (!busyActionGuard.compareAndSet(false, true)) return
         _isBusyAction.value = true
         _busyActionMessage.value = message
@@ -139,6 +144,9 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     val allTransaksi: StateFlow<List<TransaksiDetail>> = repository.allTransaksiWithDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allKasbonLogs: StateFlow<List<KasbonLog>> = repository.allKasbonLogs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val allKasbonTransaksi: StateFlow<List<TransaksiDetail>> = repository.allKasbonTransaksiWithDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -164,7 +172,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         allKurir,
         _currentUserEmail
     ) { sync, kurirs, email ->
-        KaryawanScopeHelper.isKaryawanRole(sync.role, email, kurirs)
+        KaryawanScopeHelper.isKaryawanRole(sync.role, email, sync.ownerEmail, kurirs)
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
@@ -257,6 +265,20 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         syncEngine.stop()
     }
 
+    /**
+     * Dipanggil sebelum Firebase.signOut(). Semua data depot di perangkat ini
+     * dihapus agar akun berikutnya tidak melihat data pemilik sebelumnya.
+     */
+    suspend fun clearLocalDataForLogout() {
+        _currentUserEmail.value = null
+        syncEngine.stop()
+        try {
+            syncEngine.clearLocalData()
+        } catch (e: Exception) {
+            showSnackbar("Gagal menghapus data lokal: ${e.localizedMessage ?: "Kesalahan database"}")
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         syncEngine.stop()
@@ -271,6 +293,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         return KaryawanScopeHelper.isKaryawanRole(
             syncRole = realtimeSyncState.value.role,
             userEmail = email,
+            ownerEmail = realtimeSyncState.value.ownerEmail,
             kurirList = allKurir.value
         )
     }
@@ -282,6 +305,15 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             null
         }
         return KaryawanScopeHelper.resolveActiveKaryawan(email, allKurir.value)
+    }
+
+    private fun isOwnerEmail(email: String): Boolean {
+        val normalized = KaryawanScopeHelper.normalizeEmail(email)
+        if (normalized.isBlank()) return false
+        val ownerEmail = realtimeSyncState.value.ownerEmail.ifBlank {
+            _currentUserEmail.value ?: Firebase.auth.currentUser?.email.orEmpty()
+        }
+        return KaryawanScopeHelper.normalizeEmail(ownerEmail) == normalized
     }
 
     // --- Transaksi & Screen Tab State ---
@@ -592,6 +624,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun permanentDeleteTransaksi(transaksi: Transaksi) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menghapus permanen.")
+            return
+        }
         launchGuardedAction("Menghapus permanen...") {
             repository.deleteTransaksi(transaksi)
             showSnackbar("Transaksi dihapus permanen")
@@ -728,8 +764,12 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun permanentDeletePelanggan(pelanggan: Pelanggan) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menghapus permanen.")
+            return
+        }
         launchGuardedAction("Menghapus pelanggan permanen...") {
-            repository.deletePelanggan(pelanggan)
+            repository.permanentlyDeletePelanggan(pelanggan)
             showSnackbar("Pelanggan ${pelanggan.nama} dihapus permanen")
         }
     }
@@ -775,18 +815,20 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         nama: String,
         komisi: Double,
         email: String = "",
-        password: String = "",
         aksesAktif: Boolean = true
     ) {
         val trimmedNama = nama.trim()
         if (trimmedNama.isBlank()) return
+        if (isOwnerEmail(email)) {
+            showSnackbar("Email pemilik depot tidak bisa didaftarkan sebagai karyawan.")
+            return
+        }
         launchGuardedAction("Menambahkan kurir...") {
             repository.insertKurir(
                 Kurir(
                     nama = trimmedNama,
                     komisi_per_galon = komisi,
                     email = email.trim(),
-                    password = password.trim(),
                     akses_aktif = aksesAktif,
                     skema_komisi = "TETAP",
                     aturan_komisi = ""
@@ -797,6 +839,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateKurir(kurir: Kurir) {
+        if (isOwnerEmail(kurir.email)) {
+            showSnackbar("Email pemilik depot tidak bisa didaftarkan sebagai karyawan.")
+            return
+        }
         launchGuardedAction("Memperbarui data kurir...") {
             repository.updateKurir(kurir)
             showSnackbar("Data kurir ${kurir.nama} diperbarui")
@@ -852,16 +898,33 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun syncToCloud(context: Context, userId: String) {
+        runCloudSync(context, userId, pushLocalFirst = true)
+    }
+
+    fun restoreFromCloud(context: Context, userId: String) {
+        runCloudSync(context, userId, pushLocalFirst = false)
+    }
+
+    private fun runCloudSync(context: Context, userId: String, pushLocalFirst: Boolean) {
         if (_isSyncingCloud.value) return
         _isSyncingCloud.value = true
         _isBusyAction.value = true
-        _busyActionMessage.value = "Menyinkronkan data ke Cloud..."
+        _busyActionMessage.value = if (pushLocalFirst) {
+            "Menyinkronkan data ke Cloud..."
+        } else {
+            "Mengambil data dari Cloud..."
+        }
         viewModelScope.launch {
             try {
-                val res = syncEngine.forceSyncNow()
+                val res = syncEngine.forceSyncNow(pushLocalFirst = pushLocalFirst)
                 res.onSuccess { summary ->
                     _lastSyncSummary.value = summary
-                    showSnackbar("Sinkronisasi selesai (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)")
+                    val message = if (pushLocalFirst) {
+                        "Sinkronisasi selesai (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)"
+                    } else {
+                        "Data Cloud diterapkan (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)"
+                    }
+                    showSnackbar(message)
                 }.onFailure { err ->
                     showSnackbar("Gagal sinkronisasi: ${err.message ?: "Periksa koneksi internet"}")
                 }
@@ -873,10 +936,6 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 _isSyncingCloud.value = false
             }
         }
-    }
-
-    fun restoreFromCloud(context: Context, userId: String) {
-        syncToCloud(context, userId)
     }
 
     /**

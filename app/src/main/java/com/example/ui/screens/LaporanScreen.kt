@@ -146,6 +146,7 @@ fun LaporanScreen(
     val context = LocalContext.current
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
+    val allKasbonLogs by viewModel.allKasbonLogs.collectAsStateWithLifecycle()
 
     val rawTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
     val effectiveTransaksiList = remember(rawTransaksiList) {
@@ -200,6 +201,11 @@ fun LaporanScreen(
         filteredTx
             .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
             .sumOf { it.transaksi.remainingKasbonAmount() }
+    }
+    val pelunasanKasbonPeriode = remember(allKasbonLogs, startTime, endTime) {
+        allKasbonLogs
+            .filter { it.tanggal in startTime..endTime && it.jumlah_bayar > 0 }
+            .sumOf { it.jumlah_bayar }
     }
     val totalKomisiKurir = remember(filteredTx) {
         filteredTx.sumOf { it.transaksi.total_komisi }
@@ -941,6 +947,27 @@ fun LaporanScreen(
                                         subtitle = "Masuk ke laba setelah dilunasi",
                                         nominalText = FormatUtils.formatRupiah(piutangKasbonPeriode),
                                         accentColor = santoyaColors.warning,
+                                        iconContent = {
+                                            HydroReceiptNoteIcon(
+                                                tint = Color.White,
+                                                modifier = Modifier.size(19.dp)
+                                            )
+                                        }
+                                    )
+                                }
+
+                                if (pelunasanKasbonPeriode > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(vertical = 10.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                    )
+
+                                    FinancialBreakdownRow(
+                                        gradientColors = listOf(profitColor, AccentEmerald),
+                                        title = "Pelunasan Kasbon",
+                                        subtitle = "Kas masuk dari pembayaran kasbon periode ini",
+                                        nominalText = FormatUtils.formatRupiah(pelunasanKasbonPeriode),
+                                        accentColor = profitColor,
                                         iconContent = {
                                             HydroReceiptNoteIcon(
                                                 tint = Color.White,
