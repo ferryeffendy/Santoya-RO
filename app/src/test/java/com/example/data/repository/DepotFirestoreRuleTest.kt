@@ -233,6 +233,129 @@ class DepotFirestoreRuleTest : FirestoreEmulatorTestBase() {
         }
     }
 
+    @Test
+    fun ownerCanManagePerawatanAndStaffIsDeniedPerawatanReadAndWrite() = runBlocking {
+        val ownerUid = signInTestUser(OWNER_EMAIL, verifyEmail = true)
+        val depotId = setupOwnerDepot(ownerUid, OWNER_EMAIL, listOf(STAFF_EMAIL))
+
+        val jadwalId = "pw_${UUID.randomUUID()}"
+        val logId = "pwlog_${UUID.randomUUID()}"
+
+        withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("depots").document(depotId)
+                .collection("perawatan_jadwal").document(jadwalId)
+                .set(
+                    mapOf(
+                        "syncId" to jadwalId,
+                        "nama" to "Filter Sedimen",
+                        "intervalHari" to 30,
+                        "terakhirSelesai" to null,
+                        "jadwalBerikutnya" to 1702592000000L,
+                        "updatedAt" to 300L,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+
+            firestore.collection("depots").document(depotId)
+                .collection("perawatan_log").document(logId)
+                .set(
+                    mapOf(
+                        "syncId" to logId,
+                        "perawatanSyncId" to jadwalId,
+                        "namaPerawatan" to "Filter Sedimen",
+                        "tanggalSelesai" to 1700000000000L,
+                        "biaya" to 75000.0,
+                        "catatan" to "Ganti filter rutin",
+                        "pengeluaranSyncId" to "exp_1",
+                        "updatedAt" to 300L,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+        }
+
+        val ownerSnap = withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("depots").document(depotId)
+                .collection("perawatan_jadwal").document(jadwalId).get().await()
+        }
+        assertTrue(ownerSnap.exists())
+        assertEquals("Filter Sedimen", ownerSnap.getString("nama"))
+
+        // Switch to verified active staff: must be denied read and write on perawatan collections
+        signInTestUser(STAFF_EMAIL, verifyEmail = true)
+
+        try {
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("perawatan_jadwal").get().await()
+            }
+            fail("Expected PERMISSION_DENIED for staff listing perawatan_jadwal")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        try {
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("perawatan_jadwal").document("pw_hack")
+                    .set(
+                        mapOf(
+                            "syncId" to "pw_hack",
+                            "nama" to "Hack",
+                            "intervalHari" to 7,
+                            "terakhirSelesai" to null,
+                            "jadwalBerikutnya" to 1700000000000L,
+                            "updatedAt" to 400L,
+                            "isDeleted" to false,
+                            "serverUpdatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+            }
+            fail("Expected PERMISSION_DENIED for staff writing perawatan_jadwal")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        try {
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("perawatan_log").get().await()
+            }
+            fail("Expected PERMISSION_DENIED for staff listing perawatan_log")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        try {
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("perawatan_log").document("pwlog_hack")
+                    .set(
+                        mapOf(
+                            "syncId" to "pwlog_hack",
+                            "perawatanSyncId" to jadwalId,
+                            "namaPerawatan" to "Filter Sedimen",
+                            "tanggalSelesai" to 1700000000000L,
+                            "biaya" to 0.0,
+                            "catatan" to "Hack",
+                            "pengeluaranSyncId" to null,
+                            "updatedAt" to 400L,
+                            "isDeleted" to false,
+                            "serverUpdatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+            }
+            fail("Expected PERMISSION_DENIED for staff writing perawatan_log")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+    }
+
     private companion object {
         const val OWNER_EMAIL = "owner_rule@test.com"
         const val STAFF_EMAIL = "staff_rule@test.com"

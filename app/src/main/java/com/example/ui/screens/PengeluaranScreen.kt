@@ -216,6 +216,7 @@ fun PengeluaranScreen(
                 "filter & membran" -> "Filter & Membran"
                 "tutup & tisu galon" -> "Tutup & Tisu Galon"
                 "bensin & transport" -> "Bensin & Transport"
+                "perawatan" -> "Perawatan"
                 "operasional" -> "Operasional"
                 else -> "Lainnya"
             }
@@ -557,6 +558,7 @@ fun PengeluaranScreen(
                                 "filter & membran" -> MaterialTheme.colorScheme.primary
                                 "tutup & tisu galon" -> santoyaColors.success
                                 "bensin & transport" -> santoyaColors.warning
+                                "perawatan" -> MaterialTheme.colorScheme.tertiary
                                 "operasional" -> MaterialTheme.colorScheme.secondary
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -681,7 +683,7 @@ fun PengeluaranScreen(
         var nominalStr by remember { mutableStateOf("") }
         var tanggalMillis by remember { mutableStateOf(System.currentTimeMillis()) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
-        val kategoriOptions = listOf("Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Operasional", "Lainnya")
+        val kategoriOptions = listOf("Listrik & Air", "Filter & Membran", "Tutup & Tisu Galon", "Bensin & Transport", "Perawatan", "Operasional", "Lainnya")
         val nominalFocusRequester = remember { FocusRequester() }
         val sheetFocusManager = LocalFocusManager.current
 
@@ -1114,7 +1116,7 @@ private fun PengeluaranCategoryTwoRowGrid(
         listOf("Semua", "Listrik & Air", "Filter & Membran", "Operasional")
     }
     val row2Categories = remember {
-        listOf("Tutup & Tisu Galon", "Bensin & Transport", "Lainnya")
+        listOf("Tutup & Tisu Galon", "Bensin & Transport", "Perawatan", "Lainnya")
     }
 
     @Composable
@@ -1125,6 +1127,7 @@ private fun PengeluaranCategoryTwoRowGrid(
             "filter & membran" -> MaterialTheme.colorScheme.primary
             "tutup & tisu galon" -> santoyaColors.success
             "bensin & transport" -> santoyaColors.warning
+            "perawatan" -> MaterialTheme.colorScheme.tertiary
             "operasional" -> MaterialTheme.colorScheme.secondary
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }

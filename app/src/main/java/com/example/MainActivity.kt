@@ -61,6 +61,7 @@ import com.example.ui.screens.KurirScreen
 import com.example.ui.screens.LaporanScreen
 import com.example.ui.screens.PelangganScreen
 import com.example.ui.screens.PengeluaranScreen
+import com.example.ui.screens.PerawatanScreen
 import com.example.ui.screens.ProdukScreen
 import com.example.ui.screens.RevokedAccessDialog
 import com.example.ui.screens.SessionPreparingDialog
@@ -162,7 +163,8 @@ class MainActivity : ComponentActivity() {
                                         currentScreen == SantoyaScreen.PENGELUARAN ||
                                         currentScreen == SantoyaScreen.SETTINGS ||
                                         currentScreen == SantoyaScreen.KURIR ||
-                                        currentScreen == SantoyaScreen.PRODUK
+                                        currentScreen == SantoyaScreen.PRODUK ||
+                                        currentScreen == SantoyaScreen.PERAWATAN
                                     )
                             ) {
                                 viewModel.navigateTo(SantoyaScreen.DASHBOARD)
@@ -201,6 +203,7 @@ class MainActivity : ComponentActivity() {
                                                             SantoyaScreen.PENGELUARAN -> "Pengeluaran"
                                                             SantoyaScreen.LAPORAN -> "Laporan Keuangan"
                                                             SantoyaScreen.SETTINGS -> "Pengaturan"
+                                                            SantoyaScreen.PERAWATAN -> "Jadwal Perawatan RO"
                                                         },
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.ExtraBold,
@@ -217,6 +220,7 @@ class MainActivity : ComponentActivity() {
                                                             SantoyaScreen.PENGELUARAN -> "Catat belanja & biaya depot"
                                                             SantoyaScreen.LAPORAN -> "Omzet, laba bersih & ekspor"
                                                             SantoyaScreen.SETTINGS -> "Akun, sinkron & cadangan data"
+                                                            SantoyaScreen.PERAWATAN -> "Jadwal servis & riwayat perawatan"
                                                         },
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -422,6 +426,11 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     }
                                                 )
+                                            }
+                                            SantoyaScreen.PERAWATAN -> {
+                                                if (!isKaryawan) {
+                                                    PerawatanScreen(viewModel = viewModel)
+                                                }
                                             }
                                         }
                                     }

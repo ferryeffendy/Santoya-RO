@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.People
@@ -120,6 +121,8 @@ import com.example.util.FormatUtils
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.example.util.KaryawanScopeHelper
+import com.example.util.PerawatanScheduler
+import com.example.util.PerawatanStatus
 import com.example.util.SantoyaReceiptHelper
 import com.example.util.SyncConnectionStatus
 import com.example.viewmodel.ActiveReceiptDialog
@@ -144,6 +147,7 @@ fun DashboardScreen(
     onNavigateToPengeluaran: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PENGELUARAN) },
     onNavigateToLaporan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.LAPORAN) },
     onNavigateToSettings: () -> Unit = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
+    onNavigateToPerawatan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
     onSignOut: (() -> Unit)? = null,
     isKaryawan: Boolean = false,
     activeKaryawan: Kurir? = null,
@@ -153,11 +157,13 @@ fun DashboardScreen(
     val scopedPelangganFromVm by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
     val scopedPelangganUiModelsFromVm by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
+    val perawatanRemindersFromVm by viewModel.perawatanReminders.collectAsStateWithLifecycle()
     val activeKaryawanFromVm by viewModel.activeKaryawan.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
     val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
     var showKaryawanSignOutDialog by remember { mutableStateOf(false) }
     var showSyncInfoSheet by remember { mutableStateOf(false) }
+    val effectivePerawatanReminders = if (isKaryawan) emptyList() else perawatanRemindersFromVm
 
     val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
     val rawPelangganList = pelangganList ?: scopedPelangganFromVm
@@ -1142,6 +1148,148 @@ fun DashboardScreen(
                                         .padding(8.dp)
                                         .size(16.dp)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2b. Pengingat Perawatan Mesin RO (Khusus Pemilik: Terlambat, Hari Ini, & H-3)
+            if (!isKaryawan && effectivePerawatanReminders.isNotEmpty()) {
+                item {
+                    val overdueCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.TERLAMBAT }
+                    val dueTodayCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.HARI_INI }
+                    val soonCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.MENDEKATI }
+                    val santoyaColors = MaterialTheme.santoyaColors
+                    val alertColor = if (overdueCount > 0) MaterialTheme.colorScheme.error else santoyaColors.warning
+                    val alertContainer = if (overdueCount > 0) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
+                    val alertOnContainer = if (overdueCount > 0) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
+
+                    HydroBentoCard(
+                        accentColor = alertColor,
+                        cornerRadius = 18.dp,
+                        tintAlpha = 0.12f,
+                        onClick = onNavigateToPerawatan,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("card_dashboard_perawatan_reminder")
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    HydroGradientBadge(
+                                        gradientColors = listOf(alertColor, AccentCyan),
+                                        size = 38.dp,
+                                        cornerRadius = 12.dp
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Build,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Perawatan Mesin RO (${effectivePerawatanReminders.size})",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        val statusSummary = buildList {
+                                            if (overdueCount > 0) add("$overdueCount terlambat")
+                                            if (dueTodayCount > 0) add("$dueTodayCount hari ini")
+                                            if (soonCount > 0) add("$soonCount H-3")
+                                        }.joinToString(" • ")
+                                        Text(
+                                            text = statusSummary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = alertColor,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = alertContainer,
+                                    border = BorderStroke(1.dp, alertColor.copy(alpha = 0.35f)),
+                                    modifier = Modifier.testTag("btn_dashboard_perawatan_reminder")
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "Kelola",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = alertOnContainer
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
+                                            contentDescription = "Buka Jadwal Perawatan",
+                                            tint = alertOnContainer,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                effectivePerawatanReminders.take(3).forEach { eval ->
+                                    val isLate = eval.status == PerawatanStatus.TERLAMBAT
+                                    val pillColor = if (isLate) MaterialTheme.colorScheme.error else santoyaColors.warning
+                                    val pillBg = if (isLate) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
+                                    val pillFg = if (isLate) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "• ${eval.item.nama}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = pillBg
+                                        ) {
+                                            Text(
+                                                text = PerawatanScheduler.formatStatusBadge(eval),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = pillFg,
+                                                maxLines = 1,
+                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                     }

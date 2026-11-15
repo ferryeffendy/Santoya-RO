@@ -10,6 +10,8 @@ import com.example.data.dao.KurirDao
 import com.example.data.dao.PelangganDao
 import com.example.data.dao.PendingSyncDao
 import com.example.data.dao.PengeluaranDao
+import com.example.data.dao.PerawatanDao
+import com.example.data.dao.PerawatanLogDao
 import com.example.data.dao.ProdukDao
 import com.example.data.dao.TransaksiDao
 import com.example.data.entity.Kurir
@@ -18,8 +20,11 @@ import com.example.data.entity.KasbonLog
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.PendingSyncEntity
 import com.example.data.entity.Pengeluaran
+import com.example.data.entity.PerawatanItem
+import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
+import com.example.util.PerawatanScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,9 +37,11 @@ import kotlinx.coroutines.launch
         Pengeluaran::class,
         Transaksi::class,
         KasbonLog::class,
-        PendingSyncEntity::class
+        PendingSyncEntity::class,
+        PerawatanItem::class,
+        PerawatanLog::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -46,6 +53,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transaksiDao(): TransaksiDao
     abstract fun kasbonLogDao(): KasbonLogDao
     abstract fun pendingSyncDao(): PendingSyncDao
+    abstract fun perawatanDao(): PerawatanDao
+    abstract fun perawatanLogDao(): PerawatanLogDao
 
     companion object {
         @Volatile
@@ -177,6 +186,50 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `perawatan_item` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `nama` TEXT NOT NULL,
+                        `intervalHari` INTEGER NOT NULL,
+                        `terakhirSelesai` INTEGER,
+                        `jadwalBerikutnya` INTEGER NOT NULL,
+                        `updatedAt` INTEGER NOT NULL,
+                        `syncId` TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_perawatan_item_syncId` ON `perawatan_item` (`syncId`)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `perawatan_log` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `perawatanSyncId` TEXT NOT NULL,
+                        `namaPerawatan` TEXT NOT NULL,
+                        `tanggalSelesai` INTEGER NOT NULL,
+                        `biaya` REAL NOT NULL,
+                        `catatan` TEXT NOT NULL,
+                        `pengeluaranSyncId` TEXT,
+                        `updatedAt` INTEGER NOT NULL,
+                        `syncId` TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_perawatan_log_syncId` ON `perawatan_log` (`syncId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_perawatan_log_perawatanSyncId` ON `perawatan_log` (`perawatanSyncId`)")
+
+                val now = System.currentTimeMillis()
+                PerawatanScheduler.buildDefaultItems(now).forEach { item ->
+                    db.execSQL(
+                        "INSERT OR IGNORE INTO `perawatan_item` (`nama`, `intervalHari`, `terakhirSelesai`, `jadwalBerikutnya`, `updatedAt`, `syncId`) VALUES (?, ?, NULL, ?, ?, ?)",
+                        arrayOf<Any>(item.nama, item.intervalHari, item.jadwalBerikutnya, item.updatedAt, item.syncId)
+                    )
+                }
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -193,7 +246,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_10_11,
                         MIGRATION_11_12,
-                        MIGRATION_12_13
+                        MIGRATION_12_13,
+                        MIGRATION_13_14
                     )
                     .addCallback(DatabaseCallback(context.applicationContext))
                     .build()
@@ -220,6 +274,9 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         private suspend fun populateInitialData(db: AppDatabase) {
+            if (db.perawatanDao().count() == 0) {
+                db.perawatanDao().insertAllIgnore(PerawatanScheduler.buildDefaultItems())
+            }
             if (db.pelangganDao().count() > 0 || db.produkDao().count() > 0) {
                 return
             }

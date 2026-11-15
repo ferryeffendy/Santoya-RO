@@ -18,6 +18,5 @@ local.properties
 debug.keystore
 *-debug.log
 
-# Firebase config (berisi API key; jangan di-commit)
-google-services.json
-app/google-services.json
+
+

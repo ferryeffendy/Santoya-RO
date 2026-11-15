@@ -14,6 +14,8 @@ import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.PendingSyncEntity
 import com.example.data.entity.Pengeluaran
+import com.example.data.entity.PerawatanItem
+import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
 import com.google.firebase.firestore.DocumentChange
@@ -72,6 +74,8 @@ object SyncCollections {
     const val TRANSAKSI = "transaksi"
     const val PENGELUARAN = "pengeluaran"
     const val KASBON_LOGS = "kasbon_logs"
+    const val PERAWATAN_JADWAL = "perawatan_jadwal"
+    const val PERAWATAN_LOG = "perawatan_log"
 }
 
 object SyncOperations {
@@ -287,6 +291,8 @@ class RealtimeSyncEngine(
 
     private suspend fun clearLocalDataInternal() {
         db.withTransaction {
+            db.perawatanLogDao().deleteAll()
+            db.perawatanDao().deleteAll()
             db.pengeluaranDao().deleteAll()
             db.transaksiDao().deleteAll()
             db.kasbonLogDao().deleteAll()
@@ -358,7 +364,11 @@ class RealtimeSyncEngine(
                 add(SyncCollections.PELANGGAN)
                 add(SyncCollections.TRANSAKSI)
                 add(SyncCollections.KASBON_LOGS)
-                if (activeRole == DepotRole.OWNER) add(SyncCollections.PENGELUARAN)
+                if (activeRole == DepotRole.OWNER) {
+                    add(SyncCollections.PENGELUARAN)
+                    add(SyncCollections.PERAWATAN_JADWAL)
+                    add(SyncCollections.PERAWATAN_LOG)
+                }
             }
 
             withTimeout(15_000L) {
@@ -444,6 +454,8 @@ class RealtimeSyncEngine(
             // staf dihapus dan aplikasi jatuh kembali ke mode pemilik.
             if (previousDepot != null && previousDepot != depotId) {
                 db.withTransaction {
+                    db.perawatanLogDao().deleteAll()
+                    db.perawatanDao().deleteAll()
                     db.pengeluaranDao().deleteAll()
                     db.transaksiDao().deleteAll()
                     db.kasbonLogDao().deleteAll()
@@ -454,9 +466,13 @@ class RealtimeSyncEngine(
                 }
                 cachedSnapshots.clear()
                 receivedInitialCollections.clear()
-            } else if (role == DepotRole.STAFF && previousDepot == null) {
-                // Login staf pertama kali di perangkat: buang sisa data yang tidak dikenal.
-                db.withTransaction { db.pengeluaranDao().deleteAll() }
+            } else if (role == DepotRole.STAFF) {
+                // Karyawan tidak boleh memiliki data pengeluaran maupun jadwal/riwayat perawatan pemilik di cache lokal.
+                db.withTransaction {
+                    db.pengeluaranDao().deleteAll()
+                    db.perawatanLogDao().deleteAll()
+                    db.perawatanDao().deleteAll()
+                }
             }
             if (activeUid != sessionUid) return@launch
             prefs.edit().putString(KEY_LAST_DEPOT_ID, depotId).apply()
@@ -493,6 +509,8 @@ class RealtimeSyncEngine(
             add(SyncCollections.KASBON_LOGS)
             if (role == DepotRole.OWNER) {
                 add(SyncCollections.PENGELUARAN)
+                add(SyncCollections.PERAWATAN_JADWAL)
+                add(SyncCollections.PERAWATAN_LOG)
             }
         }
 
@@ -628,6 +646,8 @@ class RealtimeSyncEngine(
         db.transaksiDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.TRANSAKSI, it.syncId, it.updatedAt) }
         db.pengeluaranDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PENGELUARAN, it.syncId, it.updatedAt) }
         db.kasbonLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.KASBON_LOGS, it.syncId, it.updatedAt) }
+        db.perawatanDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_JADWAL, it.syncId, it.updatedAt) }
+        db.perawatanLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_LOG, it.syncId, it.updatedAt) }
     }
 
     private suspend fun applyAllSnapshotsInOrder() {
@@ -674,10 +694,22 @@ class RealtimeSyncEngine(
                     )
                 }
 
-                // 6. Pengeluaran (Owner only)
+                // 6. Pengeluaran & Perawatan RO (Owner only)
                 if (activeRole == DepotRole.OWNER) {
                     cachedSnapshots[SyncCollections.PENGELUARAN]?.forEach { doc ->
                         applyPengeluaranDoc(doc, pendingMap["${SyncCollections.PENGELUARAN}:${doc.id}"])
+                    }
+                    cachedSnapshots[SyncCollections.PERAWATAN_JADWAL]?.forEach { doc ->
+                        applyPerawatanJadwalDoc(doc, pendingMap["${SyncCollections.PERAWATAN_JADWAL}:${doc.id}"])
+                    }
+                    cachedSnapshots[SyncCollections.PERAWATAN_LOG]?.forEach { doc ->
+                        applyPerawatanLogDoc(doc, pendingMap["${SyncCollections.PERAWATAN_LOG}:${doc.id}"])
+                    }
+                    if (receivedInitialCollections.contains(SyncCollections.PERAWATAN_JADWAL) &&
+                        cachedSnapshots[SyncCollections.PERAWATAN_JADWAL].isNullOrEmpty() &&
+                        db.perawatanDao().count() == 0
+                    ) {
+                        db.perawatanDao().insertAllIgnore(PerawatanScheduler.buildDefaultItems())
                     }
                 }
             }
@@ -737,7 +769,15 @@ class RealtimeSyncEngine(
                                 pelangganSyncToId = pelangganSyncToId,
                                 pending = pending
                             )
-                            SyncCollections.PENGELUARAN -> applyPengeluaranDoc(doc, pending)
+                            SyncCollections.PENGELUARAN -> {
+                                if (activeRole == DepotRole.OWNER) applyPengeluaranDoc(doc, pending)
+                            }
+                            SyncCollections.PERAWATAN_JADWAL -> {
+                                if (activeRole == DepotRole.OWNER) applyPerawatanJadwalDoc(doc, pending)
+                            }
+                            SyncCollections.PERAWATAN_LOG -> {
+                                if (activeRole == DepotRole.OWNER) applyPerawatanLogDoc(doc, pending)
+                            }
                         }
                     }
                 }
@@ -780,6 +820,8 @@ class RealtimeSyncEngine(
             SyncCollections.TRANSAKSI -> db.transaksiDao().deleteBySyncId(syncId)
             SyncCollections.KASBON_LOGS -> db.kasbonLogDao().deleteBySyncId(syncId)
             SyncCollections.PENGELUARAN -> db.pengeluaranDao().deleteBySyncId(syncId)
+            SyncCollections.PERAWATAN_JADWAL -> db.perawatanDao().deleteBySyncId(syncId)
+            SyncCollections.PERAWATAN_LOG -> db.perawatanLogDao().deleteBySyncId(syncId)
         }
     }
 
@@ -1149,6 +1191,101 @@ class RealtimeSyncEngine(
         }
     }
 
+    private suspend fun applyPerawatanJadwalDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
+        val syncId = doc.getString("syncId") ?: doc.id
+        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
+
+        val isDeleted = doc.getBoolean("isDeleted") == true
+        val local = db.perawatanDao().getBySyncId(syncId)
+
+        if (isDeleted) {
+            if (local != null && cloudUpdatedAt >= local.updatedAt) {
+                db.perawatanDao().deleteBySyncId(syncId)
+            }
+            return
+        }
+
+        val nama = doc.getString("nama")?.takeIf { it.isNotBlank() } ?: return
+        val intervalHari = ((doc.get("intervalHari") as? Number)?.toInt() ?: 30).coerceIn(1, 3650)
+        val terakhirSelesai = (doc.get("terakhirSelesai") as? Number)?.toLong()
+        val jadwalBerikutnya = (doc.get("jadwalBerikutnya") as? Number)?.toLong()
+            ?: PerawatanScheduler.calculateNextDueDateMillis(System.currentTimeMillis(), intervalHari)
+
+        if (local == null) {
+            db.perawatanDao().insert(
+                PerawatanItem(
+                    nama = nama,
+                    intervalHari = intervalHari,
+                    terakhirSelesai = terakhirSelesai,
+                    jadwalBerikutnya = jadwalBerikutnya,
+                    updatedAt = cloudUpdatedAt,
+                    syncId = syncId
+                )
+            )
+        } else if (cloudUpdatedAt > local.updatedAt) {
+            db.perawatanDao().update(
+                local.copy(
+                    nama = nama,
+                    intervalHari = intervalHari,
+                    terakhirSelesai = terakhirSelesai,
+                    jadwalBerikutnya = jadwalBerikutnya,
+                    updatedAt = cloudUpdatedAt
+                )
+            )
+        }
+    }
+
+    private suspend fun applyPerawatanLogDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
+        val syncId = doc.getString("syncId") ?: doc.id
+        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
+
+        val isDeleted = doc.getBoolean("isDeleted") == true
+        val local = db.perawatanLogDao().getBySyncId(syncId)
+
+        if (isDeleted) {
+            if (local != null && cloudUpdatedAt >= local.updatedAt) {
+                db.perawatanLogDao().deleteBySyncId(syncId)
+            }
+            return
+        }
+
+        val perawatanSyncId = doc.getString("perawatanSyncId")?.takeIf { it.isNotBlank() } ?: return
+        val namaPerawatan = doc.getString("namaPerawatan")?.takeIf { it.isNotBlank() } ?: return
+        val tanggalSelesai = (doc.get("tanggalSelesai") as? Number)?.toLong() ?: 0L
+        val biaya = ((doc.get("biaya") as? Number)?.toDouble() ?: 0.0).coerceAtLeast(0.0)
+        val catatan = doc.getString("catatan") ?: ""
+        val pengeluaranSyncId = doc.getString("pengeluaranSyncId")
+
+        if (local == null) {
+            db.perawatanLogDao().insert(
+                PerawatanLog(
+                    perawatanSyncId = perawatanSyncId,
+                    namaPerawatan = namaPerawatan,
+                    tanggalSelesai = tanggalSelesai,
+                    biaya = biaya,
+                    catatan = catatan,
+                    pengeluaranSyncId = pengeluaranSyncId,
+                    updatedAt = cloudUpdatedAt,
+                    syncId = syncId
+                )
+            )
+        } else if (cloudUpdatedAt > local.updatedAt) {
+            db.perawatanLogDao().update(
+                local.copy(
+                    perawatanSyncId = perawatanSyncId,
+                    namaPerawatan = namaPerawatan,
+                    tanggalSelesai = tanggalSelesai,
+                    biaya = biaya,
+                    catatan = catatan,
+                    pengeluaranSyncId = pengeluaranSyncId,
+                    updatedAt = cloudUpdatedAt
+                )
+            )
+        }
+    }
+
     private suspend fun flushPendingQueueInternal() {
         val uid = activeUid ?: return
         val depotId = activeDepotId.ifBlank { return }
@@ -1180,7 +1317,9 @@ class RealtimeSyncEngine(
                 SyncCollections.PELANGGAN to 2,
                 SyncCollections.TRANSAKSI to 3,
                 SyncCollections.KASBON_LOGS to 4,
-                SyncCollections.PENGELUARAN to 5
+                SyncCollections.PENGELUARAN to 5,
+                SyncCollections.PERAWATAN_JADWAL to 6,
+                SyncCollections.PERAWATAN_LOG to 7
             )
             val ordered = allPending.sortedWith(
                 compareBy<PendingSyncEntity> { orderPriority[it.collectionName] ?: 99 }
@@ -1191,6 +1330,8 @@ class RealtimeSyncEngine(
 
             for (item in ordered) {
                 val isOwnerOnlyCollection = item.collectionName == SyncCollections.PENGELUARAN ||
+                    item.collectionName == SyncCollections.PERAWATAN_JADWAL ||
+                    item.collectionName == SyncCollections.PERAWATAN_LOG ||
                     item.collectionName == SyncCollections.PRODUK ||
                     item.collectionName == SyncCollections.KURIR
                 if (activeRole == DepotRole.STAFF && isOwnerOnlyCollection) {
@@ -1444,6 +1585,62 @@ class RealtimeSyncEngine(
                         "sisa_kasbon_sesudah" to log.sisa_kasbon_sesudah,
                         "metode_bayar" to log.metode_bayar.take(40),
                         "catatan" to log.catatan.take(300),
+                        "updatedAt" to log.updatedAt,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                }
+            }
+            SyncCollections.PERAWATAN_JADWAL -> {
+                if (isDelete) {
+                    mapOf(
+                        "syncId" to syncId,
+                        "nama" to "(Dihapus)",
+                        "intervalHari" to 30,
+                        "terakhirSelesai" to null,
+                        "jadwalBerikutnya" to 0L,
+                        "updatedAt" to item.updatedAt,
+                        "isDeleted" to true,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                } else {
+                    val itemPerawatan = db.perawatanDao().getBySyncId(syncId) ?: return null
+                    mapOf(
+                        "syncId" to itemPerawatan.syncId,
+                        "nama" to itemPerawatan.nama.trim().take(120).ifBlank { "Perawatan RO" },
+                        "intervalHari" to itemPerawatan.intervalHari.coerceIn(1, 3650),
+                        "terakhirSelesai" to itemPerawatan.terakhirSelesai?.coerceAtLeast(0L),
+                        "jadwalBerikutnya" to itemPerawatan.jadwalBerikutnya.coerceAtLeast(0L),
+                        "updatedAt" to itemPerawatan.updatedAt,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                }
+            }
+            SyncCollections.PERAWATAN_LOG -> {
+                if (isDelete) {
+                    mapOf(
+                        "syncId" to syncId,
+                        "perawatanSyncId" to "deleted",
+                        "namaPerawatan" to "(Dihapus)",
+                        "tanggalSelesai" to 0L,
+                        "biaya" to 0.0,
+                        "catatan" to "",
+                        "pengeluaranSyncId" to null,
+                        "updatedAt" to item.updatedAt,
+                        "isDeleted" to true,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                } else {
+                    val log = db.perawatanLogDao().getBySyncId(syncId) ?: return null
+                    mapOf(
+                        "syncId" to log.syncId,
+                        "perawatanSyncId" to log.perawatanSyncId.take(128).ifBlank { "unknown" },
+                        "namaPerawatan" to log.namaPerawatan.trim().take(120).ifBlank { "Perawatan RO" },
+                        "tanggalSelesai" to log.tanggalSelesai.coerceAtLeast(0L),
+                        "biaya" to log.biaya.coerceAtLeast(0.0),
+                        "catatan" to log.catatan.trim().take(500),
+                        "pengeluaranSyncId" to log.pengeluaranSyncId?.take(128),
                         "updatedAt" to log.updatedAt,
                         "isDeleted" to false,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()

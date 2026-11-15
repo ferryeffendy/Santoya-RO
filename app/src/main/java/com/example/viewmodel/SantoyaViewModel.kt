@@ -9,6 +9,8 @@ import com.example.data.entity.KasbonLog
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Pengeluaran
+import com.example.data.entity.PerawatanItem
+import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
@@ -16,6 +18,8 @@ import com.example.data.repository.SantoyaRepository
 import com.example.util.DepotRole
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
+import com.example.util.PerawatanEvaluation
+import com.example.util.PerawatanScheduler
 import com.example.util.RealtimeSyncEngine
 import com.example.util.RealtimeSyncState
 import com.example.util.SyncConnectionStatus
@@ -44,7 +48,8 @@ enum class SantoyaScreen {
     PRODUK,
     PENGELUARAN,
     LAPORAN,
-    SETTINGS
+    SETTINGS,
+    PERAWATAN
 }
 
 enum class KasbonSortOption {
@@ -122,6 +127,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     val currentScreen: StateFlow<SantoyaScreen> = _currentScreen.asStateFlow()
 
     fun navigateTo(screen: SantoyaScreen) {
+        if (screen == SantoyaScreen.PERAWATAN && isUserKaryawan()) {
+            showSnackbar("Jadwal Perawatan hanya dapat diakses pemilik depot.")
+            return
+        }
         _currentScreen.value = screen
     }
 
@@ -218,6 +227,31 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         scopedPelangganTransaksi
     ) { pelangganList, transaksiList ->
         getPelangganUiModels(pelangganList, transaksiList)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Jadwal & Riwayat Perawatan RO (Khusus Pemilik) ---
+    val allPerawatanEvaluations: StateFlow<List<PerawatanEvaluation>> = combine(
+        repository.allPerawatan,
+        isKaryawan
+    ) { items, karyawan ->
+        if (karyawan) emptyList() else PerawatanScheduler.evaluateAndSort(items)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val perawatanReminders: StateFlow<List<PerawatanEvaluation>> = combine(
+        allPerawatanEvaluations,
+        isKaryawan
+    ) { evaluations, karyawan ->
+        if (karyawan) emptyList() else PerawatanScheduler.filterDashboardReminders(evaluations)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allPerawatanLogs: StateFlow<List<PerawatanLog>> = combine(
+        repository.allPerawatanLogs,
+        isKaryawan
+    ) { logs, karyawan ->
+        if (karyawan) emptyList() else logs
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -882,6 +916,114 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         launchGuardedAction("Menghapus pengeluaran...") {
             repository.deletePengeluaran(pengeluaran)
             showSnackbar("Pengeluaran dihapus")
+        }
+    }
+
+    // --- Aksi Jadwal Perawatan RO (Khusus Pemilik) ---
+    fun addPerawatan(nama: String, intervalHari: Int, jadwalPertama: Long? = null) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat mengelola jadwal perawatan.")
+            return
+        }
+        val cleanName = nama.trim()
+        if (cleanName.isBlank() || intervalHari < 1) return
+        val safeInterval = intervalHari.coerceIn(1, 3650)
+        val nextDue = jadwalPertama ?: PerawatanScheduler.calculateNextDueDateMillis(
+            completionDateMillis = System.currentTimeMillis(),
+            intervalHari = safeInterval
+        )
+        launchGuardedAction("Menambahkan jadwal perawatan...") {
+            repository.insertPerawatan(
+                PerawatanItem(
+                    nama = cleanName,
+                    intervalHari = safeInterval,
+                    terakhirSelesai = null,
+                    jadwalBerikutnya = nextDue
+                )
+            )
+            showSnackbar("Jadwal \"$cleanName\" ditambahkan")
+        }
+    }
+
+    fun updatePerawatan(
+        item: PerawatanItem,
+        namaBaru: String,
+        intervalHariBaru: Int,
+        jadwalBerikutnyaBaru: Long? = null
+    ) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat mengubah jadwal perawatan.")
+            return
+        }
+        val cleanName = namaBaru.trim()
+        if (cleanName.isBlank() || intervalHariBaru < 1) return
+        val safeInterval = intervalHariBaru.coerceIn(1, 3650)
+        val updatedDue = jadwalBerikutnyaBaru ?: if (item.terakhirSelesai != null) {
+            PerawatanScheduler.calculateNextDueDateMillis(item.terakhirSelesai, safeInterval)
+        } else {
+            item.jadwalBerikutnya
+        }
+        launchGuardedAction("Memperbarui jadwal perawatan...") {
+            repository.updatePerawatan(
+                item.copy(
+                    nama = cleanName,
+                    intervalHari = safeInterval,
+                    jadwalBerikutnya = updatedDue
+                )
+            )
+            showSnackbar("Jadwal \"$cleanName\" diperbarui")
+        }
+    }
+
+    fun deletePerawatan(item: PerawatanItem) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menghapus jadwal perawatan.")
+            return
+        }
+        launchGuardedAction("Menghapus jadwal perawatan...") {
+            repository.deletePerawatan(item)
+            showSnackbar("Jadwal \"${item.nama}\" dihapus")
+        }
+    }
+
+    fun completePerawatan(
+        item: PerawatanItem,
+        tanggalSelesai: Long,
+        biaya: Double,
+        catatan: String
+    ) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menandai perawatan selesai.")
+            return
+        }
+        launchGuardedAction("Menyimpan penyelesaian perawatan...") {
+            val saved = repository.completePerawatan(
+                item = item,
+                tanggalSelesai = tanggalSelesai,
+                biaya = biaya,
+                catatan = catatan
+            )
+            if (saved) {
+                val msg = if (biaya > 0.0) {
+                    "Perawatan \"${item.nama}\" selesai & biaya ${FormatUtils.formatRupiah(biaya)} dicatat ke Pengeluaran"
+                } else {
+                    "Perawatan \"${item.nama}\" ditandai selesai"
+                }
+                showSnackbar(msg)
+            } else {
+                showSnackbar("Jadwal perawatan tidak ditemukan")
+            }
+        }
+    }
+
+    fun deletePerawatanLog(log: PerawatanLog) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menghapus riwayat perawatan.")
+            return
+        }
+        launchGuardedAction("Menghapus riwayat perawatan...") {
+            repository.deletePerawatanLog(log)
+            showSnackbar("Riwayat perawatan dihapus")
         }
     }
 

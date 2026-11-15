@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.CloudUpload
@@ -99,6 +100,8 @@ fun SettingsScreen(
     val isSyncingCloud by viewModel.isSyncingCloud.collectAsStateWithLifecycle()
     val lastSyncSummary by viewModel.lastSyncSummary.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
+    val perawatanEvaluations by viewModel.allPerawatanEvaluations.collectAsStateWithLifecycle()
+    val perawatanReminders by viewModel.perawatanReminders.collectAsStateWithLifecycle()
     val currentUser = remember { Firebase.auth.currentUser }
 
     LazyColumn(
@@ -243,6 +246,24 @@ fun SettingsScreen(
                                 modifier = Modifier.size(22.dp)
                             )
                         }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                    )
+                    val perawatanSubtitle = if (perawatanReminders.isNotEmpty()) {
+                        "${perawatanEvaluations.size} jadwal • ${perawatanReminders.size} perlu perhatian"
+                    } else {
+                        "${perawatanEvaluations.size} jadwal • Atur servis & ganti filter RO"
+                    }
+                    SettingsMenuRow(
+                        title = "Jadwal Perawatan RO",
+                        subtitle = perawatanSubtitle,
+                        icon = Icons.Outlined.Build,
+                        iconColor = MaterialTheme.colorScheme.primary,
+                        onClick = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
+                        modifier = Modifier.testTag("menu_jadwal_perawatan")
                     )
                 }
             }

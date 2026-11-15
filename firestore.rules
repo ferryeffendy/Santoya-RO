@@ -167,6 +167,28 @@ service cloud.firestore {
              data.catatan is string && data.catatan.size() <= 300;
     }
 
+    function isValidPerawatanJadwal(data, docId) {
+      return data.keys().hasAll(['syncId', 'nama', 'intervalHari', 'jadwalBerikutnya', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'nama', 'intervalHari', 'terakhirSelesai', 'jadwalBerikutnya', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.nama is string && data.nama.size() >= 1 && data.nama.size() <= 120 &&
+             data.intervalHari is number && data.intervalHari >= 1 && data.intervalHari <= 3650 &&
+             (!('terakhirSelesai' in data) || data.terakhirSelesai == null || (data.terakhirSelesai is number && data.terakhirSelesai >= 0)) &&
+             data.jadwalBerikutnya is number && data.jadwalBerikutnya >= 0;
+    }
+
+    function isValidPerawatanLog(data, docId) {
+      return data.keys().hasAll(['syncId', 'perawatanSyncId', 'namaPerawatan', 'tanggalSelesai', 'biaya', 'catatan', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'perawatanSyncId', 'namaPerawatan', 'tanggalSelesai', 'biaya', 'catatan', 'pengeluaranSyncId', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.perawatanSyncId is string && data.perawatanSyncId.size() >= 1 && data.perawatanSyncId.size() <= 128 &&
+             data.namaPerawatan is string && data.namaPerawatan.size() >= 1 && data.namaPerawatan.size() <= 120 &&
+             data.tanggalSelesai is number && data.tanggalSelesai >= 0 &&
+             data.biaya is number && data.biaya >= 0 &&
+             data.catatan is string && data.catatan.size() <= 500 &&
+             (!('pengeluaranSyncId' in data) || data.pengeluaranSyncId == null || (data.pengeluaranSyncId is string && data.pengeluaranSyncId.size() <= 128));
+    }
+
     match /staff_links/{emailKey} {
       allow get: if isSignedIn() &&
                     isValidEmailKey(emailKey) &&
@@ -271,6 +293,20 @@ service cloud.firestore {
         allow get: if isValidId(docId) && isDepotOwner(depotId);
         allow list: if isDepotOwner(depotId);
         allow create, update: if isValidId(docId) && isValidPengeluaran(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /perawatan_jadwal/{docId} {
+        allow get: if isValidId(docId) && isDepotOwner(depotId);
+        allow list: if isDepotOwner(depotId);
+        allow create, update: if isValidId(docId) && isValidPerawatanJadwal(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+
+      match /perawatan_log/{docId} {
+        allow get: if isValidId(docId) && isDepotOwner(depotId);
+        allow list: if isDepotOwner(depotId);
+        allow create, update: if isValidId(docId) && isValidPerawatanLog(incoming(), docId) && isDepotOwner(depotId);
         allow delete: if isValidId(docId) && isDepotOwner(depotId);
       }
     }

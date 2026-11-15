@@ -261,3 +261,122 @@ test("revoking staff removes access immediately", async () => {
   const sDb = staffDb(true);
   await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("transaksi").get());
 });
+
+test("owner can CRUD perawatan_jadwal and perawatan_log while staff, outsider, and unauthenticated users are denied", async () => {
+  await seedDepotWithStaff();
+  const oDb = ownerDb();
+  const sDb = staffDb(true);
+  const outDb = outsiderDb();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+
+  const jadwalRef = oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_tds");
+  const logRef = oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").doc("pwlog_1");
+
+  // Owner can create, read, update, and list perawatan_jadwal & perawatan_log
+  await assertSucceeds(
+    jadwalRef.set({
+      syncId: "pw_tds",
+      nama: "Cek TDS",
+      intervalHari: 7,
+      terakhirSelesai: null,
+      jadwalBerikutnya: 1700600000000,
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+  await assertSucceeds(jadwalRef.get());
+  await assertSucceeds(oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").get());
+
+  await assertSucceeds(
+    logRef.set({
+      syncId: "pwlog_1",
+      perawatanSyncId: "pw_tds",
+      namaPerawatan: "Cek TDS",
+      tanggalSelesai: 1700000000000,
+      biaya: 50000,
+      catatan: "Air jernih 14 ppm",
+      pengeluaranSyncId: "exp_pw_1",
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+  await assertSucceeds(logRef.get());
+  await assertSucceeds(oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").get());
+
+  // Schema validation rejects invalid intervalHari / negative biaya / unexpected field
+  await assertFails(
+    oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_bad").set({
+      syncId: "pw_bad",
+      nama: "Invalid Interval",
+      intervalHari: 0,
+      terakhirSelesai: null,
+      jadwalBerikutnya: 1700600000000,
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+  await assertFails(
+    oDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").doc("pwlog_bad").set({
+      syncId: "pwlog_bad",
+      perawatanSyncId: "pw_tds",
+      namaPerawatan: "Cek TDS",
+      tanggalSelesai: 1700000000000,
+      biaya: -100,
+      catatan: "",
+      pengeluaranSyncId: null,
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+
+  // Staff cannot get, list, create, update, or delete perawatan_jadwal or perawatan_log
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_tds").get());
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").get());
+  await assertFails(
+    sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_staff").set({
+      syncId: "pw_staff",
+      nama: "Bypass",
+      intervalHari: 7,
+      terakhirSelesai: null,
+      jadwalBerikutnya: 1700600000000,
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_tds").update({ nama: "Hacked", updatedAt: 1700000000001, serverUpdatedAt: ts() }));
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").doc("pw_tds").delete());
+
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").doc("pwlog_1").get());
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").get());
+  await assertFails(
+    sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").doc("pwlog_staff").set({
+      syncId: "pwlog_staff",
+      perawatanSyncId: "pw_tds",
+      namaPerawatan: "Cek TDS",
+      tanggalSelesai: 1700000000000,
+      biaya: 0,
+      catatan: "Staff bypass",
+      pengeluaranSyncId: null,
+      updatedAt: 1700000000000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+  await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").doc("pwlog_1").delete());
+
+  // Outsider & unauthenticated denied
+  await assertFails(outDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").get());
+  await assertFails(outDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").get());
+  await assertFails(unauthDb.collection("depots").doc(DEPOT_ID).collection("perawatan_jadwal").get());
+  await assertFails(unauthDb.collection("depots").doc(DEPOT_ID).collection("perawatan_log").get());
+
+  // Owner can delete own perawatan docs
+  await assertSucceeds(logRef.delete());
+  await assertSucceeds(jadwalRef.delete());
+});
+

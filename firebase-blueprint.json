@@ -138,6 +138,40 @@
         "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
       },
       "required": ["syncId", "pelangganSyncId", "tanggal", "jumlah_bayar", "sisa_kasbon_sebelum", "sisa_kasbon_sesudah", "metode_bayar", "catatan", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "PerawatanJadwal": {
+      "title": "PerawatanJadwal",
+      "description": "Jadwal perawatan berkala mesin RO depot (khusus Pemilik)",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "nama": { "type": "string", "description": "Nama komponen atau pekerjaan perawatan RO" },
+        "intervalHari": { "type": "number", "description": "Interval perawatan dalam hari" },
+        "terakhirSelesai": { "type": "number", "description": "Epoch millis penyelesaian terakhir (opsional)" },
+        "jadwalBerikutnya": { "type": "number", "description": "Epoch millis jadwal perawatan berikutnya" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "nama", "intervalHari", "jadwalBerikutnya", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "PerawatanLog": {
+      "title": "PerawatanLog",
+      "description": "Riwayat pelaksanaan perawatan mesin RO depot (khusus Pemilik)",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "perawatanSyncId": { "type": "string", "description": "SyncId jadwal perawatan terkait" },
+        "namaPerawatan": { "type": "string", "description": "Nama perawatan saat dikerjakan" },
+        "tanggalSelesai": { "type": "number", "description": "Epoch millis tanggal selesai perawatan" },
+        "biaya": { "type": "number", "description": "Biaya perawatan dalam rupiah" },
+        "catatan": { "type": "string", "description": "Catatan pekerjaan perawatan" },
+        "pengeluaranSyncId": { "type": "string", "description": "SyncId entri pengeluaran otomatis jika biaya > 0" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "perawatanSyncId", "namaPerawatan", "tanggalSelesai", "biaya", "catatan", "updatedAt", "isDeleted", "serverUpdatedAt"]
     }
   },
   "firestore": {
@@ -172,6 +206,14 @@
     "/depots/{depotId}/kasbon_logs/{docId}": {
       "schema": { "$ref": "#/entities/KasbonLog" },
       "description": "Koleksi riwayat pembayaran kasbon per depot"
+    },
+    "/depots/{depotId}/perawatan_jadwal/{docId}": {
+      "schema": { "$ref": "#/entities/PerawatanJadwal" },
+      "description": "Koleksi jadwal perawatan mesin RO (hanya Pemilik)"
+    },
+    "/depots/{depotId}/perawatan_log/{docId}": {
+      "schema": { "$ref": "#/entities/PerawatanLog" },
+      "description": "Koleksi riwayat perawatan mesin RO (hanya Pemilik)"
     }
   }
 }

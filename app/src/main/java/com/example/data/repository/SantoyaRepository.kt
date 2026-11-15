@@ -8,11 +8,14 @@ import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.PendingSyncEntity
 import com.example.data.entity.Pengeluaran
+import com.example.data.entity.PerawatanItem
+import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import com.example.util.KaryawanScopeHelper
 import com.example.util.KomisiCalculator
+import com.example.util.PerawatanScheduler
 import com.example.util.SyncCollections
 import com.example.util.SyncOperations
 import kotlinx.coroutines.Dispatchers
@@ -437,6 +440,130 @@ class SantoyaRepository(
         onLocalMutation?.invoke()
     }
 
+    // --- Jadwal & Riwayat Perawatan RO (Khusus Pemilik) ---
+    val allPerawatan: Flow<List<PerawatanItem>> = db.perawatanDao().getAll()
+    val allPerawatanLogs: Flow<List<PerawatanLog>> = db.perawatanLogDao().getAll()
+
+    suspend fun insertPerawatan(item: PerawatanItem): Long {
+        val now = System.currentTimeMillis()
+        val safeInterval = item.intervalHari.coerceIn(1, 3650)
+        val nextDue = if (item.jadwalBerikutnya > 0L) {
+            item.jadwalBerikutnya
+        } else {
+            PerawatanScheduler.calculateNextDueDateMillis(now, safeInterval)
+        }
+        val entity = item.copy(
+            nama = item.nama.trim(),
+            intervalHari = safeInterval,
+            jadwalBerikutnya = nextDue,
+            updatedAt = now
+        )
+        val id = db.withTransaction {
+            val insertedId = db.perawatanDao().insert(entity)
+            enqueueUpsert(SyncCollections.PERAWATAN_JADWAL, entity.syncId, now)
+            insertedId
+        }
+        onLocalMutation?.invoke()
+        return id
+    }
+
+    suspend fun updatePerawatan(item: PerawatanItem) {
+        val now = System.currentTimeMillis()
+        val safeInterval = item.intervalHari.coerceIn(1, 3650)
+        val entity = item.copy(
+            nama = item.nama.trim(),
+            intervalHari = safeInterval,
+            updatedAt = now
+        )
+        db.withTransaction {
+            db.perawatanDao().update(entity)
+            enqueueUpsert(SyncCollections.PERAWATAN_JADWAL, entity.syncId, now)
+        }
+        onLocalMutation?.invoke()
+    }
+
+    suspend fun deletePerawatan(item: PerawatanItem) {
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            db.perawatanDao().delete(item)
+            enqueueDelete(SyncCollections.PERAWATAN_JADWAL, item.syncId, now)
+        }
+        onLocalMutation?.invoke()
+    }
+
+    /**
+     * Menandai jadwal perawatan selesai, menghitung jadwal berikutnya dari tanggal selesai + interval,
+     * menyimpan riwayat perawatan, dan otomatis mencatat Pengeluaran kategori "Perawatan" jika biaya > 0.
+     */
+    suspend fun completePerawatan(
+        item: PerawatanItem,
+        tanggalSelesai: Long,
+        biaya: Double,
+        catatan: String
+    ): Boolean {
+        val now = System.currentTimeMillis()
+        val cleanBiaya = biaya.coerceAtLeast(0.0)
+        val cleanCatatan = catatan.trim()
+        var saved = false
+
+        db.withTransaction {
+            val latest = db.perawatanDao().getById(item.id)
+                ?: db.perawatanDao().getBySyncId(item.syncId)
+                ?: return@withTransaction
+
+            val nextDue = PerawatanScheduler.calculateNextDueDateMillis(
+                completionDateMillis = tanggalSelesai,
+                intervalHari = latest.intervalHari
+            )
+
+            var pengeluaranSyncId: String? = null
+            if (cleanBiaya > 0.0) {
+                val expense = Pengeluaran(
+                    tanggal = tanggalSelesai,
+                    nama_item = "Perawatan: ${latest.nama}",
+                    kategori = PerawatanScheduler.KATEGORI_PENGELUARAN_PERAWATAN,
+                    nominal = cleanBiaya,
+                    updatedAt = now
+                )
+                db.pengeluaranDao().insert(expense)
+                enqueueUpsert(SyncCollections.PENGELUARAN, expense.syncId, now)
+                pengeluaranSyncId = expense.syncId
+            }
+
+            val updatedItem = latest.copy(
+                terakhirSelesai = tanggalSelesai,
+                jadwalBerikutnya = nextDue,
+                updatedAt = now
+            )
+            db.perawatanDao().update(updatedItem)
+            enqueueUpsert(SyncCollections.PERAWATAN_JADWAL, updatedItem.syncId, now)
+
+            val log = PerawatanLog(
+                perawatanSyncId = updatedItem.syncId,
+                namaPerawatan = updatedItem.nama,
+                tanggalSelesai = tanggalSelesai,
+                biaya = cleanBiaya,
+                catatan = cleanCatatan,
+                pengeluaranSyncId = pengeluaranSyncId,
+                updatedAt = now
+            )
+            db.perawatanLogDao().insert(log)
+            enqueueUpsert(SyncCollections.PERAWATAN_LOG, log.syncId, now)
+            saved = true
+        }
+        if (saved) onLocalMutation?.invoke()
+        return saved
+    }
+
+    suspend fun deletePerawatanLog(log: PerawatanLog) {
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            db.perawatanLogDao().delete(log)
+            enqueueDelete(SyncCollections.PERAWATAN_LOG, log.syncId, now)
+        }
+        onLocalMutation?.invoke()
+    }
+
     // --- Transaksi ---
     val allTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllWithDetail()
     val allKasbonTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllKasbonWithDetail()
@@ -776,6 +903,12 @@ class SantoyaRepository(
             db.kasbonLogDao().getAllOnce().forEach {
                 enqueueUpsert(SyncCollections.KASBON_LOGS, it.syncId, it.updatedAt)
             }
+            db.perawatanDao().getAllOnce().forEach {
+                enqueueUpsert(SyncCollections.PERAWATAN_JADWAL, it.syncId, it.updatedAt)
+            }
+            db.perawatanLogDao().getAllOnce().forEach {
+                enqueueUpsert(SyncCollections.PERAWATAN_LOG, it.syncId, it.updatedAt)
+            }
         }
         onLocalMutation?.invoke()
     }
@@ -798,6 +931,8 @@ class SantoyaRepository(
             db.produkDao().deleteAll()
             db.pengeluaranDao().deleteAll()
             db.kasbonLogDao().deleteAll()
+            db.perawatanLogDao().deleteAll()
+            db.perawatanDao().deleteAll()
             db.pendingSyncDao().deleteAll()
         }
     }
