@@ -27,12 +27,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pelanggan
+import com.example.ui.theme.SantoyaRadius
 import com.example.util.FormatUtils
 
 @Composable
@@ -47,11 +49,11 @@ fun KasbonPelunasanDialog(
     val nominalDouble = nominalInput.toDoubleOrNull() ?: 0.0
 
     SantoyaFormBottomSheet(
-        title = "Pelunasan Kasbon",
+        title = stringResource(R.string.kasbon_dialog_title),
         subtitle = pelanggan.nama,
         headerIcon = Icons.Outlined.Payments,
         onDismiss = onDismiss,
-        confirmLabel = "Simpan Pembayaran",
+        confirmLabel = stringResource(R.string.kasbon_dialog_confirm),
         confirmEnabled = nominalDouble > 0,
         confirmTestTag = "btn_confirm_bayar_kasbon",
         onConfirm = {
@@ -63,21 +65,21 @@ fun KasbonPelunasanDialog(
         }
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
                     text = pelanggan.nama,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (pelanggan.alamat.isNotBlank()) {
                     Text(
                         text = pelanggan.alamat,
-                        fontSize = 12.sp,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -88,13 +90,13 @@ fun KasbonPelunasanDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Sisa Kasbon",
-                        fontSize = 13.sp,
+                        text = stringResource(R.string.kasbon_remaining_label),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = FormatUtils.formatRupiah(pelanggan.sisa_kasbon),
-                        fontSize = 16.sp,
+                        style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -103,8 +105,8 @@ fun KasbonPelunasanDialog(
         }
 
         Text(
-            text = "Nominal Pembayaran",
-            fontSize = 13.sp,
+            text = stringResource(R.string.kasbon_amount_label),
+            style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -114,7 +116,7 @@ fun KasbonPelunasanDialog(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             SantoyaFilterPill(
-                label = "Bayar Penuh",
+                label = stringResource(R.string.kasbon_pay_full),
                 selected = nominalDouble == pelanggan.sisa_kasbon,
                 onClick = { nominalInput = pelanggan.sisa_kasbon.toLong().toString() },
                 centerContent = true,
@@ -122,7 +124,7 @@ fun KasbonPelunasanDialog(
                 modifier = Modifier.weight(1f)
             )
             SantoyaFilterPill(
-                label = "50%",
+                label = stringResource(R.string.kasbon_pay_half),
                 selected = nominalDouble == (pelanggan.sisa_kasbon / 2),
                 onClick = { nominalInput = (pelanggan.sisa_kasbon / 2).toLong().toString() },
                 centerContent = true,
@@ -130,7 +132,7 @@ fun KasbonPelunasanDialog(
                 modifier = Modifier.weight(0.75f)
             )
             SantoyaFilterPill(
-                label = "Rp 10.000",
+                label = stringResource(R.string.kasbon_pay_10k),
                 selected = nominalDouble == 10000.0,
                 onClick = { nominalInput = "10000" },
                 centerContent = true,
@@ -142,9 +144,9 @@ fun KasbonPelunasanDialog(
         OutlinedTextField(
             value = nominalInput,
             onValueChange = { nominalInput = it.filter { char -> char.isDigit() } },
-            label = { Text("Nominal Bayar (Rp)") },
+            label = { Text(stringResource(R.string.kasbon_input_label)) },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Done
@@ -164,8 +166,11 @@ fun KasbonPelunasanDialog(
         if (nominalDouble > 0) {
             val sisaSetelahBayar = (pelanggan.sisa_kasbon - nominalDouble).coerceAtLeast(0.0)
             Text(
-                text = "Sisa kasbon setelah bayar: ${FormatUtils.formatRupiah(sisaSetelahBayar)}",
-                fontSize = 12.sp,
+                text = stringResource(
+                    R.string.kasbon_remaining_after,
+                    FormatUtils.formatRupiah(sisaSetelahBayar)
+                ),
+                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                 fontWeight = FontWeight.SemiBold,
                 color = if (sisaSetelahBayar == 0.0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )

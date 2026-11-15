@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.outlined.CloudDownload
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Shield
@@ -42,6 +44,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -58,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,6 +84,7 @@ import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
+import com.example.util.SyncConnectionStatus
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
 import com.google.firebase.Firebase
@@ -102,6 +107,8 @@ fun SettingsScreen(
     var showCloudDiagnosticDialog by remember { mutableStateOf(false) }
 
     val isSyncingCloud by viewModel.isSyncingCloud.collectAsStateWithLifecycle()
+    val activeSyncPushMode by viewModel.activeSyncPushMode.collectAsStateWithLifecycle()
+    val cloudSyncError by viewModel.cloudSyncError.collectAsStateWithLifecycle()
     val lastSyncSummary by viewModel.lastSyncSummary.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
     val perawatanEvaluations by viewModel.allPerawatanEvaluations.collectAsStateWithLifecycle()
@@ -118,7 +125,7 @@ fun SettingsScreen(
 
         // 1. Profil Pemilik
         item {
-            SettingsSectionTitle("Profil Pemilik")
+            SettingsSectionTitle(stringResource(R.string.settings_section_profile))
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -211,7 +218,7 @@ fun SettingsScreen(
 
         // 2. Kelola Depot (Master Data dinaikkan ke posisi ke-2)
         item {
-            SettingsSectionTitle("Kelola Depot")
+            SettingsSectionTitle(stringResource(R.string.settings_section_depot))
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -282,7 +289,7 @@ fun SettingsScreen(
 
         // 3. Sinkronisasi Antar Perangkat (Gabungan Cloud + Offline-First)
         item {
-            SettingsSectionTitle("Sinkronisasi Antar Perangkat")
+            SettingsSectionTitle(stringResource(R.string.settings_section_sync))
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -316,7 +323,7 @@ fun SettingsScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Sinkronisasi Otomatis",
+                                text = stringResource(R.string.settings_sync_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -324,7 +331,7 @@ fun SettingsScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "Data otomatis tersinkron di semua HP",
+                                text = stringResource(R.string.settings_sync_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -355,7 +362,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Tetap jalan tanpa sinyal • Tersimpan di HP",
+                                    text = stringResource(R.string.settings_sync_offline_note),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -393,13 +400,104 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        }
+                    }
 
-                            if (!syncState.errorMessage.isNullOrBlank()) {
-                                Text(
-                                    text = syncState.errorMessage ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
+                    AnimatedVisibility(visible = isSyncingCloud) {
+                        Surface(
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp)
+                                .testTag("banner_sync_loading")
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = if (activeSyncPushMode == false) {
+                                            stringResource(R.string.settings_sync_pull_progress)
+                                        } else {
+                                            stringResource(R.string.settings_sync_push_progress)
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                LinearProgressIndicator(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surface
                                 )
+                            }
+                        }
+                    }
+
+                    val effectiveSyncError = cloudSyncError?.takeIf { it.isNotBlank() }
+                        ?: syncState.errorMessage?.takeIf { it.isNotBlank() }
+                    AnimatedVisibility(
+                        visible = !isSyncingCloud &&
+                            (effectiveSyncError != null || syncState.status == SyncConnectionStatus.ERROR)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp)
+                                .testTag("banner_sync_error")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ErrorOutline,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.settings_sync_error_title),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                    Text(
+                                        text = effectiveSyncError ?: "Periksa koneksi internet Anda.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                                if (currentUser != null) {
+                                    TextButton(
+                                        onClick = {
+                                            viewModel.clearCloudSyncError()
+                                            viewModel.syncToCloud(context, currentUser.uid)
+                                        },
+                                        modifier = Modifier.heightIn(min = SantoyaSize.touchTarget)
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.action_retry),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -530,14 +628,19 @@ fun SettingsScreen(
                                 .height(SantoyaSize.touchTarget)
                                 .testTag("btn_sync_to_cloud")
                         ) {
-                            if (isSyncingCloud) {
+                            if (isSyncingCloud && activeSyncPushMode != false) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Menyimpan...", style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    text = stringResource(R.string.settings_sync_btn_backing_up),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             } else {
                                 Icon(
                                     imageVector = Icons.Outlined.CloudUpload,
@@ -546,7 +649,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Cadangkan",
+                                    text = stringResource(R.string.settings_sync_btn_backup),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
@@ -568,19 +671,34 @@ fun SettingsScreen(
                                 .height(SantoyaSize.touchTarget)
                                 .testTag("btn_restore_from_cloud")
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.CloudDownload,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Ambil Data",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                            if (isSyncingCloud && activeSyncPushMode == false) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_sync_btn_restoring),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.CloudDownload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_sync_btn_restore),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                 }
@@ -844,10 +962,10 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
             title = {
-                Text("Keluar dari Akun Pemilik?", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_sign_out_title), fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Anda harus login lagi pakai akun Google untuk membuka data depot.")
+                Text(stringResource(R.string.settings_sign_out_msg))
             },
             confirmButton = {
                 Button(
@@ -861,7 +979,7 @@ fun SettingsScreen(
                     ),
                     modifier = Modifier.testTag("btn_confirm_sign_out")
                 ) {
-                    Text("Keluar")
+                    Text(stringResource(R.string.action_sign_out))
                 }
             },
             dismissButton = {
@@ -869,7 +987,7 @@ fun SettingsScreen(
                     onClick = { showSignOutDialog = false },
                     modifier = Modifier.testTag("btn_cancel_sign_out")
                 ) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -879,10 +997,10 @@ fun SettingsScreen(
         AlertDialog(
             onDismissRequest = { showRestoreCloudDialog = false },
             title = {
-                Text("Ambil Data dari Cloud?", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_sync_restore_dialog_title), fontWeight = FontWeight.Bold)
             },
             text = {
-                Text("Data pelanggan, produk, kurir, dan transaksi dari Cloud akan digabungkan ke HP ini. Lanjutkan?")
+                Text(stringResource(R.string.settings_sync_restore_dialog_msg))
             },
             confirmButton = {
                 Button(
@@ -895,7 +1013,7 @@ fun SettingsScreen(
                     },
                     modifier = Modifier.testTag("btn_confirm_restore_cloud")
                 ) {
-                    Text("Ambil Data")
+                    Text(stringResource(R.string.settings_sync_btn_restore))
                 }
             },
             dismissButton = {
@@ -903,7 +1021,7 @@ fun SettingsScreen(
                     onClick = { showRestoreCloudDialog = false },
                     modifier = Modifier.testTag("btn_cancel_restore_cloud")
                 ) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

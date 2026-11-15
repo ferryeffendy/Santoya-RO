@@ -1,6 +1,7 @@
 package com.example.util
 
 import android.util.Log
+import com.aistudio.companion.kzpmrw.BuildConfig
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -17,6 +18,36 @@ enum class OperationType(val value: String) {
     WRITE("write")
 }
 
+/**
+ * Menyamarkan alamat email untuk log produksi agar tidak membocorkan PII di Logcat.
+ */
+fun redactEmailForLog(email: String?, redact: Boolean = !BuildConfig.DEBUG): String? {
+    if (email.isNullOrBlank() || !redact) return email
+    val trimmed = email.trim()
+    val atIndex = trimmed.indexOf('@')
+    if (atIndex <= 0 || atIndex == trimmed.lastIndex) return "***"
+    val localPart = trimmed.substring(0, atIndex)
+    val domainPart = trimmed.substring(atIndex)
+    val visiblePrefix = when {
+        localPart.length >= 3 -> localPart.take(2)
+        else -> localPart.take(1)
+    }
+    return "$visiblePrefix***$domainPart"
+}
+
+/**
+ * Menyamarkan UID atau identifier akun untuk log produksi agar tetap dapat dilacak tanpa mengekspos ID penuh.
+ */
+fun redactUidForLog(uid: String?, redact: Boolean = !BuildConfig.DEBUG): String? {
+    if (uid.isNullOrBlank() || !redact) return uid
+    val trimmed = uid.trim()
+    if (trimmed.length <= 6) return "***"
+    return "${trimmed.take(4)}***${trimmed.takeLast(2)}"
+}
+
+/**
+ * Mencatat error Firestore terstruktur dengan penyamaran PII otomatis pada build produksi.
+ */
 fun handleFirestoreError(
     exception: Throwable,
     operationType: OperationType,
@@ -33,18 +64,20 @@ fun handleFirestoreError(
         null
     }
 
+    val shouldRedact = !BuildConfig.DEBUG
+
     val providerInfoList = currentUser?.providerData?.map { provider ->
         JSONObject().apply {
             put("providerId", provider.providerId)
-            put("email", provider.email)
+            put("email", redactEmailForLog(provider.email, shouldRedact))
         }
     } ?: emptyList()
 
     val authInfoJson = JSONObject().apply {
-        put("userId", currentUser?.uid)
-        put("email", currentUser?.email)
+        put("userId", redactUidForLog(currentUser?.uid, shouldRedact))
+        put("email", redactEmailForLog(currentUser?.email, shouldRedact))
         put("emailVerified", currentUser?.isEmailVerified)
-        put("tenantId", currentUser?.tenantId)
+        put("tenantId", redactUidForLog(currentUser?.tenantId, shouldRedact))
         put("providerInfo", JSONArray(providerInfoList))
     }
 

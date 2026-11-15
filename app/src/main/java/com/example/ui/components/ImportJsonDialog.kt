@@ -33,10 +33,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
+import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
 import com.example.util.ExportHelper
 
 @Composable
@@ -50,6 +53,9 @@ fun ImportJsonDialog(
     var jsonInput by remember { mutableStateOf("") }
     var selectedFileName by remember { mutableStateOf<String?>(null) }
 
+    val readSuccessMsg = stringResource(R.string.import_dialog_read_success)
+    val readErrorMsg = stringResource(R.string.import_dialog_read_error)
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -58,19 +64,19 @@ fun ImportJsonDialog(
             if (content != null) {
                 jsonInput = content
                 selectedFileName = uri.lastPathSegment ?: "cadangan_santoya.json"
-                Toast.makeText(context, "File cadangan terbaca", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, readSuccessMsg, Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(context, "Gagal membaca file cadangan", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, readErrorMsg, Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     SantoyaFormBottomSheet(
-        title = "Pulihkan dari File Cadangan",
-        subtitle = "Impor file JSON atau tempel teks cadangan",
+        title = stringResource(R.string.import_dialog_title),
+        subtitle = stringResource(R.string.import_dialog_subtitle),
         headerIcon = Icons.Outlined.FileUpload,
         onDismiss = onDismiss,
-        confirmLabel = "Pulihkan",
+        confirmLabel = stringResource(R.string.import_dialog_confirm),
         confirmEnabled = jsonInput.isNotBlank(),
         confirmTestTag = "btn_confirm_import_json",
         onConfirm = {
@@ -83,7 +89,7 @@ fun ImportJsonDialog(
         }
     ) {
         Surface(
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -96,9 +102,8 @@ fun ImportJsonDialog(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Pilih file cadangan dari HP, atau tempel teks cadangannya di bawah.",
-                    fontSize = 11.sp,
-                    lineHeight = 16.sp,
+                    text = stringResource(R.string.import_dialog_info),
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
             }
@@ -106,23 +111,25 @@ fun ImportJsonDialog(
 
         FilledTonalButton(
             onClick = { filePickerLauncher.launch("*/*") },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(SantoyaRadius.md),
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 48.dp)
+                .heightIn(min = SantoyaSize.touchTarget)
                 .testTag("btn_pick_json_file")
         ) {
             Icon(imageVector = Icons.Outlined.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (selectedFileName != null) "File: $selectedFileName" else "Pilih File Cadangan",
-                fontSize = 13.sp
+                text = selectedFileName?.let {
+                    stringResource(R.string.import_dialog_selected_file, it)
+                } ?: stringResource(R.string.import_dialog_pick_file),
+                style = MaterialTheme.typography.labelLarge
             )
         }
 
         Text(
-            text = "Atau tempel teks cadangan:",
-            fontSize = 12.sp,
+            text = stringResource(R.string.import_dialog_paste_label),
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onBackground
         )
@@ -133,17 +140,13 @@ fun ImportJsonDialog(
             placeholder = {
                 Text(
                     "{\n  \"data_pelanggan_nested\": [\n    {\n      \"nama\": \"Bu Siti\",\n      \"alamat\": \"Desa Santoya\",\n      \"no_hp\": \"0812...\",\n      \"sisa_kasbon\": 0,\n      \"riwayat_transaksi\": [...]\n    }\n  ]\n}",
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace)
                 )
             },
             minLines = 5,
             maxLines = 9,
-            shape = RoundedCornerShape(12.dp),
-            textStyle = androidx.compose.ui.text.TextStyle(
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
-            ),
+            shape = RoundedCornerShape(SantoyaRadius.md),
+            textStyle = MaterialTheme.typography.labelSmall.copy(fontFamily = FontFamily.Monospace),
             modifier = Modifier
                 .fillMaxWidth()
                 .bringIntoViewOnFocus()

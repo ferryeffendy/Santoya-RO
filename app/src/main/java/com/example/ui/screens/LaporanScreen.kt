@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,6 +99,7 @@ import com.example.ui.components.resolvePengeluaranCategoryColor
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
+import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
@@ -157,6 +159,7 @@ fun LaporanScreen(
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
     val allKasbonLogs by viewModel.allKasbonLogs.collectAsStateWithLifecycle()
+    val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
 
     val rawTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
     val effectiveTransaksiList = remember(rawTransaksiList) {
@@ -434,7 +437,7 @@ fun LaporanScreen(
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "Periode Laporan",
+                                    text = stringResource(R.string.laporan_period_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -452,15 +455,16 @@ fun LaporanScreen(
                                     MaterialTheme.colorScheme.primary
                                 } else {
                                     MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
-                                }
+                                },
+                                modifier = Modifier.heightIn(min = SantoyaSize.touchTarget)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Outlined.DateRange,
-                                        contentDescription = "Pilih Rentang Tanggal",
+                                        contentDescription = stringResource(R.string.laporan_calendar_cd),
                                         tint = if (isCustomDateRange) {
                                             MaterialTheme.colorScheme.onPrimary
                                         } else {
@@ -470,7 +474,7 @@ fun LaporanScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Kalender",
+                                        text = stringResource(R.string.laporan_calendar_label),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = if (isCustomDateRange) {
@@ -540,11 +544,11 @@ fun LaporanScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             val chipLabels = mapOf(
-                                LaporanPeriode.HARI_INI to "Harian",
-                                LaporanPeriode.MINGGU_INI to "Mingguan",
-                                LaporanPeriode.BULAN_INI to "Bulanan",
-                                LaporanPeriode.TAHUN_INI to "Tahunan",
-                                LaporanPeriode.SEMUA to "Semua"
+                                LaporanPeriode.HARI_INI to stringResource(R.string.laporan_period_daily),
+                                LaporanPeriode.MINGGU_INI to stringResource(R.string.laporan_period_weekly),
+                                LaporanPeriode.BULAN_INI to stringResource(R.string.laporan_period_monthly),
+                                LaporanPeriode.TAHUN_INI to stringResource(R.string.laporan_period_yearly),
+                                LaporanPeriode.SEMUA to stringResource(R.string.laporan_period_all)
                             )
                             LaporanPeriode.values().forEach { filter ->
                                 val isSelected = !isCustomDateRange && selectedPeriode == filter
@@ -554,7 +558,7 @@ fun LaporanScreen(
                                         viewModel.setLaporanPeriode(filter)
                                         showAllDetails = false
                                     },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(SantoyaRadius.sm),
                                     color = if (isSelected) {
                                         MaterialTheme.colorScheme.primary
                                     } else {
@@ -567,17 +571,18 @@ fun LaporanScreen(
                                     },
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(34.dp)
+                                        .heightIn(min = SantoyaSize.touchTarget)
                                 ) {
                                     Box(
                                         contentAlignment = Alignment.Center,
                                         modifier = Modifier
-                                            .fillMaxSize()
+                                            .fillMaxWidth()
+                                            .heightIn(min = SantoyaSize.touchTarget)
                                             .padding(horizontal = 2.dp)
                                     ) {
                                         Text(
                                             text = chipLabels[filter] ?: filter.label,
-                                            style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.5.sp),
+                                            style = MaterialTheme.typography.labelMedium,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isSelected) {
                                                 MaterialTheme.colorScheme.onPrimary
@@ -597,14 +602,21 @@ fun LaporanScreen(
                 }
             }
 
-            // 2. Main Profit & Loss Summary Card OR Empty State
-            if (!hasPeriodActivity) {
+            // 2. Loading Skeleton OR Main Profit & Loss Summary Card OR Empty State
+            if (!isInitialDataLoaded && rawTransaksiList.isEmpty() && effectivePengeluaranList.isEmpty()) {
+                item {
+                    SantoyaLoadingSkeleton(
+                        itemCount = 4,
+                        message = stringResource(R.string.laporan_loading)
+                    )
+                }
+            } else if (!hasPeriodActivity) {
                 item {
                     SantoyaEmptyState(
                         emptyType = SantoyaEmptyType.LAPORAN,
-                        title = "Belum ada transaksi di periode ini",
-                        subtitle = "Belum ada data. Coba pilih periode lain atau catat transaksi baru.",
-                        primaryActionLabel = "Catat Transaksi",
+                        title = stringResource(R.string.laporan_empty_title),
+                        subtitle = stringResource(R.string.laporan_empty_subtitle),
+                        primaryActionLabel = stringResource(R.string.laporan_empty_cta),
                         primaryActionIcon = Icons.Outlined.Add,
                         onPrimaryAction = {
                             viewModel.setTransaksiTab(0)
@@ -1246,7 +1258,7 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 40.dp),
+                                    .heightIn(min = SantoyaSize.touchTarget),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1272,7 +1284,7 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = 40.dp),
+                                    .heightIn(min = SantoyaSize.touchTarget),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1590,15 +1602,22 @@ fun LaporanScreen(
                                 shape = RoundedCornerShape(SantoyaRadius.sm),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .heightIn(min = SantoyaSize.touchTarget)
                                     .testTag("btn_export_pdf")
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.PictureAsPdf,
-                                    contentDescription = "Ekspor PDF",
+                                    contentDescription = stringResource(R.string.laporan_export_pdf),
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ekspor PDF", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = stringResource(R.string.laporan_export_pdf),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
 
                             OutlinedButton(
@@ -1614,15 +1633,22 @@ fun LaporanScreen(
                                 shape = RoundedCornerShape(SantoyaRadius.sm),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .heightIn(min = SantoyaSize.touchTarget)
                                     .testTag("btn_export_csv")
                             ) {
                                 Icon(
                                     imageVector = Icons.Outlined.TableView,
-                                    contentDescription = "Ekspor CSV",
+                                    contentDescription = stringResource(R.string.laporan_export_csv),
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Ekspor CSV", maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = stringResource(R.string.laporan_export_csv),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
                     }
@@ -1788,7 +1814,7 @@ fun LaporanScreen(
                                 shape = RoundedCornerShape(SantoyaRadius.md),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(42.dp)
+                                    .heightIn(min = SantoyaSize.touchTarget)
                             ) {
                                 Text(
                                     text = if (showAllDetails) {
@@ -1889,7 +1915,7 @@ fun LaporanScreen(
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(42.dp)
+                                    .heightIn(min = SantoyaSize.touchTarget)
                             ) {
                                 Text(
                                     text = if (showAllDetails) {

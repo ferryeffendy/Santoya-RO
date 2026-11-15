@@ -80,6 +80,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -91,6 +92,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Pengeluaran
 import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard
@@ -268,7 +270,7 @@ fun PengeluaranScreen(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Add,
-                        contentDescription = "Catat Pengeluaran"
+                        contentDescription = stringResource(R.string.pengeluaran_fab_cd)
                     )
                 }
             }
@@ -295,7 +297,7 @@ fun PengeluaranScreen(
                 SantoyaSearchBar(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
-                    placeholder = "Cari pengeluaran, kategori, nominal...",
+                    placeholder = stringResource(R.string.pengeluaran_search_placeholder),
                     testTag = "input_search_pengeluaran",
                     resultCount = if (searchQuery.isNotBlank()) periodAndSearchFilteredList.size else null
                 )
@@ -450,7 +452,7 @@ fun PengeluaranScreen(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
-                                        text = "Rincian per Kategori",
+                                        text = stringResource(R.string.pengeluaran_category_breakdown),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary,
@@ -515,18 +517,22 @@ fun PengeluaranScreen(
                                 selectedDateFilter == PengeluaranDateFilter.SEMUA
                             SantoyaEmptyState(
                                 emptyType = SantoyaEmptyType.LAPORAN,
-                                title = if (isUnfilteredEmpty) "Belum Ada Pengeluaran" else "Pengeluaran Tidak Ditemukan",
-                                subtitle = if (isUnfilteredEmpty) {
-                                    "Catat biaya listrik, tutup galon, atau BBM antar agar laba bersih tercatat akurat."
+                                title = if (isUnfilteredEmpty) {
+                                    stringResource(R.string.pengeluaran_empty_title)
                                 } else {
-                                    "Tidak ada catatan pengeluaran untuk periode dan kategori yang dipilih."
+                                    stringResource(R.string.pengeluaran_empty_filtered_title)
                                 },
-                                primaryActionLabel = if (isUnfilteredEmpty) "Catat Pengeluaran" else null,
+                                subtitle = if (isUnfilteredEmpty) {
+                                    stringResource(R.string.pengeluaran_empty_subtitle)
+                                } else {
+                                    stringResource(R.string.pengeluaran_empty_filtered_subtitle)
+                                },
+                                primaryActionLabel = if (isUnfilteredEmpty) stringResource(R.string.pengeluaran_empty_cta) else null,
                                 primaryActionIcon = if (isUnfilteredEmpty) Icons.Outlined.Add else null,
                                 onPrimaryAction = if (isUnfilteredEmpty) {
                                     { showAddDialog = true }
                                 } else null,
-                                secondaryActionLabel = if (!isUnfilteredEmpty) "Reset Filter" else null,
+                                secondaryActionLabel = if (!isUnfilteredEmpty) stringResource(R.string.pengeluaran_reset_filter) else null,
                                 secondaryActionIcon = if (!isUnfilteredEmpty) Icons.Outlined.Clear else null,
                                 onSecondaryAction = if (!isUnfilteredEmpty) {
                                     {
@@ -968,52 +974,59 @@ private fun PengeluaranDateFilterRow(
                     }
 
                     val shape = RoundedCornerShape(SantoyaRadius.pill)
-                    Surface(
-                        shape = shape,
-                        color = containerColor,
-                        border = BorderStroke(1.dp, borderColor),
+                    Box(
                         modifier = Modifier
                             .weight(itemWeight)
-                            .heightIn(min = 34.dp)
+                            .heightIn(min = SantoyaSize.touchTarget)
                             .clip(shape)
                             .semantics {
                                 this.selected = isSelected
                                 this.role = Role.RadioButton
                             }
                             .clickable { onSelectFilter(option) }
-                            .testTag("filter_date_${option.name.lowercase()}")
+                            .testTag("filter_date_${option.name.lowercase()}"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = innerHorizontal, vertical = 5.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                        Surface(
+                            shape = shape,
+                            color = containerColor,
+                            border = BorderStroke(1.dp, borderColor),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 36.dp)
                         ) {
-                            if (option == PengeluaranDateFilter.RENTANG) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DateRange,
-                                    contentDescription = null,
-                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else contentColor,
-                                    modifier = Modifier.size(if (availableWidth < 360.dp) 12.dp else 13.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                            }
-                            Text(
-                                text = option.label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontSize = labelFontSize,
-                                    lineHeight = labelFontSize
-                                ),
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                color = contentColor,
-                                maxLines = 1,
-                                softWrap = false,
-                                overflow = TextOverflow.Clip,
-                                onTextLayout = { result ->
-                                    if (result.hasVisualOverflow && labelFontSize.value > 8f) {
-                                        labelFontSize = (labelFontSize.value - 0.5f).coerceAtLeast(8f).sp
-                                    }
+                            Row(
+                                modifier = Modifier.padding(horizontal = innerHorizontal, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                if (option == PengeluaranDateFilter.RENTANG) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DateRange,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else contentColor,
+                                        modifier = Modifier.size(if (availableWidth < 360.dp) 12.dp else 13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
                                 }
-                            )
+                                Text(
+                                    text = option.label,
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = labelFontSize,
+                                        lineHeight = labelFontSize
+                                    ),
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                                    color = contentColor,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Clip,
+                                    onTextLayout = { result ->
+                                        if (result.hasVisualOverflow && labelFontSize.value > 8f) {
+                                            labelFontSize = (labelFontSize.value - 0.5f).coerceAtLeast(8f).sp
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -1075,15 +1088,14 @@ private fun PengeluaranDateFilterRow(
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.Clear,
-                                contentDescription = "Reset tanggal",
+                                contentDescription = stringResource(R.string.pengeluaran_reset_date_cd),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(12.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))
                             Text(
-                                text = "Reset",
+                                text = stringResource(R.string.action_reset),
                                 style = MaterialTheme.typography.labelSmall,
-                                fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

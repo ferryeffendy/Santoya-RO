@@ -376,11 +376,14 @@ class RealtimeSyncEngine(
                     val snap = depotRef.collection(col).get().await()
                     recordReads(snap.documents.size.coerceAtLeast(1))
                     applyMutex.withLock {
-                        cachedSnapshots[col] = snap.documents
+                        cachedSnapshots[col] = snap.documents.take(MAX_INITIAL_SNAPSHOT_DOCS_PER_COL)
                         receivedInitialCollections.add(col)
                     }
                 }
                 applyAllSnapshotsInOrder()
+                applyMutex.withLock {
+                    cachedSnapshots.clear()
+                }
             }
 
             val pCount = db.pelangganDao().count()
@@ -434,6 +437,7 @@ class RealtimeSyncEngine(
         hasSeededInitialOwnerPush = false
 
         val previousDepot = prefs.getString(KEY_LAST_DEPOT_ID, null)
+        val previousRole = activeRole
         activeDepotId = depotId
         activeRole = role
 
@@ -449,10 +453,22 @@ class RealtimeSyncEngine(
 
         scope.launch {
             val sessionUid = activeUid ?: return@launch
-            // Setiap perpindahan depot wajib menghapus data depot lama, apa pun
-            // perannya. Ini mencegah data staf lama tetap terbaca saat tautan
-            // staf dihapus dan aplikasi jatuh kembali ke mode pemilik.
+            // Setiap perpindahan depot wajib mengirim antrean yang masih valid milik depot lama
+            // terlebih dahulu (best-effort), lalu menghapus data depot lama agar tidak tercampur.
             if (previousDepot != null && previousDepot != depotId) {
+                val lastOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
+                if (lastOwnerUid == sessionUid && checkIsOnline()) {
+                    try {
+                        withTimeout(5_000L) {
+                            flushPendingQueueInternal(
+                                targetDepotId = previousDepot,
+                                targetRole = previousRole
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Best-effort flush before switching depot skipped: ${e.message}")
+                    }
+                }
                 db.withTransaction {
                     db.perawatanLogDao().deleteAll()
                     db.perawatanDao().deleteAll()
@@ -545,22 +561,28 @@ class RealtimeSyncEngine(
                         recordReads(readsCount)
                         scope.launch {
                             autoRetryCount = 0
-                            applyMutex.withLock {
-                                cachedSnapshots[colName] = snapshot.documents
-                                receivedInitialCollections.add(colName)
-                            }
                             if (isInitialForCollection) {
+                                applyMutex.withLock {
+                                    cachedSnapshots[colName] =
+                                        snapshot.documents.take(MAX_INITIAL_SNAPSHOT_DOCS_PER_COL)
+                                    receivedInitialCollections.add(colName)
+                                }
                                 applyAllSnapshotsInOrder()
                             } else {
                                 applyChangedDocuments(colName, snapshot.documentChanges)
                             }
 
-                            if (role == DepotRole.OWNER && !hasSeededInitialOwnerPush &&
-                                receivedInitialCollections.containsAll(collections)
-                            ) {
-                                hasSeededInitialOwnerPush = true
-                                enqueueMissingLocalRecordsForOwner()
-                                flushPendingQueueInternal()
+                            if (receivedInitialCollections.containsAll(collections)) {
+                                if (role == DepotRole.OWNER && !hasSeededInitialOwnerPush) {
+                                    hasSeededInitialOwnerPush = true
+                                    enqueueMissingLocalRecordsForOwner()
+                                    flushPendingQueueInternal()
+                                }
+                                applyMutex.withLock {
+                                    if (cachedSnapshots.isNotEmpty()) {
+                                        cachedSnapshots.clear()
+                                    }
+                                }
                             }
 
                             _state.update {
@@ -1286,9 +1308,12 @@ class RealtimeSyncEngine(
         }
     }
 
-    private suspend fun flushPendingQueueInternal() {
+    private suspend fun flushPendingQueueInternal(
+        targetDepotId: String = activeDepotId,
+        targetRole: DepotRole = activeRole
+    ) {
         val uid = activeUid ?: return
-        val depotId = activeDepotId.ifBlank { return }
+        val depotId = targetDepotId.ifBlank { return }
         if (_state.value.status == SyncConnectionStatus.REVOKED) return
         if (!checkIsOnline()) {
             _state.update { it.copy(isOnline = false, status = SyncConnectionStatus.OFFLINE) }
@@ -1334,7 +1359,7 @@ class RealtimeSyncEngine(
                     item.collectionName == SyncCollections.PERAWATAN_LOG ||
                     item.collectionName == SyncCollections.PRODUK ||
                     item.collectionName == SyncCollections.KURIR
-                if (activeRole == DepotRole.STAFF && isOwnerOnlyCollection) {
+                if (targetRole == DepotRole.STAFF && isOwnerOnlyCollection) {
                     db.pendingSyncDao().remove(item.collectionName, item.syncId)
                     continue
                 }
@@ -1873,6 +1898,7 @@ class RealtimeSyncEngine(
         private const val PREFS_NAME = "santoya_sync_prefs"
         private const val KEY_LAST_DEPOT_ID = "last_depot_id"
         private const val KEY_LAST_OWNER_UID = "last_owner_uid"
+        private const val MAX_INITIAL_SNAPSHOT_DOCS_PER_COL = 5_000
         private val EMAIL_KEY_REGEX = Regex("^[a-zA-Z0-9_.+\\-@]+$")
     }
 }

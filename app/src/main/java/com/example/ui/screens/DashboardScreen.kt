@@ -71,6 +71,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -286,14 +287,14 @@ fun DashboardScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Image(
                                 painter = painterResource(id = R.drawable.logo_santoya),
-                                contentDescription = "Logo Santoya",
+                                contentDescription = stringResource(R.string.dashboard_logo_cd),
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.size(38.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "SANTOYA RO",
+                                    text = stringResource(R.string.dashboard_brand_title),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -301,7 +302,7 @@ fun DashboardScreen(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Kasir & Antar Galon",
+                                    text = stringResource(R.string.dashboard_brand_subtitle),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -324,7 +325,7 @@ fun DashboardScreen(
                             if (!isKaryawan) {
                                 SantoyaTopBarIconButton(
                                     icon = Icons.Outlined.Settings,
-                                    contentDescription = "Pengaturan",
+                                    contentDescription = stringResource(R.string.dashboard_settings_cd),
                                     onClick = onNavigateToSettings,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.testTag("dashboard_settings_button")
@@ -332,7 +333,7 @@ fun DashboardScreen(
                             } else if (onSignOut != null) {
                                 SantoyaTopBarIconButton(
                                     icon = Icons.AutoMirrored.Outlined.Logout,
-                                    contentDescription = "Keluar Akun",
+                                    contentDescription = stringResource(R.string.dashboard_sign_out_cd),
                                     onClick = { showKaryawanSignOutDialog = true },
                                     tint = MaterialTheme.colorScheme.error,
                                     containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -381,7 +382,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Akses akun Anda sedang dimatikan pemilik. Hubungi pemilik untuk mengaktifkannya lagi.",
+                                text = stringResource(R.string.dashboard_revoked_banner),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onErrorContainer
@@ -458,7 +459,11 @@ fun DashboardScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = if (isKaryawan) "SETORAN TUNAI HARI INI" else "PENDAPATAN TUNAI HARI INI",
+                                            text = if (isKaryawan) {
+                                                stringResource(R.string.dashboard_hero_staff_deposit)
+                                            } else {
+                                                stringResource(R.string.dashboard_hero_owner_revenue)
+                                            },
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = FontWeight.SemiBold,
                                             letterSpacing = 0.7.sp,
@@ -553,9 +558,8 @@ fun DashboardScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "LABA BERSIH",
+                                                    text = stringResource(R.string.dashboard_net_profit_label),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
@@ -571,9 +575,8 @@ fun DashboardScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "Kas masuk dikurangi biaya & komisi",
+                                                text = stringResource(R.string.dashboard_net_profit_desc),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
                                                 color = santoyaColors.onHero.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -614,9 +617,8 @@ fun DashboardScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "TOTAL PIUTANG",
+                                                    text = stringResource(R.string.dashboard_receivables_label),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
@@ -632,9 +634,8 @@ fun DashboardScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "Cek daftar kasbon →",
+                                                text = stringResource(R.string.dashboard_receivables_cta),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
                                                 color = santoyaColors.onHero.copy(alpha = 0.65f),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
@@ -684,9 +685,8 @@ fun DashboardScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "GALON HARI INI",
+                                                    text = stringResource(R.string.dashboard_galon_today_label),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
@@ -705,7 +705,7 @@ fun DashboardScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
-                                                        text = "Galon",
+                                                        text = stringResource(R.string.unit_galon),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.Medium,
                                                         color = santoyaColors.onHero.copy(alpha = 0.75f),
@@ -753,9 +753,8 @@ fun DashboardScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "ESTIMASI BULAN INI",
+                                                    text = stringResource(R.string.dashboard_galon_month_estimate_label),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
@@ -774,7 +773,7 @@ fun DashboardScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
-                                                        text = "Galon",
+                                                        text = stringResource(R.string.unit_galon),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.Medium,
                                                         color = santoyaColors.onHero.copy(alpha = 0.75f),
@@ -826,9 +825,8 @@ fun DashboardScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "KOMISI HARI INI",
+                                                    text = stringResource(R.string.dashboard_staff_commission_today),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
@@ -844,9 +842,12 @@ fun DashboardScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "${karyawanMetrics.galonHariIni} Galon • ${karyawanMetrics.pesananHariIni} Order",
+                                                text = stringResource(
+                                                    R.string.dashboard_staff_galon_orders,
+                                                    karyawanMetrics.galonHariIni,
+                                                    karyawanMetrics.pesananHariIni
+                                                ),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                 maxLines = 1,
@@ -888,9 +889,8 @@ fun DashboardScreen(
                                                 }
                                                 Spacer(modifier = Modifier.width(6.dp))
                                                 Text(
-                                                    text = "KOMISI BULAN INI",
+                                                    text = stringResource(R.string.dashboard_staff_commission_month),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.78f),
                                                     maxLines = 1,
@@ -906,9 +906,12 @@ fun DashboardScreen(
                                                 modifier = Modifier.fillMaxWidth()
                                             )
                                             Text(
-                                                text = "${karyawanMetrics.galonBulanIni} Galon • ${karyawanMetrics.pesananBulanIni} Order",
+                                                text = stringResource(
+                                                    R.string.dashboard_staff_galon_orders,
+                                                    karyawanMetrics.galonBulanIni,
+                                                    karyawanMetrics.pesananBulanIni
+                                                ),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
                                                 fontWeight = FontWeight.Medium,
                                                 color = santoyaColors.onHero.copy(alpha = 0.75f),
                                                 maxLines = 1,
@@ -958,9 +961,8 @@ fun DashboardScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column {
                                                 Text(
-                                                    text = "PIUTANG PELANGGAN",
+                                                    text = stringResource(R.string.dashboard_staff_receivables),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
@@ -1011,9 +1013,8 @@ fun DashboardScreen(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "PELANGGAN SAYA",
+                                                    text = stringResource(R.string.dashboard_staff_customers),
                                                     style = MaterialTheme.typography.labelSmall,
-                                                    fontSize = 10.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = santoyaColors.onHero.copy(alpha = 0.72f),
                                                     maxLines = 1,
@@ -1032,7 +1033,7 @@ fun DashboardScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(4.dp))
                                                     Text(
-                                                        text = "Orang",
+                                                        text = stringResource(R.string.unit_orang),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.Medium,
                                                         color = santoyaColors.onHero.copy(alpha = 0.75f),
@@ -1574,7 +1575,6 @@ fun DashboardScreen(
                                             Text(
                                                 text = detail.transaksi.status.uppercase(),
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 9.5.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
                                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -1847,7 +1847,6 @@ private fun EditorialCompactHorizontalBentoCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1923,7 +1922,6 @@ private fun EditorialFullBannerBentoCard(
                             Text(
                                 text = badgeTag,
                                 style = MaterialTheme.typography.labelSmall,
-                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = santoyaColors.onSuccessContainer,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

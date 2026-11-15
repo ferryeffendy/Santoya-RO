@@ -167,6 +167,12 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     private val _isSyncingCloud = MutableStateFlow(false)
     val isSyncingCloud: StateFlow<Boolean> = _isSyncingCloud.asStateFlow()
 
+    private val _activeSyncPushMode = MutableStateFlow<Boolean?>(null)
+    val activeSyncPushMode: StateFlow<Boolean?> = _activeSyncPushMode.asStateFlow()
+
+    private val _cloudSyncError = MutableStateFlow<String?>(null)
+    val cloudSyncError: StateFlow<String?> = _cloudSyncError.asStateFlow()
+
     private val _lastSyncSummary = MutableStateFlow<SyncSummary?>(null)
     val lastSyncSummary: StateFlow<SyncSummary?> = _lastSyncSummary.asStateFlow()
 
@@ -1049,9 +1055,15 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         runCloudSync(context, userId, pushLocalFirst = false)
     }
 
+    fun clearCloudSyncError() {
+        _cloudSyncError.value = null
+    }
+
     private fun runCloudSync(context: Context, userId: String, pushLocalFirst: Boolean) {
         if (_isSyncingCloud.value) return
         _isSyncingCloud.value = true
+        _activeSyncPushMode.value = pushLocalFirst
+        _cloudSyncError.value = null
         _isBusyAction.value = true
         _busyActionMessage.value = if (pushLocalFirst) {
             "Menyinkronkan data ke Cloud..."
@@ -1063,6 +1075,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 val res = syncEngine.forceSyncNow(pushLocalFirst = pushLocalFirst)
                 res.onSuccess { summary ->
                     _lastSyncSummary.value = summary
+                    _cloudSyncError.value = null
                     val message = if (pushLocalFirst) {
                         "Sinkronisasi selesai (${summary.pelangganCount} pelanggan, ${summary.transaksiCount} transaksi)"
                     } else {
@@ -1070,13 +1083,18 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                     }
                     showSnackbar(message)
                 }.onFailure { err ->
-                    showSnackbar("Gagal sinkronisasi: ${err.message ?: "Periksa koneksi internet"}")
+                    val errText = "Gagal sinkronisasi: ${err.message ?: "Periksa koneksi internet"}"
+                    _cloudSyncError.value = errText
+                    showSnackbar(errText)
                 }
             } catch (e: Exception) {
-                showSnackbar("Koneksi gagal: ${e.message ?: "Periksa jaringan"}")
+                val errText = "Koneksi gagal: ${e.message ?: "Periksa jaringan"}"
+                _cloudSyncError.value = errText
+                showSnackbar(errText)
             } finally {
                 _busyActionMessage.value = null
                 _isBusyAction.value = false
+                _activeSyncPushMode.value = null
                 _isSyncingCloud.value = false
             }
         }
