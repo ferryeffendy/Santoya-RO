@@ -16,6 +16,7 @@ beberapa perangkat dalam satu depot.
 ## Prasyarat
 
 - Android Studio (JDK 17) atau JDK 17 + Android SDK 36.
+- JDK 21 diperlukan hanya untuk menjalankan unit test Robolectric dengan SDK 36.
 - Proyek Firebase dengan **Authentication (Google)** dan **Cloud Firestore** aktif.
 - File `app/google-services.json` dari Firebase Console.
 
@@ -72,16 +73,29 @@ beberapa perangkat dalam satu depot.
 
 ## Build APK lewat GitHub Actions
 
-Workflow `.github/workflows/BuildAPK.yml` menjalankan unit test dan membuat
-APK debug. Tambahkan secret berikut di **Settings > Secrets and variables >
-Actions**:
+Workflow `.github/workflows/BuildAPK.yml` membuat APK debug. Tambahkan secret
+berikut di **Settings > Secrets and variables > Actions**:
 
 | Secret | Isi |
 | --- | --- |
 | `GOOGLE_SERVICES_JSON` | Isi lengkap file `google-services.json` |
 
-Setelah push ke `main`, unduh APK dari tab **Actions > Build Android APK >
-Artifacts**.
+Setelah secret diisi, jalankan workflow **Build Android APK** dari tab
+**Actions** (atau push ke `main`). Unduh APK dari bagian **Artifacts**.
+
+Workflow `.github/workflows/CompileCheck.yml` berjalan otomatis pada setiap
+push/PR. Workflow ini membangun APK debug dengan konfigurasi Firebase dummy
+dan menjalankan unit test terpilih, sehingga error kompilasi cepat terdeteksi
+tanpa memerlukan secret.
+
+## Impor ke AI Studio
+
+1. Buka AI Studio Build, lalu pilih **Import from GitHub**.
+2. Pilih repo `ferryeffendy/Santoya-RO` dan branch `main`.
+3. AI Studio hanya mengimpor kode sumber; AI Studio tidak membangun APK.
+   Untuk membuat APK, gunakan GitHub Actions atau Android Studio.
+4. Jika AI Studio meminta konfigurasi Firebase, unggah
+   `app/google-services.json` yang sesuai dengan project Firebase aplikasi.
 
 ## Catatan migrasi database
 
