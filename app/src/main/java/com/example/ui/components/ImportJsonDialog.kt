@@ -13,9 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.FileUpload
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,7 +68,7 @@ fun ImportJsonDialog(
     SantoyaFormBottomSheet(
         title = "Pulihkan dari File Cadangan",
         subtitle = "Impor file JSON atau tempel teks cadangan",
-        headerIcon = Icons.Default.FileUpload,
+        headerIcon = Icons.Outlined.FileUpload,
         onDismiss = onDismiss,
         confirmLabel = "Pulihkan",
         confirmEnabled = jsonInput.isNotBlank(),
@@ -89,7 +89,7 @@ fun ImportJsonDialog(
         ) {
             Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.Top) {
                 Icon(
-                    imageVector = Icons.Default.Info,
+                    imageVector = Icons.Outlined.Info,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
@@ -112,7 +112,7 @@ fun ImportJsonDialog(
                 .heightIn(min = 48.dp)
                 .testTag("btn_pick_json_file")
         ) {
-            Icon(imageVector = Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(imageVector = Icons.Outlined.FileOpen, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = if (selectedFileName != null) "File: $selectedFileName" else "Pilih File Cadangan",

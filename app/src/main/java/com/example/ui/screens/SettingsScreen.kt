@@ -19,20 +19,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocalShipping
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Sell
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.TableChart
-import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material.icons.automirrored.outlined.ArrowForwardIos
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.CloudUpload
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.TableChart
+import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,10 +62,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aistudio.companion.kzpmrw.BuildConfig
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HydroCourierWaveIcon
+import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.ImportJsonDialog
 import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.theme.pressClickEffect
@@ -93,6 +94,7 @@ fun SettingsScreen(
     var showImportDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
     var showRestoreCloudDialog by remember { mutableStateOf(false) }
+    var showCloudDiagnosticDialog by remember { mutableStateOf(false) }
 
     val isSyncingCloud by viewModel.isSyncingCloud.collectAsStateWithLifecycle()
     val lastSyncSummary by viewModel.lastSyncSummary.collectAsStateWithLifecycle()
@@ -131,7 +133,7 @@ fun SettingsScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.AccountCircle,
+                                    imageVector = Icons.Outlined.AccountCircle,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(28.dp)
@@ -164,7 +166,7 @@ fun SettingsScreen(
                             modifier = Modifier.testTag("btn_sign_out")
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                imageVector = Icons.AutoMirrored.Outlined.Logout,
                                 contentDescription = "Keluar Akun",
                                 tint = MaterialTheme.colorScheme.error
                             )
@@ -214,10 +216,15 @@ fun SettingsScreen(
                     SettingsMenuRow(
                         title = "Produk & Harga",
                         subtitle = "${produkList.size} produk • Atur jenis & harga jual galon",
-                        icon = Icons.Default.Sell,
                         iconColor = MaterialTheme.santoyaColors.success,
                         onClick = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
-                        modifier = Modifier.testTag("menu_master_produk")
+                        modifier = Modifier.testTag("menu_master_produk"),
+                        iconContent = {
+                            HydroGalonIcon(
+                                tint = MaterialTheme.santoyaColors.success,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -227,10 +234,15 @@ fun SettingsScreen(
                     SettingsMenuRow(
                         title = "Karyawan & Komisi",
                         subtitle = "${kurirList.size} karyawan • Atur akun kurir & komisi antar",
-                        icon = Icons.Default.LocalShipping,
                         iconColor = MaterialTheme.colorScheme.tertiary,
                         onClick = { viewModel.navigateTo(SantoyaScreen.KURIR) },
-                        modifier = Modifier.testTag("menu_kelola_kurir")
+                        modifier = Modifier.testTag("menu_kelola_kurir"),
+                        iconContent = {
+                            HydroCourierWaveIcon(
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     )
                 }
             }
@@ -260,7 +272,7 @@ fun SettingsScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.CloudSync,
+                                    imageVector = Icons.Outlined.CloudSync,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.secondary,
                                     modifier = Modifier.size(22.dp)
@@ -304,7 +316,7 @@ fun SettingsScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    imageVector = Icons.Default.Shield,
+                                    imageVector = Icons.Outlined.Shield,
                                     contentDescription = null,
                                     tint = MaterialTheme.santoyaColors.success,
                                     modifier = Modifier.size(15.dp)
@@ -359,6 +371,108 @@ fun SettingsScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Info,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Penggunaan Firestore Sesi Ini",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                TextButton(
+                                    onClick = { showCloudDiagnosticDialog = true },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                                    modifier = Modifier
+                                        .height(28.dp)
+                                        .testTag("btn_open_cloud_diagnostic")
+                                ) {
+                                    Text(
+                                        text = "Detail Ukur",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text(
+                                            text = "Reads Sesi Ini",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text(
+                                            text = "${syncState.sessionReads} Dokumen",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text(
+                                            text = "Writes Sesi Ini",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                                        )
+                                        Text(
+                                            text = "${syncState.sessionWrites} Dokumen",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = "Kuota gratis Spark: 50.000 reads & 20.000 writes/hari. Cache lokal SQLite menyerap pembacaan layar kasir (0 reads cloud).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Row(
@@ -393,7 +507,7 @@ fun SettingsScreen(
                                 Text("Menyimpan...", style = MaterialTheme.typography.titleSmall)
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.CloudUpload,
+                                    imageVector = Icons.Outlined.CloudUpload,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -422,7 +536,7 @@ fun SettingsScreen(
                                 .testTag("btn_restore_from_cloud")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CloudDownload,
+                                imageVector = Icons.Outlined.CloudDownload,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -484,7 +598,7 @@ fun SettingsScreen(
                                 .testTag("btn_export_json")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Description,
+                                imageVector = Icons.Outlined.Description,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -522,7 +636,7 @@ fun SettingsScreen(
                                 .testTag("btn_export_csv")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.TableChart,
+                                imageVector = Icons.Outlined.TableChart,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -552,7 +666,7 @@ fun SettingsScreen(
                             .testTag("btn_import_json")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.UploadFile,
+                            imageVector = Icons.Outlined.UploadFile,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -584,7 +698,7 @@ fun SettingsScreen(
                                 .testTag("btn_restore_auto_backup")
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Restore,
+                                imageVector = Icons.Outlined.Restore,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -629,7 +743,7 @@ fun SettingsScreen(
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.Info,
+                                    imageVector = Icons.Outlined.Info,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(22.dp)
@@ -761,6 +875,94 @@ fun SettingsScreen(
             }
         )
     }
+
+    if (showCloudDiagnosticDialog) {
+        val dbId = context.getString(R.string.firestore_database_id)
+        AlertDialog(
+            onDismissRequest = { showCloudDiagnosticDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Pengukuran Reads Firestore", fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Penggunaan Sesi Aplikasi:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            Text("• Dokumen dibaca (Reads): ${syncState.sessionReads}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Dokumen ditulis (Writes): ${syncState.sessionWrites}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Kuota Gratis Spark: 50.000 reads & 20.000 writes / hari", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.santoyaColors.success, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    Text(
+                        text = "Cara Cek Reads Aktual di Firebase Console:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "1. Buka console.firebase.google.com dengan browser.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "2. Pilih project: gen-lang-client-0963336772",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "3. Masuk menu Build > Firestore Database, lalu klik tab Usage (Penggunaan).",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MaterialTheme.santoyaColors.warning.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, MaterialTheme.santoyaColors.warning.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "PENTING: Di pojok kiri atas halaman Firestore, ubah dropdown database dari (default) ke database khusus depot:\n$dbId\n(Jika tetap di default, grafik akan selalu 0 karena data tersimpan di database khusus).",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Mengapa Sangat Hemat?\nAplikasi Santoya RO menggunakan arsitektur Offline-First (Room SQLite lokal). Saat Anda membuka daftar transaksi, riwayat kasir, daftar pelanggan, kasbon, dan laporan laba bersih, semua dibaca langsung dari memori HP lokal (0 reads). Firestore hanya membaca saat inisialisasi listener atau sinkronisasi perubahan antar-HP.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showCloudDiagnosticDialog = false },
+                    modifier = Modifier.testTag("btn_close_cloud_diagnostic")
+                ) {
+                    Text("Tutup")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -819,10 +1021,11 @@ private fun SystemInfoRow(
 fun SettingsMenuRow(
     title: String,
     subtitle: String,
-    icon: ImageVector,
+    icon: ImageVector? = null,
     iconColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconContent: (@Composable () -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -838,7 +1041,11 @@ fun SettingsMenuRow(
             modifier = Modifier.size(44.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(imageVector = icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(22.dp))
+                if (iconContent != null) {
+                    iconContent()
+                } else if (icon != null) {
+                    Icon(imageVector = icon, contentDescription = title, tint = iconColor, modifier = Modifier.size(22.dp))
+                }
             }
         }
         Spacer(modifier = Modifier.width(14.dp))
@@ -857,7 +1064,7 @@ fun SettingsMenuRow(
             )
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+            imageVector = Icons.AutoMirrored.Outlined.ArrowForwardIos,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.size(15.dp)

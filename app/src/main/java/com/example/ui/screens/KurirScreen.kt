@@ -27,10 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeliveryDining
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -70,6 +69,7 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.HydroCourierWaveIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
@@ -125,7 +125,7 @@ fun KurirScreen(
                     modifier = Modifier.testTag("tambah_kurir_fab")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = Icons.Outlined.Add,
                         contentDescription = "Tambah Karyawan"
                     )
                 }
@@ -141,12 +141,17 @@ fun KurirScreen(
         ) {
             item {
                 SantoyaSectionBanner(
-                    icon = Icons.Default.DeliveryDining,
                     title = "Karyawan & Komisi",
                     subtitle = "Atur akun kurir & tarif komisi",
                     badgeText = "${displayKurirList.size} Karyawan",
                     accentColor = MaterialTheme.colorScheme.secondary,
-                    onAccentColor = MaterialTheme.colorScheme.onSecondary
+                    onAccentColor = MaterialTheme.colorScheme.onSecondary,
+                    iconContent = {
+                        HydroCourierWaveIcon(
+                            tint = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 )
             }
 
@@ -157,7 +162,7 @@ fun KurirScreen(
                         title = "Belum Ada Karyawan",
                         subtitle = "Tambahkan akun kurir & tarif komisi per galon agar pengiriman otomatis tercatat.",
                         primaryActionLabel = "Tambah Karyawan",
-                        primaryActionIcon = Icons.Default.Add,
+                        primaryActionIcon = Icons.Outlined.Add,
                         onPrimaryAction = { showAddDialog = true },
                         modifier = Modifier.padding(top = 8.dp)
                     )
@@ -245,7 +250,7 @@ fun KurirScreen(
                                             .testTag("btn_edit_kurir_${kurir.id}")
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Edit,
+                                            imageVector = Icons.Outlined.Edit,
                                             contentDescription = "Edit Karyawan",
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(20.dp)
@@ -258,7 +263,7 @@ fun KurirScreen(
                                             .testTag("btn_delete_kurir_${kurir.id}")
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Delete,
+                                            imageVector = Icons.Outlined.Delete,
                                             contentDescription = "Hapus Karyawan",
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(20.dp)
@@ -494,8 +499,13 @@ private fun KurirFormDialog(
     SantoyaFormBottomSheet(
         title = title,
         subtitle = "Tarif komisi & akses Google karyawan",
-        headerIcon = Icons.Default.DeliveryDining,
         headerAccent = MaterialTheme.colorScheme.secondary,
+        headerIconContent = {
+            HydroCourierWaveIcon(
+                tint = androidx.compose.ui.graphics.Color.White,
+                modifier = Modifier.size(21.dp)
+            )
+        },
         confirmLabel = confirmLabel,
         confirmTestTag = "btn_simpan_kurir",
         onDismiss = onDismiss,

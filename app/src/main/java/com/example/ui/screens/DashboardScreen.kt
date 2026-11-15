@@ -25,17 +25,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoGraph
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -326,7 +326,7 @@ fun DashboardScreen(
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                imageVector = Icons.Default.Settings,
+                                                imageVector = Icons.Outlined.Settings,
                                                 contentDescription = "Pengaturan",
                                                 tint = MaterialTheme.colorScheme.onSurface,
                                                 modifier = Modifier.size(19.dp)
@@ -346,7 +346,7 @@ fun DashboardScreen(
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
-                                                imageVector = Icons.Default.Logout,
+                                                imageVector = Icons.AutoMirrored.Outlined.Logout,
                                                 contentDescription = "Keluar Akun",
                                                 tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(19.dp)
@@ -389,7 +389,7 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Block,
+                                imageVector = Icons.Outlined.Block,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(20.dp)
@@ -1016,7 +1016,7 @@ fun DashboardScreen(
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
                                                     Icon(
-                                                        imageVector = Icons.Default.People,
+                                                        imageVector = Icons.Outlined.People,
                                                         contentDescription = null,
                                                         tint = Color.White,
                                                         modifier = Modifier.size(18.dp)
@@ -1098,7 +1098,7 @@ fun DashboardScreen(
                                     cornerRadius = 12.dp
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.NotificationsActive,
+                                        imageVector = Icons.Outlined.NotificationsActive,
                                         contentDescription = null,
                                         tint = Color.White,
                                         modifier = Modifier.size(19.dp)
@@ -1135,7 +1135,7 @@ fun DashboardScreen(
                                 border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.35f))
                             ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                                     contentDescription = "Lihat Jadwal",
                                     tint = santoyaColors.warning,
                                     modifier = Modifier
@@ -1233,7 +1233,7 @@ fun DashboardScreen(
                             ) {
                                 HydroExpenseFlowIcon(
                                     tint = MaterialTheme.colorScheme.error,
-                                    leafAccent = SantoyaWaterBlue,
+                                    leafAccent = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(21.dp)
                                 )
                             }
@@ -1320,7 +1320,7 @@ fun DashboardScreen(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(12.dp)
@@ -1350,7 +1350,7 @@ fun DashboardScreen(
                         },
                         compact = true,
                         primaryActionLabel = "Buat Transaksi",
-                        primaryActionIcon = Icons.Default.Add,
+                        primaryActionIcon = Icons.Outlined.Add,
                         onPrimaryAction = {
                             viewModel.setTransaksiTab(0)
                             onNavigateToTransaksi()
@@ -1813,7 +1813,7 @@ private fun EditorialFullBannerBentoCard(
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
                         contentDescription = null,
                         tint = accentColor,
                         modifier = Modifier.size(15.dp)

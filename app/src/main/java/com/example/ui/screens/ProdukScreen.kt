@@ -26,14 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.Sell
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.WaterDrop
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -73,6 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.Produk
+import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
@@ -119,7 +116,7 @@ fun ProdukScreen(
                     modifier = Modifier.testTag("fab_add_produk")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        imageVector = Icons.Outlined.Add,
                         contentDescription = "Tambah Produk"
                     )
                 }
@@ -135,12 +132,17 @@ fun ProdukScreen(
         ) {
             item {
                 SantoyaSectionBanner(
-                    icon = Icons.Default.Sell,
                     title = "Produk & Harga",
                     subtitle = "Atur produk & harga jual",
                     badgeText = "${displayList.size} Produk",
                     accentColor = MaterialTheme.colorScheme.primary,
-                    onAccentColor = MaterialTheme.colorScheme.onPrimary
+                    onAccentColor = MaterialTheme.colorScheme.onPrimary,
+                    iconContent = {
+                        HydroGalonIcon(
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 )
             }
 
@@ -151,7 +153,7 @@ fun ProdukScreen(
                         title = "Belum Ada Produk",
                         subtitle = "Tambahkan daftar galon atau layanan isi ulang agar siap digunakan di kasir.",
                         primaryActionLabel = "Tambah Produk",
-                        primaryActionIcon = Icons.Default.Add,
+                        primaryActionIcon = Icons.Outlined.Add,
                         onPrimaryAction = { showAddDialog = true },
                         modifier = Modifier.padding(top = 8.dp)
                     )
@@ -182,11 +184,9 @@ fun ProdukScreen(
                                     modifier = Modifier.size(40.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.WaterDrop,
-                                            contentDescription = null,
+                                        HydroGalonIcon(
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(22.dp)
                                         )
                                     }
                                 }
@@ -218,7 +218,7 @@ fun ProdukScreen(
                                     modifier = Modifier.size(42.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Edit,
+                                        imageVector = Icons.Outlined.Edit,
                                         contentDescription = "Edit Produk",
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(20.dp)
@@ -229,7 +229,7 @@ fun ProdukScreen(
                                     modifier = Modifier.size(42.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Delete,
+                                        imageVector = Icons.Outlined.Delete,
                                         contentDescription = "Hapus Produk",
                                         tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(20.dp)
@@ -272,7 +272,12 @@ fun ProdukScreen(
         SantoyaFormBottomSheet(
             title = if (target == null) "Tambah Produk" else "Edit Produk",
             subtitle = "Atur nama dan harga jual per galon",
-            headerIcon = Icons.Default.WaterDrop,
+            headerIconContent = {
+                HydroGalonIcon(
+                    tint = Color.White,
+                    modifier = Modifier.size(21.dp)
+                )
+            },
             confirmLabel = if (target == null) "Simpan" else "Perbarui",
             onDismiss = {
                 showAddDialog = false
@@ -343,7 +348,7 @@ fun ProdukScreen(
             onDismissRequest = { produkToDelete = null },
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Outlined.Warning,
                     contentDescription = "Peringatan",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(36.dp)
@@ -407,7 +412,7 @@ fun ProdukScreen(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Delete,
+                        imageVector = Icons.Outlined.Delete,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )

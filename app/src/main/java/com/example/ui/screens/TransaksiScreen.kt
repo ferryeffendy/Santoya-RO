@@ -36,21 +36,21 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -67,9 +67,7 @@ import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -109,10 +107,12 @@ import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaAdaptiveTabPillRow
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
 import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.components.SantoyaTabPillItem
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentAmber
@@ -214,45 +214,29 @@ fun TransaksiScreen(
     }
 
     Column(modifier = modifier.fillMaxSize().imePadding()) {
-        PrimaryTabRow(
-            selectedTabIndex = pagerState.currentPage,
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Tab(
-                selected = pagerState.currentPage == 0,
-                onClick = {
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(0)
-                    }
-                },
-                text = {
-                    Text(
-                        "Catat Penjualan",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (pagerState.currentPage == 0) FontWeight.ExtraBold else FontWeight.SemiBold
-                    )
-                },
-                modifier = Modifier.testTag("tab_catat_penjualan")
-            )
-            Tab(
-                selected = pagerState.currentPage == 1,
-                onClick = {
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(1)
-                    }
-                },
-                text = {
-                    Text(
-                        "Riwayat ($activeTransaksiCount)",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = if (pagerState.currentPage == 1) FontWeight.ExtraBold else FontWeight.SemiBold
-                    )
-                },
-                modifier = Modifier.testTag("tab_riwayat_penjualan")
+        val transaksiTabItems = remember(activeTransaksiCount) {
+            listOf(
+                SantoyaTabPillItem(
+                    label = "Catat Penjualan",
+                    testTag = "tab_catat_penjualan"
+                ),
+                SantoyaTabPillItem(
+                    label = "Riwayat",
+                    badgeCount = activeTransaksiCount,
+                    testTag = "tab_riwayat_penjualan"
+                )
             )
         }
+
+        SantoyaAdaptiveTabPillRow(
+            items = transaksiTabItems,
+            selectedIndex = pagerState.currentPage,
+            onSelect = { idx ->
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(idx)
+                }
+            }
+        )
 
         HorizontalPager(
             state = pagerState,
@@ -438,7 +422,7 @@ fun CatatPenjualanTab(
                             elevation = 2.dp
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CalendarToday,
+                                imageVector = Icons.Outlined.CalendarToday,
                                 contentDescription = null,
                                 tint = Color.White,
                                 modifier = Modifier.size(14.dp)
@@ -574,7 +558,7 @@ fun CatatPenjualanTab(
                     },
                     leadingIcon = {
                         Icon(
-                            Icons.Default.Search,
+                            Icons.Outlined.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
@@ -595,7 +579,7 @@ fun CatatPenjualanTab(
                                     modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
-                                        Icons.Default.Clear,
+                                        Icons.Outlined.Clear,
                                         contentDescription = "Hapus Pilihan",
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -611,7 +595,7 @@ fun CatatPenjualanTab(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    Icons.Default.PersonAdd,
+                                    Icons.Outlined.PersonAdd,
                                     contentDescription = "Tambah Pelanggan Baru",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(19.dp)
@@ -701,7 +685,7 @@ fun CatatPenjualanTab(
                                         }
                                         if (isSelected) {
                                             Icon(
-                                                imageVector = Icons.Default.Check,
+                                                imageVector = Icons.Outlined.Check,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(16.dp)
@@ -740,7 +724,7 @@ fun CatatPenjualanTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Check,
+                                imageVector = Icons.Outlined.Check,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(13.dp)
@@ -782,7 +766,7 @@ fun CatatPenjualanTab(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Receipt,
+                                imageVector = Icons.Outlined.Receipt,
                                 contentDescription = null,
                                 tint = santoyaColors.warning,
                                 modifier = Modifier.size(13.dp)
@@ -935,7 +919,7 @@ fun CatatPenjualanTab(
                         trailingIcon = if (isKaryawan) {
                             {
                                 Icon(
-                                    imageVector = Icons.Default.Lock,
+                                    imageVector = Icons.Outlined.Lock,
                                     contentDescription = "Harga dikunci Pemilik",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(16.dp)
@@ -1025,7 +1009,7 @@ fun CatatPenjualanTab(
                                         .size(32.dp)
                                         .testTag("btn_minus_galon")
                                 ) {
-                                    Icon(Icons.Default.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
                                 }
 
                                 Box(
@@ -1062,7 +1046,7 @@ fun CatatPenjualanTab(
                                         .size(32.dp)
                                         .testTag("btn_plus_galon")
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Outlined.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
                                 }
                             }
                         }
@@ -1413,7 +1397,7 @@ fun CatatPenjualanTab(
                                     modifier = Modifier.size(48.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Clear,
+                                        imageVector = Icons.Outlined.Clear,
                                         contentDescription = "Kosongkan Uang Muka",
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1617,7 +1601,7 @@ fun CatatPenjualanTab(
                             .height(42.dp)
                             .testTag("btn_simpan_dan_cetak")
                     ) {
-                        Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Outlined.Print, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             if (isBusyAction) "Memproses..." else "Cetak Struk",
@@ -1648,7 +1632,7 @@ fun CatatPenjualanTab(
                             .height(42.dp)
                             .testTag("btn_simpan_transaksi")
                     ) {
-                        Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             if (isBusyAction) "Menyimpan..." else "Simpan",
@@ -1673,7 +1657,7 @@ fun CatatPenjualanTab(
         SantoyaFormBottomSheet(
             title = "Atur Jumlah Galon",
             subtitle = "Pilih cepat atau ketik jumlah manual",
-            headerIcon = Icons.Default.Edit,
+            headerIcon = Icons.Outlined.Edit,
             onDismiss = { showEditJumlahDialog = false },
             confirmLabel = "Terapkan",
             onConfirm = applyJumlah
@@ -1751,7 +1735,7 @@ fun CatatPenjualanTab(
         SantoyaFormBottomSheet(
             title = "Tambah Pelanggan Baru",
             subtitle = "Otomatis terpilih di transaksi ini",
-            headerIcon = Icons.Default.PersonAdd,
+            headerIcon = Icons.Outlined.PersonAdd,
             onDismiss = { showAddCustomerDialog = false },
             confirmLabel = "Simpan",
             confirmEnabled = namaBaru.isNotBlank(),
@@ -1855,7 +1839,7 @@ fun CatatPenjualanTab(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Lock,
+                            imageVector = Icons.Outlined.Lock,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
@@ -2139,7 +2123,7 @@ fun RiwayatTransaksiTab(
                 },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
@@ -2156,7 +2140,7 @@ fun RiwayatTransaksiTab(
                             modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Clear,
+                                imageVector = Icons.Outlined.Clear,
                                 contentDescription = "Bersihkan Pencarian",
                                 modifier = Modifier.size(18.dp)
                             )
@@ -2410,12 +2394,12 @@ fun RiwayatTransaksiTab(
                             "Belum ada transaksi ${selectedFilter.label.lowercase()}."
                         },
                         primaryActionLabel = if (!hasActiveFilter) "Catat Transaksi" else null,
-                        primaryActionIcon = if (!hasActiveFilter) Icons.Default.Add else null,
+                        primaryActionIcon = if (!hasActiveFilter) Icons.Outlined.Add else null,
                         onPrimaryAction = if (!hasActiveFilter) {
                             { viewModel.setTransaksiTab(0) }
                         } else null,
                         secondaryActionLabel = if (hasActiveFilter) "Reset Filter" else null,
-                        secondaryActionIcon = if (hasActiveFilter) Icons.Default.Clear else null,
+                        secondaryActionIcon = if (hasActiveFilter) Icons.Outlined.Clear else null,
                         onSecondaryAction = if (hasActiveFilter) {
                             {
                                 searchQuery = ""
@@ -2617,7 +2601,7 @@ fun RiwayatTransaksiTab(
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.Restore,
+                                        imageVector = Icons.Outlined.Restore,
                                         contentDescription = "Pulihkan",
                                         modifier = Modifier.size(15.dp)
                                     )
@@ -2637,7 +2621,7 @@ fun RiwayatTransaksiTab(
                                     modifier = Modifier.height(32.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.DeleteForever,
+                                        imageVector = Icons.Outlined.DeleteForever,
                                         contentDescription = "Hapus Permanen",
                                         modifier = Modifier.size(15.dp)
                                     )
@@ -2669,7 +2653,7 @@ fun RiwayatTransaksiTab(
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Check,
+                                                imageVector = Icons.Outlined.Check,
                                                 contentDescription = "Tandai Lunas",
                                                 tint = Color(0xFF047857),
                                                 modifier = Modifier.size(14.dp)
@@ -2698,7 +2682,7 @@ fun RiwayatTransaksiTab(
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Edit,
+                                            imageVector = Icons.Outlined.Edit,
                                             contentDescription = "Edit",
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(19.dp)
@@ -2723,7 +2707,7 @@ fun RiwayatTransaksiTab(
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Print,
+                                            imageVector = Icons.Outlined.Print,
                                             contentDescription = "Cetak",
                                             tint = MaterialTheme.colorScheme.primary,
                                             modifier = Modifier.size(19.dp)
@@ -2745,7 +2729,7 @@ fun RiwayatTransaksiTab(
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Share,
+                                            imageVector = Icons.Outlined.Share,
                                             contentDescription = "Bagikan",
                                             tint = MaterialTheme.colorScheme.secondary,
                                             modifier = Modifier.size(19.dp)
@@ -2757,7 +2741,7 @@ fun RiwayatTransaksiTab(
                                         modifier = Modifier.size(40.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Delete,
+                                            imageVector = Icons.Outlined.Delete,
                                             contentDescription = "Hapus",
                                             tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(19.dp)
@@ -2942,7 +2926,7 @@ fun RiwayatTransaksiTab(
         SantoyaFormBottomSheet(
             title = "Edit Transaksi",
             subtitle = "Pelanggan: ${detail.pelanggan?.nama ?: "Umum"}",
-            headerIcon = Icons.Default.Edit,
+            headerIcon = Icons.Outlined.Edit,
             onDismiss = { editingTransaksi = null },
             confirmLabel = "Simpan Perubahan",
             confirmEnabled = isValidEdit,
@@ -3061,7 +3045,7 @@ fun RiwayatTransaksiTab(
                 trailingIcon = if (isKaryawan) {
                     {
                         Icon(
-                            imageVector = Icons.Default.Lock,
+                            imageVector = Icons.Outlined.Lock,
                             contentDescription = "Harga dikunci Pemilik",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)

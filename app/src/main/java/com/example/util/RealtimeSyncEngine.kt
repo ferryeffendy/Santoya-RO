@@ -58,7 +58,9 @@ data class RealtimeSyncState(
     val pendingCount: Int = 0,
     val isOnline: Boolean = true,
     val lastSyncedAt: Long? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val sessionReads: Int = 0,
+    val sessionWrites: Int = 0
 )
 
 object SyncCollections {
@@ -91,6 +93,16 @@ class RealtimeSyncEngine(
     private val _state = MutableStateFlow(RealtimeSyncState())
     val state: StateFlow<RealtimeSyncState> = _state.asStateFlow()
 
+    private fun recordReads(count: Int) {
+        if (count <= 0) return
+        _state.update { it.copy(sessionReads = it.sessionReads + count) }
+    }
+
+    private fun recordWrites(count: Int) {
+        if (count <= 0) return
+        _state.update { it.copy(sessionWrites = it.sessionWrites + count) }
+    }
+
     private var activeUid: String? = null
     private var activeEmail: String = ""
     private var activeDepotId: String = ""
@@ -120,10 +132,12 @@ class RealtimeSyncEngine(
         hasSeededInitialOwnerPush = false
 
         val initialOnline = checkIsOnline()
-        _state.value = RealtimeSyncState(
-            status = if (initialOnline) SyncConnectionStatus.CONNECTING else SyncConnectionStatus.OFFLINE,
-            isOnline = initialOnline
-        )
+        _state.update {
+            it.copy(
+                status = if (initialOnline) SyncConnectionStatus.CONNECTING else SyncConnectionStatus.OFFLINE,
+                isOnline = initialOnline
+            )
+        }
 
         registerNetworkCallback()
         observePendingQueue()
@@ -141,6 +155,7 @@ class RealtimeSyncEngine(
         val staffLinkPath = "staff_links/$cleanEmail"
         staffLinkListener = firestore.document(staffLinkPath)
             .addSnapshotListener { snapshot, error ->
+                recordReads(1)
                 if (error != null) {
                     handleFirestoreError(error, OperationType.GET, staffLinkPath)
                     // Fallback gracefully to personal owner depot only if lookup is denied
@@ -205,7 +220,10 @@ class RealtimeSyncEngine(
         hasSeededInitialOwnerPush = false
         cachedSnapshots.clear()
         receivedInitialCollections.clear()
-        _state.value = RealtimeSyncState()
+        _state.value = RealtimeSyncState(
+            sessionReads = _state.value.sessionReads,
+            sessionWrites = _state.value.sessionWrites
+        )
     }
 
     fun scheduleFlush(delayMs: Long = 250L) {
@@ -271,6 +289,7 @@ class RealtimeSyncEngine(
             withTimeout(15_000L) {
                 for (col in cols) {
                     val snap = depotRef.collection(col).get().await()
+                    recordReads(snap.documents.size.coerceAtLeast(1))
                     applyMutex.withLock {
                         cachedSnapshots[col] = snap.documents
                         receivedInitialCollections.add(col)
@@ -396,6 +415,7 @@ class RealtimeSyncEngine(
 
         collections.forEach { colName ->
             val path = "depots/$depotId/$colName"
+            var isInitialSnapshotForCol = true
             val registration = depotRef.collection(colName)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) {
@@ -414,6 +434,13 @@ class RealtimeSyncEngine(
                         return@addSnapshotListener
                     }
                     if (snapshot != null) {
+                        val readsCount = if (isInitialSnapshotForCol) {
+                            isInitialSnapshotForCol = false
+                            snapshot.documents.size.coerceAtLeast(1)
+                        } else {
+                            snapshot.documentChanges.size
+                        }
+                        recordReads(readsCount)
                         scope.launch {
                             autoRetryCount = 0
                             applyMutex.withLock {
@@ -953,6 +980,7 @@ class RealtimeSyncEngine(
                             .set(payload)
                             .await()
                     }
+                    recordWrites(1)
                     db.pendingSyncDao().remove(item.collectionName, item.syncId)
 
                     if (item.collectionName == SyncCollections.KURIR) {
@@ -1226,6 +1254,7 @@ class RealtimeSyncEngine(
         val depotPath = "depots/$depotId"
         val depotRef = firestore.document(depotPath)
         val existingDepot = try {
+            recordReads(1)
             depotRef.get().await()
         } catch (_: Exception) {
             null
@@ -1241,6 +1270,7 @@ class RealtimeSyncEngine(
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             depotRef.set(createPayload).await()
+            recordWrites(1)
         } else {
             val currentMembers = (existingDepot.get("memberEmails") as? List<*>)
                 ?.mapNotNull { it as? String }
@@ -1259,6 +1289,7 @@ class RealtimeSyncEngine(
                         "updatedAt" to FieldValue.serverTimestamp()
                     )
                 ).await()
+                recordWrites(1)
             }
         }
 
@@ -1268,6 +1299,7 @@ class RealtimeSyncEngine(
                 .whereEqualTo("ownerUid", ownerUid)
                 .get()
                 .await()
+            recordReads(existingLinksSnap.documents.size.coerceAtLeast(1))
             val existingByEmail = existingLinksSnap.documents.associateBy { it.id }
             val desiredByEmail = validKurirs.associateBy { it.email.trim().lowercase() }
 
@@ -1275,6 +1307,7 @@ class RealtimeSyncEngine(
                 if (!desiredByEmail.containsKey(emailKey)) {
                     try {
                         doc.reference.delete().await()
+                        recordWrites(1)
                     } catch (e: Exception) {
                         Log.w(TAG, "Skip deleting staff_link $emailKey: ${e.message}")
                     }
@@ -1298,6 +1331,7 @@ class RealtimeSyncEngine(
                                     "updatedAt" to FieldValue.serverTimestamp()
                                 )
                             ).await()
+                            recordWrites(1)
                         }
                     } else {
                         val curActive = existing.getBoolean("active") ?: true
@@ -1315,6 +1349,7 @@ class RealtimeSyncEngine(
                                     "updatedAt" to FieldValue.serverTimestamp()
                                 )
                             ).await()
+                            recordWrites(1)
                         }
                     }
                 } catch (e: Exception) {

@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,9 +9,13 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
@@ -33,13 +38,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudDone
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,6 +59,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -114,35 +120,35 @@ fun RealtimeSyncStatusPill(
 
     val (icon, label, tint, bgColor, borderColor) = when (syncState.status) {
         SyncConnectionStatus.LIVE -> Tuple5(
-            Icons.Default.CloudDone,
+            Icons.Outlined.CloudDone,
             "Terhubung",
             santoyaColors.success,
             santoyaColors.successContainer.copy(alpha = 0.55f),
             santoyaColors.success.copy(alpha = 0.35f)
         )
         SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
-            Icons.Default.CloudSync,
+            Icons.Outlined.CloudSync,
             if (syncState.pendingCount > 0) "Sinkron (${syncState.pendingCount})" else "Sinkron...",
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
             MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
         )
         SyncConnectionStatus.OFFLINE -> Tuple5(
-            Icons.Default.CloudOff,
+            Icons.Outlined.CloudOff,
             if (syncState.pendingCount > 0) "Offline (${syncState.pendingCount})" else "Mode Offline",
             santoyaColors.warning,
             santoyaColors.warningContainer.copy(alpha = 0.6f),
             santoyaColors.warning.copy(alpha = 0.45f)
         )
         SyncConnectionStatus.REVOKED -> Tuple5(
-            Icons.Default.Block,
+            Icons.Outlined.Block,
             "Dibatasi",
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
             MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
         )
         SyncConnectionStatus.ERROR -> Tuple5(
-            Icons.Default.CloudOff,
+            Icons.Outlined.CloudOff,
             "Cek Koneksi",
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
@@ -214,35 +220,35 @@ fun SantoyaSyncInfoBottomSheet(
             "Database terhubung ke Firebase Firestore. Semua data dan perubahan otomatis tersinkron.",
             santoyaColors.success,
             santoyaColors.successContainer.copy(alpha = 0.5f),
-            Icons.Default.CloudDone
+            Icons.Outlined.CloudDone
         )
         SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
             "Sedang Menyinkronkan...",
             "Mengirim dan menerima pembaruan data antara HP dan Cloud Firestore.",
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            Icons.Default.CloudSync
+            Icons.Outlined.CloudSync
         )
         SyncConnectionStatus.OFFLINE -> Tuple5(
             "Mode Offline",
             "Tidak ada koneksi internet. Data transaksi tetap tersimpan aman di HP dan akan otomatis dikirim saat online.",
             santoyaColors.warning,
             santoyaColors.warningContainer.copy(alpha = 0.5f),
-            Icons.Default.CloudOff
+            Icons.Outlined.CloudOff
         )
         SyncConnectionStatus.REVOKED -> Tuple5(
             "Akses Dibatasi",
             "Akun ini belum memiliki izin akses depot atau dinonaktifkan oleh Pemilik.",
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
-            Icons.Default.Block
+            Icons.Outlined.Block
         )
         SyncConnectionStatus.ERROR -> Tuple5(
             "Gagal Terhubung",
             syncState.errorMessage ?: "Periksa koneksi data seluler atau WiFi perangkat Anda.",
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
-            Icons.Default.CloudOff
+            Icons.Outlined.CloudOff
         )
     }
 
@@ -385,7 +391,7 @@ fun SantoyaSyncInfoBottomSheet(
                     .heightIn(min = 44.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Outlined.Settings,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
@@ -431,7 +437,7 @@ fun LocalStorageStatusPill(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
         ) {
             Icon(
-                imageVector = if (isConnected) Icons.Default.CloudDone else Icons.Default.CheckCircle,
+                imageVector = if (isConnected) Icons.Outlined.CloudDone else Icons.Outlined.CheckCircle,
                 contentDescription = if (isConnected) "Sinkronisasi Cloud Aktif" else "Lokal HP",
                 tint = if (isConnected) MaterialTheme.colorScheme.primary else santoyaColors.success,
                 modifier = Modifier.size(15.dp)
@@ -453,13 +459,14 @@ fun LocalStorageStatusPill(
  */
 @Composable
 fun SantoyaSectionBanner(
-    icon: ImageVector,
+    icon: ImageVector? = null,
     title: String,
     subtitle: String,
     badgeText: String,
     accentColor: Color,
     onAccentColor: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    iconContent: (@Composable () -> Unit)? = null
 ) {
     HydroBentoCard(
         accentColor = accentColor,
@@ -481,12 +488,16 @@ fun SantoyaSectionBanner(
                 size = 44.dp,
                 cornerRadius = 14.dp
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = onAccentColor,
-                    modifier = Modifier.size(21.dp)
-                )
+                if (iconContent != null) {
+                    iconContent()
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = onAccentColor,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -573,6 +584,7 @@ fun SantoyaFormBottomSheet(
     confirmEnabled: Boolean = true,
     confirmContainerColor: Color = MaterialTheme.colorScheme.primary,
     confirmTestTag: String? = null,
+    headerIconContent: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -601,19 +613,23 @@ fun SantoyaFormBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    if (headerIcon != null) {
+                    if (headerIconContent != null || headerIcon != null) {
                         HydroGradientBadge(
                             gradientColors = listOf(headerAccent, AccentCyan),
                             size = 38.dp,
                             cornerRadius = 12.dp,
                             elevation = 2.dp
                         ) {
-                            Icon(
-                                imageVector = headerIcon,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(19.dp)
-                            )
+                            if (headerIconContent != null) {
+                                headerIconContent()
+                            } else if (headerIcon != null) {
+                                Icon(
+                                    imageVector = headerIcon,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                     }
@@ -642,7 +658,7 @@ fun SantoyaFormBottomSheet(
                     modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Outlined.Close,
                         contentDescription = "Tutup",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -918,7 +934,7 @@ fun SantoyaLoadingSkeleton(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.CloudSync,
+                    imageVector = Icons.Outlined.CloudSync,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(16.dp)
@@ -1020,7 +1036,7 @@ fun SantoyaBusyStatusBanner(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.CloudSync,
+                imageVector = Icons.Outlined.CloudSync,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -1104,6 +1120,256 @@ fun SantoyaFilterPill(
         }
     }
 }
+
+/**
+ * Data item for [SantoyaAdaptiveTabPillRow].
+ */
+@Immutable
+data class SantoyaTabPillItem(
+    val label: String,
+    val badgeCount: Int? = null,
+    val isUrgentBadge: Boolean = false,
+    val testTag: String? = null
+)
+
+/**
+ * Full-width single-row capsule pill tab bar styled consistently with [SantoyaFilterPill].
+ * Dynamically scales spacing, proportional widths, and label typography so every tab fits
+ * cleanly on one row across all phone screen widths without horizontal scrolling or clipping.
+ */
+@Composable
+fun SantoyaAdaptiveTabPillRow(
+    items: List<SantoyaTabPillItem>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (items.isEmpty()) return
+
+    val density = LocalDensity.current
+    val fontScale = density.fontScale
+
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            BoxWithConstraints(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                val availableWidth = maxWidth
+                val horizontalPadding = when {
+                    availableWidth < 340.dp -> 6.dp
+                    availableWidth < 400.dp -> 10.dp
+                    else -> 12.dp
+                }
+                val itemGap = when {
+                    items.size <= 2 -> 8.dp
+                    availableWidth < 340.dp -> 3.dp
+                    availableWidth < 400.dp -> 5.dp
+                    else -> 8.dp
+                }
+                val innerHorizontalPadding = when {
+                    items.size <= 2 -> 12.dp
+                    availableWidth < 340.dp -> 3.dp
+                    availableWidth < 400.dp -> 5.dp
+                    else -> 8.dp
+                }
+                val baseLabelFontSize = when {
+                    items.size <= 2 && availableWidth >= 360.dp -> 13.sp
+                    items.size <= 2 -> 12.sp
+                    availableWidth < 330.dp -> 9.5.sp
+                    availableWidth < 365.dp -> 10.5.sp
+                    availableWidth < 400.dp -> 11.5.sp
+                    else -> 12.5.sp
+                }
+                val baseBadgeFontSize = when {
+                    items.size <= 2 -> 10.5.sp
+                    availableWidth < 330.dp -> 8.sp
+                    availableWidth < 365.dp -> 9.sp
+                    availableWidth < 400.dp -> 9.5.sp
+                    else -> 10.5.sp
+                }
+                val badgeGap = if (items.size >= 4 && availableWidth < 400.dp) 3.dp else 5.dp
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = horizontalPadding),
+                    horizontalArrangement = Arrangement.spacedBy(itemGap),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items.forEachIndexed { idx, item ->
+                        val isSelected = selectedIndex == idx
+                        val itemWeight = remember(items.size, item.label, item.badgeCount) {
+                            if (items.size <= 2) {
+                                1f
+                            } else {
+                                val badgeWeight = item.badgeCount?.toString()?.length?.let { len ->
+                                    (len * 0.16f) + 0.28f
+                                } ?: 0f
+                                ((item.label.length * 0.145f) + 0.20f + badgeWeight).coerceAtLeast(0.88f)
+                            }
+                        }
+
+                        val containerColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
+                            animationSpec = tween(180),
+                            label = "tab_pill_bg"
+                        )
+                        val contentColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            animationSpec = tween(180),
+                            label = "tab_pill_fg"
+                        )
+                        val borderColor by animateColorAsState(
+                            targetValue = if (isSelected) {
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+                            } else {
+                                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.75f)
+                            },
+                            animationSpec = tween(180),
+                            label = "tab_pill_border"
+                        )
+
+                        val initialFontSize = remember(baseLabelFontSize, fontScale, items.size) {
+                            if (items.size >= 4 && fontScale > 1.15f) {
+                                (baseLabelFontSize.value / (fontScale / 1.1f)).coerceAtLeast(8f).sp
+                            } else {
+                                baseLabelFontSize
+                            }
+                        }
+                        var labelFontSize by remember(
+                            item.label,
+                            item.badgeCount,
+                            availableWidth,
+                            initialFontSize
+                        ) {
+                            mutableStateOf(initialFontSize)
+                        }
+                        val effectiveBadgeFontSize = remember(labelFontSize, baseLabelFontSize, baseBadgeFontSize) {
+                            val ratio = (labelFontSize.value / baseLabelFontSize.value).coerceIn(0.7f, 1f)
+                            (baseBadgeFontSize.value * ratio).coerceAtLeast(7.5f).sp
+                        }
+
+                        val shape = RoundedCornerShape(50)
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val tagModifier = if (item.testTag != null) {
+                            Modifier.testTag(item.testTag)
+                        } else {
+                            Modifier
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(itemWeight)
+                                .heightIn(min = 48.dp)
+                                .then(tagModifier)
+                                .semantics {
+                                    this.selected = isSelected
+                                    this.role = Role.Tab
+                                }
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    onClick = { onSelect(idx) }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Surface(
+                                shape = shape,
+                                color = containerColor,
+                                border = BorderStroke(1.dp, borderColor),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 36.dp)
+                                    .clip(shape)
+                                    .indication(interactionSource, LocalIndication.current)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(
+                                        horizontal = innerHorizontalPadding,
+                                        vertical = 6.dp
+                                    ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = item.label,
+                                        style = MaterialTheme.typography.labelMedium.copy(
+                                            fontSize = labelFontSize,
+                                            lineHeight = labelFontSize
+                                        ),
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = contentColor,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Clip,
+                                        onTextLayout = { result ->
+                                            if (result.hasVisualOverflow && labelFontSize.value > 8f) {
+                                                labelFontSize = (labelFontSize.value - 0.5f)
+                                                    .coerceAtLeast(8f)
+                                                    .sp
+                                            }
+                                        }
+                                    )
+                                    if (item.badgeCount != null) {
+                                        Spacer(modifier = Modifier.width(badgeGap))
+                                        val badgeBg = when {
+                                            item.isUrgentBadge -> MaterialTheme.colorScheme.errorContainer
+                                            isSelected -> MaterialTheme.colorScheme.primary
+                                            else -> MaterialTheme.colorScheme.primaryContainer
+                                        }
+                                        val badgeFg = when {
+                                            item.isUrgentBadge -> MaterialTheme.colorScheme.error
+                                            isSelected -> MaterialTheme.colorScheme.onPrimary
+                                            else -> MaterialTheme.colorScheme.primary
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = badgeBg
+                                        ) {
+                                            Text(
+                                                text = item.badgeCount.toString(),
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = effectiveBadgeFontSize,
+                                                    lineHeight = effectiveBadgeFontSize
+                                                ),
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = badgeFg,
+                                                maxLines = 1,
+                                                softWrap = false,
+                                                modifier = Modifier.padding(
+                                                    horizontal = if (items.size >= 4 && availableWidth < 365.dp) 4.dp else 5.dp,
+                                                    vertical = 1.dp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(
+                thickness = 0.5.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
 
 
 

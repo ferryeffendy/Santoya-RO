@@ -41,25 +41,25 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.HourglassBottom
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.People
-import androidx.compose.material.icons.filled.PersonOff
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.People
+import androidx.compose.material.icons.outlined.PersonOff
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,10 +71,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -114,10 +111,12 @@ import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
+import com.example.ui.components.SantoyaAdaptiveTabPillRow
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaFormBottomSheet
+import com.example.ui.components.SantoyaTabPillItem
 import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
@@ -205,93 +204,43 @@ fun PelangganScreen(
                 activePelangganUiModels.count { it.pelanggan.sisa_kasbon > 0 }
             }
 
-            val tabItems = listOf(
-                Pair("Semua", null),
-                Pair("Kasbon", if (kasbonCount > 0) kasbonCount else null),
-                Pair("Jadwal", if (jadwalList.isNotEmpty()) jadwalList.size else null),
-                Pair("Pasif", null),
-                Pair("Ranking", null)
-            )
+            val tabItems = remember(kasbonCount, jadwalList.size) {
+                listOf(
+                    SantoyaTabPillItem(
+                        label = "Semua",
+                        testTag = "tab_pelanggan_semua"
+                    ),
+                    SantoyaTabPillItem(
+                        label = "Kasbon",
+                        badgeCount = if (kasbonCount > 0) kasbonCount else null,
+                        isUrgentBadge = true,
+                        testTag = "tab_pelanggan_kasbon"
+                    ),
+                    SantoyaTabPillItem(
+                        label = "Jadwal",
+                        badgeCount = if (jadwalList.isNotEmpty()) jadwalList.size else null,
+                        testTag = "tab_pelanggan_jadwal"
+                    ),
+                    SantoyaTabPillItem(
+                        label = "Pasif",
+                        testTag = "tab_pelanggan_pasif"
+                    ),
+                    SantoyaTabPillItem(
+                        label = "Ranking",
+                        testTag = "tab_pelanggan_ranking"
+                    )
+                )
+            }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val isCompactTabs = maxWidth < 400.dp
-                val tabsContent: @Composable () -> Unit = {
-                    tabItems.forEachIndexed { idx, (label, badgeCount) ->
-                        val isSelected = pagerState.currentPage == idx
-                        Tab(
-                            selected = isSelected,
-                            onClick = {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(idx)
-                                }
-                            }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(
-                                    horizontal = if (isCompactTabs) 8.dp else 4.dp,
-                                    vertical = 10.dp
-                                ),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (badgeCount != null) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = if (idx == 1) {
-                                            MaterialTheme.colorScheme.errorContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        }
-                                    ) {
-                                        Text(
-                                            text = badgeCount.toString(),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = if (idx == 1) {
-                                                MaterialTheme.colorScheme.error
-                                            } else {
-                                                MaterialTheme.colorScheme.primary
-                                            },
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+            SantoyaAdaptiveTabPillRow(
+                items = tabItems,
+                selectedIndex = pagerState.currentPage,
+                onSelect = { idx ->
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(idx)
                     }
                 }
-
-                if (isCompactTabs) {
-                    ScrollableTabRow(
-                        selectedTabIndex = pagerState.currentPage,
-                        edgePadding = 12.dp,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth(),
-                        tabs = tabsContent
-                    )
-                } else {
-                    TabRow(
-                        selectedTabIndex = pagerState.currentPage,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.fillMaxWidth(),
-                        tabs = tabsContent
-                    )
-                }
-            }
+            )
 
             HorizontalPager(
                 state = pagerState,
@@ -381,7 +330,7 @@ fun PelangganScreen(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("tambah_pelanggan_fab")
             ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = "Tambah Pelanggan")
+                Icon(imageVector = Icons.Outlined.Add, contentDescription = "Tambah Pelanggan")
             }
         }
     }
@@ -472,7 +421,7 @@ fun PelangganScreen(
             onDismissRequest = { pelangganToDelete = null },
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Warning,
+                    imageVector = Icons.Outlined.Warning,
                     contentDescription = "Peringatan",
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(36.dp)
@@ -546,7 +495,7 @@ fun PelangganScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.HourglassBottom,
+                                    imageVector = Icons.Outlined.HourglassEmpty,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.error,
                                     modifier = Modifier.size(20.dp)
@@ -587,7 +536,7 @@ fun PelangganScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
                     Icon(
-                        imageVector = if (isAuditDeleted) Icons.Default.DeleteForever else Icons.Default.Delete,
+                        imageVector = if (isAuditDeleted) Icons.Outlined.DeleteForever else Icons.Outlined.Delete,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
@@ -627,7 +576,7 @@ private fun CompactPelangganSearchBar(
         },
         leadingIcon = {
             Icon(
-                imageVector = Icons.Default.Search,
+                imageVector = Icons.Outlined.Search,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(19.dp)
@@ -643,7 +592,7 @@ private fun CompactPelangganSearchBar(
                     modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 40.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Clear,
+                        imageVector = Icons.Outlined.Clear,
                         contentDescription = "Bersihkan pencarian",
                         modifier = Modifier.size(18.dp)
                     )
@@ -784,7 +733,7 @@ private fun SemuaPelangganTab(
             )
         } else if (filtered.isEmpty()) {
             EmptyListState(
-                icon = Icons.Default.People,
+                icon = Icons.Outlined.People,
                 title = if (searchQuery.isBlank()) "Belum ada pelanggan" else "Pelanggan tidak ditemukan",
                 subtitle = if (searchQuery.isBlank()) {
                     "Ketuk tombol + untuk tambah pelanggan baru."
@@ -1070,7 +1019,7 @@ private fun PelangganItemCard(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Call,
+                                    imageVector = Icons.Outlined.Call,
                                     contentDescription = "Telepon",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
@@ -1082,7 +1031,7 @@ private fun PelangganItemCard(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
+                                imageVector = Icons.Outlined.Edit,
                                 contentDescription = "Edit",
                                 tint = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(18.dp)
@@ -1093,7 +1042,7 @@ private fun PelangganItemCard(
                             modifier = Modifier.size(36.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Delete,
+                                imageVector = Icons.Outlined.Delete,
                                 contentDescription = "Hapus",
                                 tint = MaterialTheme.colorScheme.error,
                                 modifier = Modifier.size(18.dp)
@@ -1223,7 +1172,7 @@ private fun PelangganItemCard(
                                 .heightIn(min = 38.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Restore,
+                                imageVector = Icons.Outlined.Restore,
                                 contentDescription = "Pulihkan",
                                 modifier = Modifier.size(15.dp)
                             )
@@ -1248,7 +1197,7 @@ private fun PelangganItemCard(
                             .heightIn(min = 38.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.DeleteForever,
+                            imageVector = Icons.Outlined.DeleteForever,
                             contentDescription = "Hapus Permanen",
                             modifier = Modifier.size(15.dp)
                         )
@@ -1297,7 +1246,7 @@ private fun PelangganItemCard(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Print,
+                                    imageVector = Icons.Outlined.Print,
                                     contentDescription = "Cetak Tagihan",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
@@ -1310,7 +1259,7 @@ private fun PelangganItemCard(
                                 modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Share,
+                                    imageVector = Icons.Outlined.Share,
                                     contentDescription = "Bagi WA",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(18.dp)
@@ -1327,7 +1276,7 @@ private fun PelangganItemCard(
                                 .heightIn(min = 38.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Payments,
+                                imageVector = Icons.Outlined.Payments,
                                 contentDescription = null,
                                 modifier = Modifier.size(15.dp)
                             )
@@ -1545,7 +1494,7 @@ private fun KasbonPelangganTab(
         } else if (sortedKasbon.isEmpty()) {
             EmptyListState(
                 emptyType = if (searchQuery.isBlank()) SantoyaEmptyType.KASBON else SantoyaEmptyType.PELANGGAN,
-                icon = Icons.Default.HourglassBottom,
+                icon = Icons.Outlined.HourglassEmpty,
                 title = if (searchQuery.isBlank()) "Tidak ada tagihan kasbon" else "Pelanggan tidak ditemukan",
                 subtitle = if (searchQuery.isBlank()) {
                     "Semua kasbon sudah lunas."
@@ -1805,7 +1754,7 @@ private fun KasbonPelangganTab(
                                             modifier = Modifier.size(38.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Print,
+                                                imageVector = Icons.Outlined.Print,
                                                 contentDescription = "Cetak Tagihan",
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp)
@@ -1824,7 +1773,7 @@ private fun KasbonPelangganTab(
                                             modifier = Modifier.size(38.dp)
                                         ) {
                                             Icon(
-                                                imageVector = Icons.Default.Share,
+                                                imageVector = Icons.Outlined.Share,
                                                 contentDescription = "Bagi WA",
                                                 tint = MaterialTheme.colorScheme.primary,
                                                 modifier = Modifier.size(18.dp)
@@ -1840,7 +1789,7 @@ private fun KasbonPelangganTab(
                                             .weight(1f)
                                             .heightIn(min = 38.dp)
                                     ) {
-                                        Icon(imageVector = Icons.Default.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Icon(imageVector = Icons.Outlined.Payments, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "Bayar Kasbon",
@@ -1904,7 +1853,7 @@ private fun TopRankingTab(
 
     if (ranking.isEmpty()) {
         EmptyListState(
-            icon = Icons.Default.EmojiEvents,
+            icon = Icons.Outlined.EmojiEvents,
             title = "Belum Ada Ranking Penjualan",
             subtitle = "Peringkat terisi otomatis setelah ada penjualan."
         )
@@ -1919,7 +1868,7 @@ private fun TopRankingTab(
 
             if (filteredRanking.isEmpty()) {
                 EmptyListState(
-                    icon = Icons.Default.EmojiEvents,
+                    icon = Icons.Outlined.EmojiEvents,
                     title = "Pelanggan tidak ditemukan",
                     subtitle = "Data untuk \"${searchQuery.trim()}\" tidak ditemukan.",
                     onResetSearch = {
@@ -2154,7 +2103,7 @@ private fun PasifPelangganTab(
 
         if (filteredPasif.isEmpty()) {
             EmptyListState(
-                icon = Icons.Default.PersonOff,
+                icon = Icons.Outlined.PersonOff,
                 title = if (searchQuery.isBlank()) "Semua Pelanggan Aktif" else "Pelanggan tidak ditemukan",
                 subtitle = if (searchQuery.isBlank()) {
                     "Semua pelanggan aktif pesan dalam $selectedDaysFilter hari terakhir."
@@ -2274,7 +2223,7 @@ private fun PasifPelangganTab(
                                             .fillMaxWidth()
                                             .heightIn(min = 38.dp)
                                     ) {
-                                        Icon(imageVector = Icons.Default.Call, contentDescription = null, modifier = Modifier.size(15.dp))
+                                        Icon(imageVector = Icons.Outlined.Call, contentDescription = null, modifier = Modifier.size(15.dp))
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
                                             text = "Hubungi (${cust.no_hp})",
@@ -2351,7 +2300,12 @@ private fun PelangganFormDialog(
     SantoyaFormBottomSheet(
         title = title,
         subtitle = "Data pelanggan & langganan Santoya RO",
-        headerIcon = Icons.Default.People,
+        headerIconContent = {
+            HydroCustomerDropIcon(
+                tint = Color.White,
+                modifier = Modifier.size(21.dp)
+            )
+        },
         onDismiss = onDismiss,
         confirmLabel = "Simpan",
         onConfirm = submitForm
@@ -2430,7 +2384,7 @@ private fun PelangganFormDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Lock,
+                        imageVector = Icons.Outlined.Lock,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
@@ -2590,7 +2544,7 @@ private fun PelunasanKasbonDialog(
     SantoyaFormBottomSheet(
         title = "Pelunasan Kasbon",
         subtitle = "Pelanggan: ${pelanggan.nama}",
-        headerIcon = Icons.Default.Payments,
+        headerIcon = Icons.Outlined.Payments,
         headerAccent = MaterialTheme.colorScheme.error,
         onDismiss = onDismiss,
         confirmLabel = "Konfirmasi",
@@ -2788,7 +2742,7 @@ private fun EmptyListState(
                 MaterialTheme.colorScheme.primary
             },
             secondaryActionLabel = if (onResetSearch != null) "Reset Pencarian" else null,
-            secondaryActionIcon = if (onResetSearch != null) Icons.Default.Clear else null,
+            secondaryActionIcon = if (onResetSearch != null) Icons.Outlined.Clear else null,
             onSecondaryAction = onResetSearch
         )
     }

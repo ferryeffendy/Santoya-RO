@@ -19,12 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -274,7 +273,7 @@ fun ReceiptDialog(
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                    Icon(imageVector = Icons.Default.Close, contentDescription = "Tutup")
+                    Icon(imageVector = Icons.Outlined.Close, contentDescription = "Tutup")
                 }
             }
         },
@@ -318,7 +317,7 @@ fun ReceiptDialog(
                         .fillMaxWidth()
                         .testTag("btn_print_bluetooth")
                 ) {
-                    Icon(imageVector = Icons.Default.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = Icons.Outlined.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Cetak Struk (Bluetooth)",
@@ -347,7 +346,7 @@ fun ReceiptDialog(
                         .fillMaxWidth()
                         .testTag("btn_share_wa_image")
                 ) {
-                    Icon(imageVector = Icons.Default.Image, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Kirim Gambar ke WhatsApp",
@@ -372,7 +371,7 @@ fun ReceiptDialog(
                         .fillMaxWidth()
                         .testTag("btn_share_wa_text")
                 ) {
-                    Icon(imageVector = Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(imageVector = Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Kirim Teks Struk",
@@ -413,11 +412,9 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.WaterDrop,
-                        contentDescription = null,
+                    HydroDropletSparkIcon(
                         tint = PrimaryLight,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }

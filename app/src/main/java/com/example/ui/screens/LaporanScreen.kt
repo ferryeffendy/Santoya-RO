@@ -25,18 +25,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.TrendingDown
 import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.DeliveryDining
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.TableView
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.DateRange
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.TableView
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -383,7 +381,7 @@ fun LaporanScreen(
                                     elevation = 3.dp
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.CalendarToday,
+                                        imageVector = Icons.Outlined.CalendarToday,
                                         contentDescription = null,
                                         tint = Color.White,
                                         modifier = Modifier.size(17.dp)
@@ -416,7 +414,7 @@ fun LaporanScreen(
                                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.DateRange,
+                                        imageVector = Icons.Outlined.DateRange,
                                         contentDescription = "Pilih Rentang Tanggal",
                                         tint = if (isCustomDateRange) {
                                             MaterialTheme.colorScheme.onPrimary
@@ -562,7 +560,7 @@ fun LaporanScreen(
                         title = "Belum ada transaksi di periode ini",
                         subtitle = "Belum ada data. Coba pilih periode lain atau catat transaksi baru.",
                         primaryActionLabel = "Catat Transaksi",
-                        primaryActionIcon = Icons.Default.Add,
+                        primaryActionIcon = Icons.Outlined.Add,
                         onPrimaryAction = {
                             viewModel.setTransaksiTab(0)
                             viewModel.navigateTo(SantoyaScreen.TRANSAKSI)
@@ -1133,7 +1131,7 @@ fun LaporanScreen(
                                 elevation = 3.dp
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.EmojiEvents,
+                                    imageVector = Icons.Outlined.EmojiEvents,
                                     contentDescription = null,
                                     tint = Color.White,
                                     modifier = Modifier.size(19.dp)
@@ -1170,7 +1168,7 @@ fun LaporanScreen(
                                 label = { Text("Desa (${penjualanDesaList.size})", maxLines = 1) },
                                 leadingIcon = {
                                     Icon(
-                                        imageVector = Icons.Default.LocationOn,
+                                        imageVector = Icons.Outlined.LocationOn,
                                         contentDescription = null,
                                         modifier = Modifier.size(14.dp)
                                     )
@@ -1192,10 +1190,13 @@ fun LaporanScreen(
                                 },
                                 label = { Text("Kurir (${penjualanKurirList.size})", maxLines = 1) },
                                 leadingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.DeliveryDining,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(14.dp)
+                                    HydroCourierWaveIcon(
+                                        tint = if (rankingTabIndex == 1) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 },
                                 modifier = Modifier
@@ -1469,7 +1470,7 @@ fun LaporanScreen(
                                     .testTag("btn_export_pdf")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.PictureAsPdf,
+                                    imageVector = Icons.Outlined.PictureAsPdf,
                                     contentDescription = "Ekspor PDF",
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -1493,7 +1494,7 @@ fun LaporanScreen(
                                     .testTag("btn_export_csv")
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.TableView,
+                                    imageVector = Icons.Outlined.TableView,
                                     contentDescription = "Ekspor CSV",
                                     modifier = Modifier.size(16.dp)
                                 )

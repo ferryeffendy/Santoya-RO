@@ -24,16 +24,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.HourglassBottom
-import androidx.compose.material.icons.filled.Print
-import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -186,7 +185,7 @@ fun RiwayatScreen(
                         modifier = Modifier.testTag("riwayat_back_button")
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = "Kembali"
                         )
                     }
@@ -212,7 +211,7 @@ fun RiwayatScreen(
                 placeholder = { Text("Cari nota, pelanggan, kurir, produk...") },
                 leadingIcon = {
                     Icon(
-                        imageVector = Icons.Default.Search,
+                        imageVector = Icons.Outlined.Search,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
@@ -222,7 +221,7 @@ fun RiwayatScreen(
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(
-                                imageVector = Icons.Default.Clear,
+                                imageVector = Icons.Outlined.Clear,
                                 contentDescription = "Bersihkan",
                                 modifier = Modifier.size(18.dp)
                             )
@@ -249,7 +248,7 @@ fun RiwayatScreen(
                             "Coba gunakan kata kunci pencarian lain."
                         },
                         secondaryActionLabel = if (searchQuery.isNotBlank()) "Reset Pencarian" else null,
-                        secondaryActionIcon = if (searchQuery.isNotBlank()) Icons.Default.Clear else null,
+                        secondaryActionIcon = if (searchQuery.isNotBlank()) Icons.Outlined.Clear else null,
                         onSecondaryAction = if (searchQuery.isNotBlank()) {
                             { searchQuery = "" }
                         } else null
@@ -367,7 +366,7 @@ fun RiwayatScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Print,
+                                    imageVector = Icons.Outlined.Print,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary
                                 )
@@ -449,7 +448,7 @@ fun RiwayatTransaksiCard(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isLunas) Icons.Default.CheckCircle else Icons.Default.HourglassBottom,
+                            imageVector = if (isLunas) Icons.Outlined.CheckCircle else Icons.Outlined.HourglassEmpty,
                             contentDescription = null,
                             tint = if (isLunas) santoyaColors.success else santoyaColors.warning,
                             modifier = Modifier.size(18.dp)
@@ -477,7 +476,7 @@ fun RiwayatTransaksiCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onPrint, modifier = Modifier.size(48.dp)) {
                         Icon(
-                            imageVector = Icons.Default.Print,
+                            imageVector = Icons.Outlined.Print,
                             contentDescription = "Cetak Struk",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -485,7 +484,7 @@ fun RiwayatTransaksiCard(
                     }
                     IconButton(onClick = onShare, modifier = Modifier.size(48.dp)) {
                         Icon(
-                            imageVector = Icons.Default.Share,
+                            imageVector = Icons.Outlined.Share,
                             contentDescription = "Bagikan Struk",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
@@ -493,7 +492,7 @@ fun RiwayatTransaksiCard(
                     }
                     IconButton(onClick = onDelete, modifier = Modifier.size(48.dp)) {
                         Icon(
-                            imageVector = Icons.Default.Delete,
+                            imageVector = Icons.Outlined.Delete,
                             contentDescription = "Hapus Transaksi",
                             tint = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.size(20.dp)
@@ -561,7 +560,7 @@ fun RiwayatTransaksiCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Check,
+                        imageVector = Icons.Outlined.Check,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp)
                     )

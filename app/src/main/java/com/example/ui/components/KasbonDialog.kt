@@ -12,7 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -49,7 +49,7 @@ fun KasbonPelunasanDialog(
     SantoyaFormBottomSheet(
         title = "Pelunasan Kasbon",
         subtitle = pelanggan.nama,
-        headerIcon = Icons.Default.Payments,
+        headerIcon = Icons.Outlined.Payments,
         onDismiss = onDismiss,
         confirmLabel = "Simpan Pembayaran",
         confirmEnabled = nominalDouble > 0,

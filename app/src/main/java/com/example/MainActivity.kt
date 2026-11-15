@@ -20,8 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -214,7 +214,7 @@ class MainActivity : ComponentActivity() {
                                                     ) {
                                                         Box(contentAlignment = Alignment.Center) {
                                                             Icon(
-                                                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                                                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                                                                 contentDescription = "Kembali ke Beranda",
                                                                 tint = MaterialTheme.colorScheme.onSurface,
                                                                 modifier = Modifier.size(18.dp)
@@ -246,7 +246,7 @@ class MainActivity : ComponentActivity() {
                                                             ) {
                                                                 Box(contentAlignment = Alignment.Center) {
                                                                     Icon(
-                                                                        imageVector = Icons.Default.Settings,
+                                                                        imageVector = Icons.Outlined.Settings,
                                                                         contentDescription = "Pengaturan",
                                                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                         modifier = Modifier.size(18.dp)
