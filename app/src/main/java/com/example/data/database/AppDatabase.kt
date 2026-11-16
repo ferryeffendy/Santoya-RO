@@ -245,9 +245,20 @@ abstract class AppDatabase : RoomDatabase() {
                     """
                     UPDATE `pelanggan`
                     SET `isDeleted` = 1,
-                        `deletedBy` = TRIM(SUBSTR(`alamat`, INSTR(`alamat`, '[DIHAPUS:') + 9, INSTR(`alamat`, ']') - (INSTR(`alamat`, '[DIHAPUS:') + 9))),
-                        `alamat` = TRIM(SUBSTR(`alamat`, INSTR(`alamat`, ']') + 1))
-                    WHERE `alamat` LIKE '[DIHAPUS:%]%'
+                        `deletedBy` = CASE
+                            WHEN INSTR(`alamat`, '[DIHAPUS:') > 0
+                                 AND INSTR(`alamat`, ']') > INSTR(`alamat`, '[DIHAPUS:') + 9
+                                 AND TRIM(SUBSTR(`alamat`, INSTR(`alamat`, '[DIHAPUS:') + 9, INSTR(`alamat`, ']') - (INSTR(`alamat`, '[DIHAPUS:') + 9))) != '' THEN
+                                TRIM(SUBSTR(`alamat`, INSTR(`alamat`, '[DIHAPUS:') + 9, INSTR(`alamat`, ']') - (INSTR(`alamat`, '[DIHAPUS:') + 9)))
+                            ELSE 'Karyawan'
+                        END,
+                        `alamat` = CASE
+                            WHEN INSTR(`alamat`, ']') > INSTR(`alamat`, '[DIHAPUS:') THEN
+                                TRIM(SUBSTR(`alamat`, INSTR(`alamat`, ']') + 1))
+                            ELSE `alamat`
+                        END
+                    WHERE INSTR(`alamat`, '[DIHAPUS:') > 0
+                      AND INSTR(`alamat`, ']') > INSTR(`alamat`, '[DIHAPUS:')
                     """.trimIndent()
                 )
 
@@ -258,13 +269,24 @@ abstract class AppDatabase : RoomDatabase() {
                     UPDATE `transaksi`
                     SET `isDeleted` = 1,
                         `deletedBy` = CASE
-                            WHEN `metode_bayar` LIKE 'DEL:%|%' THEN
+                            WHEN `metode_bayar` LIKE 'DEL:%|%'
+                                 AND INSTR(`metode_bayar`, 'DEL:') = 1
+                                 AND INSTR(`metode_bayar`, '|') > 5
+                                 AND TRIM(SUBSTR(`metode_bayar`, 5, INSTR(`metode_bayar`, '|') - 5)) != '' THEN
                                 TRIM(SUBSTR(`metode_bayar`, 5, INSTR(`metode_bayar`, '|') - 5))
-                            WHEN `metode_bayar` LIKE 'DEL:%' THEN
+                            WHEN `metode_bayar` LIKE 'DEL:%'
+                                 AND INSTR(`metode_bayar`, 'DEL:') = 1
+                                 AND LENGTH(`metode_bayar`) > 4
+                                 AND INSTR(`metode_bayar`, '|') = 0
+                                 AND TRIM(SUBSTR(`metode_bayar`, 5)) != '' THEN
                                 TRIM(SUBSTR(`metode_bayar`, 5))
                             ELSE 'Karyawan'
                         END
                     WHERE LOWER(`status`) = 'dihapus'
+                      AND (
+                          (`metode_bayar` LIKE 'DEL:%|%' AND INSTR(`metode_bayar`, '|') > 5)
+                          OR (`metode_bayar` LIKE 'DEL:%' AND LENGTH(`metode_bayar`) > 4)
+                      )
                     """.trimIndent()
                 )
             }

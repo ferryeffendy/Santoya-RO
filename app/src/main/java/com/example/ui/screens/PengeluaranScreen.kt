@@ -92,7 +92,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.data.entity.Pengeluaran
 import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard

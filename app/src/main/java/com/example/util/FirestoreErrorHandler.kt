@@ -1,7 +1,7 @@
 package com.example.util
 
 import android.util.Log
-import com.aistudio.companion.kzpmrw.BuildConfig
+import com.example.BuildConfig
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestoreException

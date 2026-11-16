@@ -1,0 +1,716 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 15,
+    "identityHash": "v15_santoya_ro_schema",
+    "entities": [
+      {
+        "tableName": "produk",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nama_produk` TEXT NOT NULL, `harga` REAL NOT NULL, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nama_produk",
+            "columnName": "nama_produk",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "harga",
+            "columnName": "harga",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_produk_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_produk_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "kurir",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nama` TEXT NOT NULL, `komisi_per_galon` REAL NOT NULL, `email` TEXT NOT NULL, `password` TEXT NOT NULL, `akses_aktif` INTEGER NOT NULL, `skema_komisi` TEXT NOT NULL, `aturan_komisi` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL, `isDeleted` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nama",
+            "columnName": "nama",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "komisi_per_galon",
+            "columnName": "komisi_per_galon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "email",
+            "columnName": "email",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "password",
+            "columnName": "password",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "akses_aktif",
+            "columnName": "akses_aktif",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "skema_komisi",
+            "columnName": "skema_komisi",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aturan_komisi",
+            "columnName": "aturan_komisi",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isDeleted",
+            "columnName": "isDeleted",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_kurir_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_kurir_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "pelanggan",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nama` TEXT NOT NULL, `alamat` TEXT NOT NULL, `no_hp` TEXT NOT NULL, `sisa_kasbon` REAL NOT NULL, `harga_khusus` REAL, `id_kurir_langganan` INTEGER, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nama",
+            "columnName": "nama",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "alamat",
+            "columnName": "alamat",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "no_hp",
+            "columnName": "no_hp",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sisa_kasbon",
+            "columnName": "sisa_kasbon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "harga_khusus",
+            "columnName": "harga_khusus",
+            "affinity": "REAL"
+          },
+          {
+            "fieldPath": "id_kurir_langganan",
+            "columnName": "id_kurir_langganan",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pelanggan_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pelanggan_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "pengeluaran",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `tanggal` INTEGER NOT NULL, `nama_item` TEXT NOT NULL, `kategori` TEXT NOT NULL, `nominal` REAL NOT NULL, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tanggal",
+            "columnName": "tanggal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nama_item",
+            "columnName": "nama_item",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kategori",
+            "columnName": "kategori",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nominal",
+            "columnName": "nominal",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_pengeluaran_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_pengeluaran_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "transaksi",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `tanggal` INTEGER NOT NULL, `id_pelanggan` INTEGER NOT NULL, `id_kurir` INTEGER, `id_produk` INTEGER, `jumlah` INTEGER NOT NULL, `harga_satuan` REAL NOT NULL, `total_harga` REAL NOT NULL, `total_komisi` REAL NOT NULL, `metode_bayar` TEXT NOT NULL, `status` TEXT NOT NULL, `uangMuka` INTEGER NOT NULL, `sisaKasbon` INTEGER NOT NULL, `tanggalBayar` INTEGER, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tanggal",
+            "columnName": "tanggal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id_pelanggan",
+            "columnName": "id_pelanggan",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id_kurir",
+            "columnName": "id_kurir",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "id_produk",
+            "columnName": "id_produk",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "jumlah",
+            "columnName": "jumlah",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "harga_satuan",
+            "columnName": "harga_satuan",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "total_harga",
+            "columnName": "total_harga",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "total_komisi",
+            "columnName": "total_komisi",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metode_bayar",
+            "columnName": "metode_bayar",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "uangMuka",
+            "columnName": "uangMuka",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sisaKasbon",
+            "columnName": "sisaKasbon",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tanggalBayar",
+            "columnName": "tanggalBayar",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_transaksi_id_pelanggan",
+            "unique": false,
+            "columnNames": [
+              "id_pelanggan"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaksi_id_pelanggan` ON `${TABLE_NAME}` (`id_pelanggan`)"
+          },
+          {
+            "name": "index_transaksi_id_kurir",
+            "unique": false,
+            "columnNames": [
+              "id_kurir"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaksi_id_kurir` ON `${TABLE_NAME}` (`id_kurir`)"
+          },
+          {
+            "name": "index_transaksi_id_produk",
+            "unique": false,
+            "columnNames": [
+              "id_produk"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaksi_id_produk` ON `${TABLE_NAME}` (`id_produk`)"
+          },
+          {
+            "name": "index_transaksi_tanggal",
+            "unique": false,
+            "columnNames": [
+              "tanggal"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_transaksi_tanggal` ON `${TABLE_NAME}` (`tanggal`)"
+          },
+          {
+            "name": "index_transaksi_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_transaksi_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "kasbon_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id_pelanggan` INTEGER NOT NULL, `tanggal` INTEGER NOT NULL, `jumlah_bayar` REAL NOT NULL, `sisa_kasbon_sebelum` REAL NOT NULL, `sisa_kasbon_sesudah` REAL NOT NULL, `metode_bayar` TEXT NOT NULL, `catatan` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id_pelanggan",
+            "columnName": "id_pelanggan",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tanggal",
+            "columnName": "tanggal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "jumlah_bayar",
+            "columnName": "jumlah_bayar",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sisa_kasbon_sebelum",
+            "columnName": "sisa_kasbon_sebelum",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sisa_kasbon_sesudah",
+            "columnName": "sisa_kasbon_sesudah",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "metode_bayar",
+            "columnName": "metode_bayar",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catatan",
+            "columnName": "catatan",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_kasbon_log_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_kasbon_log_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "pending_sync",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`collectionName` TEXT NOT NULL, `syncId` TEXT NOT NULL, `operation` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`collectionName`, `syncId`))",
+        "fields": [
+          {
+            "fieldPath": "collectionName",
+            "columnName": "collectionName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "collectionName",
+            "syncId"
+          ]
+        }
+      },
+      {
+        "tableName": "perawatan_item",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nama` TEXT NOT NULL, `intervalHari` INTEGER NOT NULL, `terakhirSelesai` INTEGER, `jadwalBerikutnya` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nama",
+            "columnName": "nama",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intervalHari",
+            "columnName": "intervalHari",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "terakhirSelesai",
+            "columnName": "terakhirSelesai",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "jadwalBerikutnya",
+            "columnName": "jadwalBerikutnya",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_perawatan_item_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_perawatan_item_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "perawatan_log",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `perawatanSyncId` TEXT NOT NULL, `namaPerawatan` TEXT NOT NULL, `tanggalSelesai` INTEGER NOT NULL, `biaya` REAL NOT NULL, `catatan` TEXT NOT NULL, `pengeluaranSyncId` TEXT, `updatedAt` INTEGER NOT NULL, `syncId` TEXT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "perawatanSyncId",
+            "columnName": "perawatanSyncId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "namaPerawatan",
+            "columnName": "namaPerawatan",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tanggalSelesai",
+            "columnName": "tanggalSelesai",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "biaya",
+            "columnName": "biaya",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catatan",
+            "columnName": "catatan",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "pengeluaranSyncId",
+            "columnName": "pengeluaranSyncId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "updatedAt",
+            "columnName": "updatedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "syncId",
+            "columnName": "syncId",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_perawatan_log_syncId",
+            "unique": true,
+            "columnNames": [
+              "syncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_perawatan_log_syncId` ON `${TABLE_NAME}` (`syncId`)"
+          },
+          {
+            "name": "index_perawatan_log_perawatanSyncId",
+            "unique": false,
+            "columnNames": [
+              "perawatanSyncId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_perawatan_log_perawatanSyncId` ON `${TABLE_NAME}` (`perawatanSyncId`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'v15_santoya_ro_schema')"
+    ]
+  }
+}

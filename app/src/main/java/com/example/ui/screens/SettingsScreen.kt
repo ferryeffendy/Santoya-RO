@@ -66,8 +66,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aistudio.companion.kzpmrw.BuildConfig
-import com.aistudio.companion.kzpmrw.R
+import com.example.BuildConfig
+import com.example.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk

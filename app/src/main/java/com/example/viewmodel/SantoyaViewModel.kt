@@ -4,6 +4,10 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import com.example.data.database.AppDatabase
 import com.example.data.entity.KasbonLog
 import com.example.data.entity.Kurir
@@ -118,10 +122,24 @@ data class KasbonDiscrepancy(
 class SantoyaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
+    private val transaksiDao = db.transaksiDao()
+    private val pelangganDao = db.pelangganDao()
     private val syncEngine = RealtimeSyncEngine(application, db)
     private val repository = SantoyaRepository(db, application) {
         syncEngine.scheduleFlush()
     }
+
+    val transaksiPagingFlow: Flow<PagingData<Transaksi>> = Pager(
+        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
+    ) {
+        transaksiDao.getTransaksiPaging()
+    }.flow.cachedIn(viewModelScope)
+
+    val pelangganPagingFlow: Flow<PagingData<Pelanggan>> = Pager(
+        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
+    ) {
+        pelangganDao.getPelangganPaging()
+    }.flow.cachedIn(viewModelScope)
 
     // --- Centralized Loading & Anti-Double-Tap Busy States ---
     private val _isInitialDataLoaded = MutableStateFlow(false)

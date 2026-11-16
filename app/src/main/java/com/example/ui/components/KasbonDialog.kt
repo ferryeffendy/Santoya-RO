@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.data.entity.Pelanggan
 import com.example.ui.theme.SantoyaRadius
 import com.example.util.FormatUtils

@@ -24,6 +24,12 @@ interface PendingSyncDao {
     @Query("DELETE FROM pending_sync WHERE collectionName = :collectionName AND syncId = :syncId")
     suspend fun remove(collectionName: String, syncId: String)
 
+    @Query("DELETE FROM pending_sync WHERE updatedAt < :threshold")
+    suspend fun pruneStaleEntries(threshold: Long)
+
+    @Query("SELECT COUNT(*) FROM pending_sync")
+    suspend fun getQueueSize(): Int
+
     @Query("DELETE FROM pending_sync")
     suspend fun deleteAll()
 }

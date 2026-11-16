@@ -89,7 +89,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize

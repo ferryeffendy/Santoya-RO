@@ -1,7 +1,6 @@
 package com.example
 
 import android.content.Context
-import com.aistudio.companion.kzpmrw.R
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Test

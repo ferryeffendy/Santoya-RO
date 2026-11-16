@@ -236,4 +236,60 @@ class OfflineSyncQueueUnitTest {
         engine.ensureDesignatedStaffKurirsForOwner("ferryeffendy@gmail.com")
         assertEquals(3, db.kurirDao().getAllOnce().count { !it.isDeleted })
     }
+
+    @Test
+    fun syncConflictResolver_resolvesByLatestUpdatedAt() {
+        val localNewer = Produk(id = 1, nama_produk = "Galon Lokal", harga = 6000.0, updatedAt = 2_000L, syncId = "p_1")
+        val remoteOlder = localNewer.copy(nama_produk = "Galon Cloud", updatedAt = 1_500L)
+        assertEquals(localNewer, com.example.util.SyncConflictResolver.resolve(localNewer, remoteOlder))
+
+        val remoteEqual = localNewer.copy(nama_produk = "Galon Sama", updatedAt = 2_000L)
+        assertEquals(localNewer, com.example.util.SyncConflictResolver.resolve(localNewer, remoteEqual))
+
+        val remoteNewer = localNewer.copy(nama_produk = "Galon Baru", updatedAt = 2_500L)
+        assertEquals(remoteNewer, com.example.util.SyncConflictResolver.resolve(localNewer, remoteNewer))
+    }
+
+    @Test
+    fun pendingSyncQueue_prunesStaleEntriesOnlyWhenQueueExceeds1000() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = com.example.util.RealtimeSyncEngine(context, db)
+        val now = System.currentTimeMillis()
+        val staleTimestamp = now - (35L * 24 * 60 * 60 * 1000)
+
+        for (i in 1..1001) {
+            db.pendingSyncDao().enqueue(
+                com.example.data.entity.PendingSyncEntity(
+                    collectionName = SyncCollections.PRODUK,
+                    syncId = "sync_$i",
+                    operation = SyncOperations.UPSERT,
+                    updatedAt = if (i <= 50) staleTimestamp else now
+                )
+            )
+        }
+        assertEquals(1001, db.pendingSyncDao().getQueueSize())
+
+        engine.validateAndPruneOfflineQueue()
+
+        assertEquals(951, db.pendingSyncDao().getQueueSize())
+    }
+
+    @Test
+    fun withRetry_retriesTransientFailuresAndReturnsOnSuccess() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = com.example.util.RealtimeSyncEngine(context, db)
+        var attempts = 0
+
+        val result = engine.withRetry(maxAttempts = 3, initialDelay = 1L) {
+            attempts++
+            if (attempts < 3) {
+                throw IllegalStateException("Transient network error #$attempts")
+            }
+            "ok"
+        }
+
+        assertEquals("ok", result)
+        assertEquals(3, attempts)
+    }
 }
+

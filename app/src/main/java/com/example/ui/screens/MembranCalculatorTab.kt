@@ -73,7 +73,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.HydroMembraneLayerIcon

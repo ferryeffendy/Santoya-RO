@@ -37,7 +37,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize
 import com.example.util.ExportHelper

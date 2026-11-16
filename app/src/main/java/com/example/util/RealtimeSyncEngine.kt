@@ -7,7 +7,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import androidx.room.withTransaction
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.data.database.AppDatabase
 import com.example.data.entity.KasbonLog
 import com.example.data.entity.Kurir
@@ -18,12 +18,15 @@ import com.example.data.entity.PerawatanItem
 import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
+import com.google.firebase.FirebaseApp
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -158,14 +161,19 @@ class RealtimeSyncEngine(
         observePendingQueue()
 
         val previousOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
-        if (!previousOwnerUid.isNullOrBlank() && previousOwnerUid != uid) {
-            // Jangan pernah mempercayai data lokal saat pemilik akun berganti.
-            // Bersihkan dulu, baru lanjut memuat depot milik pemilik baru.
-            _state.update { it.copy(isSwitchingOwner = true) }
-            scope.launch {
+        scope.launch {
+            validateAndPruneOfflineQueue()
+            if (activeUid != uid) return@launch
+
+            if (!previousOwnerUid.isNullOrBlank() && previousOwnerUid != uid) {
+                // Jangan pernah mempercayai data lokal saat pemilik akun berganti.
+                // Bersihkan dulu, baru lanjut memuat depot milik pemilik baru.
+                _state.update { it.copy(isSwitchingOwner = true) }
                 val wiped = try {
                     clearLocalDataInternal()
                     true
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e(TAG, "Gagal menghapus data pemilik sebelumnya", e)
                     false
@@ -185,12 +193,59 @@ class RealtimeSyncEngine(
                 prefs.edit().putString(KEY_LAST_OWNER_UID, uid).apply()
                 _state.update { it.copy(isSwitchingOwner = false) }
                 continueStart(uid, cleanEmail)
+            } else {
+                if (previousOwnerUid.isNullOrBlank()) {
+                    prefs.edit().putString(KEY_LAST_OWNER_UID, uid).apply()
+                }
+                continueStart(uid, cleanEmail)
             }
-        } else {
-            if (previousOwnerUid.isNullOrBlank()) {
-                prefs.edit().putString(KEY_LAST_OWNER_UID, uid).apply()
+        }
+    }
+
+    internal suspend fun validateAndPruneOfflineQueue() {
+        try {
+            val pendingSyncDao = db.pendingSyncDao()
+            val queueSize = pendingSyncDao.getQueueSize()
+            if (queueSize > 1000) {
+                pendingSyncDao.pruneStaleEntries(
+                    System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+                )
+                logCrashlytics("Pruned stale sync queue: was $queueSize")
             }
-            continueStart(uid, cleanEmail)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Gagal memvalidasi antrean sinkronisasi offline: ${e.message}")
+        }
+    }
+
+    private fun logCrashlytics(message: String) {
+        try {
+            if (FirebaseApp.getApps(context).isNotEmpty()) {
+                FirebaseCrashlytics.getInstance().log(message)
+            }
+        } catch (_: IllegalStateException) {
+            // Abaikan saat FirebaseApp belum diinisialisasi pada unit test
+        }
+    }
+
+    internal suspend fun <T> withRetry(
+        maxAttempts: Int = 3,
+        initialDelay: Long = 1000L,
+        block: suspend () -> T
+    ): T {
+        var attempt = 0
+        var currentDelay = initialDelay
+        while (true) {
+            try {
+                return block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (++attempt >= maxAttempts) throw e
+                delay(currentDelay)
+                currentDelay *= 2
+            }
         }
     }
 
@@ -436,7 +491,7 @@ class RealtimeSyncEngine(
             recordReads(snap.documents.size.coerceAtLeast(1))
             for (doc in snap.documents) {
                 try {
-                    doc.reference.delete().await()
+                    withRetry { doc.reference.delete().await() }
                     recordWrites(1)
                 } catch (_: Exception) {
                 }
@@ -446,8 +501,10 @@ class RealtimeSyncEngine(
 
         if (KaryawanScopeHelper.isDesignatedStaffEmail(userEmail)) {
             try {
-                withTimeout(5_000L) {
-                    firestore.collection("depots").document("depot_$uid").delete().await()
+                withTimeout(15_000L) {
+                    withRetry {
+                        firestore.collection("depots").document("depot_$uid").delete().await()
+                    }
                     recordWrites(1)
                 }
             } catch (_: Exception) {
@@ -1191,14 +1248,16 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.produkDao().update(
-                local.copy(
-                    nama_produk = nama,
-                    harga = harga,
-                    updatedAt = cloudUpdatedAt
-                )
+        } else {
+            val remote = local.copy(
+                nama_produk = nama,
+                harga = harga,
+                updatedAt = cloudUpdatedAt
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.produkDao().update(resolved)
+            }
         }
     }
 
@@ -1257,19 +1316,21 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.kurirDao().update(
-                local.copy(
-                    nama = nama,
-                    komisi_per_galon = komisi,
-                    email = email,
-                    akses_aktif = aksesAktif,
-                    skema_komisi = skema,
-                    aturan_komisi = aturan,
-                    updatedAt = cloudUpdatedAt,
-                    isDeleted = false
-                )
+        } else {
+            val remote = local.copy(
+                nama = nama,
+                komisi_per_galon = komisi,
+                email = email,
+                akses_aktif = aksesAktif,
+                skema_komisi = skema,
+                aturan_komisi = aturan,
+                updatedAt = cloudUpdatedAt,
+                isDeleted = false
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.kurirDao().update(resolved)
+            }
         }
     }
 
@@ -1332,20 +1393,22 @@ class RealtimeSyncEngine(
                     deletedBy = null
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.pelangganDao().update(
-                local.copy(
-                    nama = nama,
-                    alamat = alamat,
-                    no_hp = noHp,
-                    sisa_kasbon = sisaKasbon,
-                    harga_khusus = hargaKhusus,
-                    id_kurir_langganan = idKurirLangganan,
-                    updatedAt = cloudUpdatedAt,
-                    isDeleted = false,
-                    deletedBy = null
-                )
+        } else {
+            val remote = local.copy(
+                nama = nama,
+                alamat = alamat,
+                no_hp = noHp,
+                sisa_kasbon = sisaKasbon,
+                harga_khusus = hargaKhusus,
+                id_kurir_langganan = idKurirLangganan,
+                updatedAt = cloudUpdatedAt,
+                isDeleted = false,
+                deletedBy = null
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.pelangganDao().update(resolved)
+            }
         }
     }
 
@@ -1434,27 +1497,29 @@ class RealtimeSyncEngine(
                     deletedBy = deletedBy
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.transaksiDao().update(
-                local.copy(
-                    tanggal = tanggal,
-                    id_pelanggan = idPelanggan,
-                    id_kurir = idKurir,
-                    id_produk = idProduk,
-                    jumlah = jumlah,
-                    harga_satuan = hargaSatuan,
-                    total_harga = totalHarga,
-                    total_komisi = totalKomisi,
-                    metode_bayar = metode,
-                    status = status,
-                    uangMuka = uangMuka,
-                    sisaKasbon = sisaKasbon,
-                    tanggalBayar = tanggalBayar ?: local.tanggalBayar,
-                    updatedAt = cloudUpdatedAt,
-                    isDeleted = isSoftDeleted,
-                    deletedBy = deletedBy
-                )
+        } else {
+            val remote = local.copy(
+                tanggal = tanggal,
+                id_pelanggan = idPelanggan,
+                id_kurir = idKurir,
+                id_produk = idProduk,
+                jumlah = jumlah,
+                harga_satuan = hargaSatuan,
+                total_harga = totalHarga,
+                total_komisi = totalKomisi,
+                metode_bayar = metode,
+                status = status,
+                uangMuka = uangMuka,
+                sisaKasbon = sisaKasbon,
+                tanggalBayar = tanggalBayar ?: local.tanggalBayar,
+                updatedAt = cloudUpdatedAt,
+                isDeleted = isSoftDeleted,
+                deletedBy = deletedBy
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.transaksiDao().update(resolved)
+            }
         }
     }
 
@@ -1500,19 +1565,21 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.kasbonLogDao().update(
-                local.copy(
-                    id_pelanggan = idPelanggan,
-                    tanggal = tanggal,
-                    jumlah_bayar = jumlahBayar,
-                    sisa_kasbon_sebelum = sebelum,
-                    sisa_kasbon_sesudah = sesudah,
-                    metode_bayar = metode,
-                    catatan = catatan,
-                    updatedAt = cloudUpdatedAt
-                )
+        } else {
+            val remote = local.copy(
+                id_pelanggan = idPelanggan,
+                tanggal = tanggal,
+                jumlah_bayar = jumlahBayar,
+                sisa_kasbon_sebelum = sebelum,
+                sisa_kasbon_sesudah = sesudah,
+                metode_bayar = metode,
+                catatan = catatan,
+                updatedAt = cloudUpdatedAt
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.kasbonLogDao().update(resolved)
+            }
         }
     }
 
@@ -1547,16 +1614,18 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.pengeluaranDao().update(
-                local.copy(
-                    tanggal = tanggal,
-                    nama_item = namaItem,
-                    kategori = kategori,
-                    nominal = nominal,
-                    updatedAt = cloudUpdatedAt
-                )
+        } else {
+            val remote = local.copy(
+                tanggal = tanggal,
+                nama_item = namaItem,
+                kategori = kategori,
+                nominal = nominal,
+                updatedAt = cloudUpdatedAt
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.pengeluaranDao().update(resolved)
+            }
         }
     }
 
@@ -1592,16 +1661,18 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.perawatanDao().update(
-                local.copy(
-                    nama = nama,
-                    intervalHari = intervalHari,
-                    terakhirSelesai = terakhirSelesai,
-                    jadwalBerikutnya = jadwalBerikutnya,
-                    updatedAt = cloudUpdatedAt
-                )
+        } else {
+            val remote = local.copy(
+                nama = nama,
+                intervalHari = intervalHari,
+                terakhirSelesai = terakhirSelesai,
+                jadwalBerikutnya = jadwalBerikutnya,
+                updatedAt = cloudUpdatedAt
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.perawatanDao().update(resolved)
+            }
         }
     }
 
@@ -1640,18 +1711,20 @@ class RealtimeSyncEngine(
                     syncId = syncId
                 )
             )
-        } else if (cloudUpdatedAt > local.updatedAt) {
-            db.perawatanLogDao().update(
-                local.copy(
-                    perawatanSyncId = perawatanSyncId,
-                    namaPerawatan = namaPerawatan,
-                    tanggalSelesai = tanggalSelesai,
-                    biaya = biaya,
-                    catatan = catatan,
-                    pengeluaranSyncId = pengeluaranSyncId,
-                    updatedAt = cloudUpdatedAt
-                )
+        } else {
+            val remote = local.copy(
+                perawatanSyncId = perawatanSyncId,
+                namaPerawatan = namaPerawatan,
+                tanggalSelesai = tanggalSelesai,
+                biaya = biaya,
+                catatan = catatan,
+                pengeluaranSyncId = pengeluaranSyncId,
+                updatedAt = cloudUpdatedAt
             )
+            val resolved = SyncConflictResolver.resolve(local, remote)
+            if (resolved !== local) {
+                db.perawatanLogDao().update(resolved)
+            }
         }
     }
 
@@ -1719,11 +1792,13 @@ class RealtimeSyncEngine(
                         continue
                     }
 
-                    withTimeout(10_000L) {
-                        depotRef.collection(item.collectionName)
-                            .document(item.syncId)
-                            .set(payload)
-                            .await()
+                    withTimeout(20_000L) {
+                        withRetry {
+                            depotRef.collection(item.collectionName)
+                                .document(item.syncId)
+                                .set(payload)
+                                .await()
+                        }
                     }
                     recordWrites(1)
                     db.pendingSyncDao().remove(item.collectionName, item.syncId)
@@ -2139,7 +2214,7 @@ class RealtimeSyncEngine(
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            depotRef.set(createPayload).await()
+            withRetry { depotRef.set(createPayload).await() }
             recordWrites(1)
         } else {
             val currentMembers = (existingDepot.get("memberEmails") as? List<*>)
@@ -2148,17 +2223,19 @@ class RealtimeSyncEngine(
             val currentOwnerEmail = existingDepot.getString("ownerEmail").orEmpty()
             if (currentMembers != activeMemberEmails || currentOwnerEmail != ownerEmail) {
                 val createdAtVal = existingDepot.getTimestamp("createdAt") ?: FieldValue.serverTimestamp()
-                depotRef.set(
-                    mapOf(
-                        "depotId" to depotId,
-                        "ownerUid" to ownerUid,
-                        "ownerEmail" to ownerEmail.take(160),
-                        "name" to "Santoya RO",
-                        "memberEmails" to activeMemberEmails,
-                        "createdAt" to createdAtVal,
-                        "updatedAt" to FieldValue.serverTimestamp()
-                    )
-                ).await()
+                withRetry {
+                    depotRef.set(
+                        mapOf(
+                            "depotId" to depotId,
+                            "ownerUid" to ownerUid,
+                            "ownerEmail" to ownerEmail.take(160),
+                            "name" to "Santoya RO",
+                            "memberEmails" to activeMemberEmails,
+                            "createdAt" to createdAtVal,
+                            "updatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+                }
                 recordWrites(1)
             }
         }
@@ -2176,7 +2253,7 @@ class RealtimeSyncEngine(
             for ((emailKey, doc) in existingByEmail) {
                 if (!desiredByEmail.containsKey(emailKey)) {
                     try {
-                        doc.reference.delete().await()
+                        withRetry { doc.reference.delete().await() }
                         recordWrites(1)
                     } catch (e: Exception) {
                         Log.w(TAG, "Skip deleting staff_link $emailKey: ${e.message}")
@@ -2190,17 +2267,19 @@ class RealtimeSyncEngine(
                 try {
                     if (existing == null) {
                         if (kurir.akses_aktif) {
-                            linkRef.set(
-                                mapOf(
-                                    "depotId" to depotId,
-                                    "ownerUid" to ownerUid,
-                                    "ownerEmail" to ownerEmail.take(160),
-                                    "staffEmail" to emailKey,
-                                    "active" to true,
-                                    "createdAt" to FieldValue.serverTimestamp(),
-                                    "updatedAt" to FieldValue.serverTimestamp()
-                                )
-                            ).await()
+                            withRetry {
+                                linkRef.set(
+                                    mapOf(
+                                        "depotId" to depotId,
+                                        "ownerUid" to ownerUid,
+                                        "ownerEmail" to ownerEmail.take(160),
+                                        "staffEmail" to emailKey,
+                                        "active" to true,
+                                        "createdAt" to FieldValue.serverTimestamp(),
+                                        "updatedAt" to FieldValue.serverTimestamp()
+                                    )
+                                ).await()
+                            }
                             recordWrites(1)
                         }
                     } else {
@@ -2214,17 +2293,19 @@ class RealtimeSyncEngine(
                             curOwnerUid != ownerUid
                         ) {
                             val linkCreatedAt = existing.getTimestamp("createdAt") ?: FieldValue.serverTimestamp()
-                            linkRef.set(
-                                mapOf(
-                                    "depotId" to depotId,
-                                    "ownerUid" to ownerUid,
-                                    "ownerEmail" to ownerEmail.take(160),
-                                    "staffEmail" to emailKey,
-                                    "active" to kurir.akses_aktif,
-                                    "createdAt" to linkCreatedAt,
-                                    "updatedAt" to FieldValue.serverTimestamp()
-                                )
-                            ).await()
+                            withRetry {
+                                linkRef.set(
+                                    mapOf(
+                                        "depotId" to depotId,
+                                        "ownerUid" to ownerUid,
+                                        "ownerEmail" to ownerEmail.take(160),
+                                        "staffEmail" to emailKey,
+                                        "active" to kurir.akses_aktif,
+                                        "createdAt" to linkCreatedAt,
+                                        "updatedAt" to FieldValue.serverTimestamp()
+                                    )
+                                ).await()
+                            }
                             recordWrites(1)
                         }
                     }

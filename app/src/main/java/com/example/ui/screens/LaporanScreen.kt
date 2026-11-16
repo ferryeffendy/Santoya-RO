@@ -82,7 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.HydroBentoCard

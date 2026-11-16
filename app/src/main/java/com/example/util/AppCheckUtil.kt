@@ -3,7 +3,7 @@ package com.example.util
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.aistudio.companion.kzpmrw.BuildConfig
+import com.example.BuildConfig
 import com.google.firebase.FirebaseApp
 import com.google.firebase.appcheck.AppCheckProviderFactory
 import com.google.firebase.appcheck.FirebaseAppCheck

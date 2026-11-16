@@ -2,12 +2,9 @@ package com.example
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -52,19 +49,11 @@ import com.example.ui.components.RealtimeSyncStatusPill
 import com.example.ui.components.SantoyaBusyStatusBanner
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
 import com.example.ui.components.SantoyaTopBarIconButton
+import com.example.ui.navigation.AppNavigation
 import com.example.ui.screens.AuthScreen
-import com.example.ui.screens.DashboardScreen
-import com.example.ui.screens.KurirScreen
-import com.example.ui.screens.LaporanScreen
-import com.example.ui.screens.PelangganScreen
-import com.example.ui.screens.PengeluaranScreen
-import com.example.ui.screens.PerawatanScreen
-import com.example.ui.screens.ProdukScreen
 import com.example.ui.screens.RevokedAccessDialog
 import com.example.ui.screens.RoleConfirmationDialog
 import com.example.ui.screens.SessionPreparingDialog
-import com.example.ui.screens.SettingsScreen
-import com.example.ui.screens.TransaksiScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.util.SyncConnectionStatus
 import com.example.util.configureAppCheck
@@ -73,6 +62,7 @@ import com.example.viewmodel.SantoyaViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -128,7 +118,6 @@ class MainActivity : ComponentActivity() {
                         val receiptDialogData by viewModel.receiptDialog.collectAsStateWithLifecycle()
                         val snackbarMessage by viewModel.snackbarMessage.collectAsStateWithLifecycle()
                         val isKaryawan by viewModel.isKaryawan.collectAsStateWithLifecycle()
-                        val activeKaryawan by viewModel.activeKaryawan.collectAsStateWithLifecycle()
                         val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
                         val busyActionMessage by viewModel.busyActionMessage.collectAsStateWithLifecycle()
                         val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
@@ -148,7 +137,8 @@ class MainActivity : ComponentActivity() {
                                         try {
                                             val credentialManager = CredentialManager.create(this@MainActivity)
                                             credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                                        } catch (_: Exception) {
+                                        } catch (e: Exception) {
+                                            FirebaseCrashlytics.getInstance().recordException(e)
                                         }
                                         Firebase.auth.signOut()
                                     }
@@ -172,26 +162,13 @@ class MainActivity : ComponentActivity() {
                                         try {
                                             val credentialManager = CredentialManager.create(this@MainActivity)
                                             credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                                        } catch (_: Exception) {
+                                        } catch (e: Exception) {
+                                            FirebaseCrashlytics.getInstance().recordException(e)
                                         }
                                         Firebase.auth.signOut()
                                     }
                                 }
                             )
-                        }
-
-                        LaunchedEffect(currentScreen, isKaryawan) {
-                            if (isKaryawan && (
-                                    currentScreen == SantoyaScreen.LAPORAN ||
-                                        currentScreen == SantoyaScreen.PENGELUARAN ||
-                                        currentScreen == SantoyaScreen.SETTINGS ||
-                                        currentScreen == SantoyaScreen.KURIR ||
-                                        currentScreen == SantoyaScreen.PRODUK ||
-                                        currentScreen == SantoyaScreen.PERAWATAN
-                                    )
-                            ) {
-                                viewModel.navigateTo(SantoyaScreen.DASHBOARD)
-                            }
                         }
 
                         val snackbarHostState = remember { SnackbarHostState() }
@@ -201,10 +178,6 @@ class MainActivity : ComponentActivity() {
                                 snackbarHostState.showSnackbar(msg)
                                 viewModel.clearSnackbar()
                             }
-                        }
-
-                        BackHandler(enabled = currentScreen != SantoyaScreen.DASHBOARD) {
-                            viewModel.navigateTo(SantoyaScreen.DASHBOARD)
                         }
 
                         Scaffold(
@@ -310,128 +283,11 @@ class MainActivity : ComponentActivity() {
                                     message = busyActionMessage
                                 )
                                 Box(modifier = Modifier.fillMaxSize()) {
-                                    Crossfade(
-                                        targetState = currentScreen,
-                                        animationSpec = tween(durationMillis = 220),
-                                        label = "screen_crossfade"
-                                    ) { screen ->
-                                        when (screen) {
-                                            SantoyaScreen.DASHBOARD -> {
-                                                val scopedTransaksi by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
-                                                val scopedPelanggan by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
-                                                val pengeluaranList by viewModel.allPengeluaran.collectAsStateWithLifecycle()
-                                                val scopedPelangganUiModels by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
-                                                DashboardScreen(
-                                                    viewModel = viewModel,
-                                                    transaksiList = scopedTransaksi,
-                                                    pelangganList = scopedPelanggan,
-                                                    pengeluaranList = if (isKaryawan) emptyList() else pengeluaranList,
-                                                    pelangganUiModels = scopedPelangganUiModels,
-                                                    onSignOut = {
-                                                        coroutineScope.launch {
-                                                            viewModel.clearLocalDataForLogout()
-                                                            try {
-                                                                val credentialManager = CredentialManager.create(this@MainActivity)
-                                                                credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                                                            } catch (_: Exception) {
-                                                            }
-                                                            Firebase.auth.signOut()
-                                                        }
-                                                    },
-                                                    isKaryawan = isKaryawan,
-                                                    activeKaryawan = activeKaryawan
-                                                )
-                                            }
-                                            SantoyaScreen.TRANSAKSI -> {
-                                                val scopedTransaksi by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
-                                                val scopedPelanggan by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
-                                                val produkList by viewModel.allProduk.collectAsStateWithLifecycle()
-                                                val kurirList by viewModel.allKurir.collectAsStateWithLifecycle()
-                                                TransaksiScreen(
-                                                    viewModel = viewModel,
-                                                    transaksiList = scopedTransaksi,
-                                                    pelangganList = scopedPelanggan,
-                                                    produkList = produkList,
-                                                    kurirList = kurirList,
-                                                    isKaryawan = isKaryawan,
-                                                    activeKaryawan = activeKaryawan
-                                                )
-                                            }
-                                            SantoyaScreen.PELANGGAN -> {
-                                                val scopedPelangganUiModels by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
-                                                val scopedPelangganTransaksi by viewModel.scopedPelangganTransaksi.collectAsStateWithLifecycle()
-                                                PelangganScreen(
-                                                    viewModel = viewModel,
-                                                    pelangganUiModels = scopedPelangganUiModels,
-                                                    transaksiList = scopedPelangganTransaksi,
-                                                    isKaryawan = isKaryawan,
-                                                    activeKaryawan = activeKaryawan
-                                                )
-                                            }
-                                            SantoyaScreen.KURIR -> {
-                                                val kurirList by viewModel.allKurir.collectAsStateWithLifecycle()
-                                                val transaksiList by viewModel.allTransaksi.collectAsStateWithLifecycle()
-                                                KurirScreen(
-                                                    viewModel = viewModel,
-                                                    kurirList = kurirList,
-                                                    transaksiList = transaksiList
-                                                )
-                                            }
-                                            SantoyaScreen.PRODUK -> {
-                                                val produkList by viewModel.allProduk.collectAsStateWithLifecycle()
-                                                ProdukScreen(
-                                                    viewModel = viewModel,
-                                                    produkList = produkList
-                                                )
-                                            }
-                                            SantoyaScreen.PENGELUARAN -> {
-                                                val pengeluaranList by viewModel.allPengeluaran.collectAsStateWithLifecycle()
-                                                PengeluaranScreen(
-                                                    viewModel = viewModel,
-                                                    pengeluaranList = pengeluaranList
-                                                )
-                                            }
-                                            SantoyaScreen.LAPORAN -> {
-                                                val transaksiList by viewModel.allTransaksi.collectAsStateWithLifecycle()
-                                                val pengeluaranList by viewModel.allPengeluaran.collectAsStateWithLifecycle()
-                                                LaporanScreen(
-                                                    viewModel = viewModel,
-                                                    transaksiList = transaksiList,
-                                                    pengeluaranList = pengeluaranList
-                                                )
-                                            }
-                                            SantoyaScreen.SETTINGS -> {
-                                                val pelangganList by viewModel.allPelanggan.collectAsStateWithLifecycle()
-                                                val transaksiList by viewModel.allTransaksi.collectAsStateWithLifecycle()
-                                                val produkList by viewModel.allProduk.collectAsStateWithLifecycle()
-                                                val kurirList by viewModel.allKurir.collectAsStateWithLifecycle()
-                                                SettingsScreen(
-                                                    viewModel = viewModel,
-                                                    pelangganList = pelangganList,
-                                                    transaksiList = transaksiList,
-                                                    produkList = produkList,
-                                                    kurirList = kurirList,
-                                                    onSignOut = {
-                                                        coroutineScope.launch {
-                                                            viewModel.clearLocalDataForLogout()
-                                                            try {
-                                                                val credentialManager = CredentialManager.create(this@MainActivity)
-                                                                credentialManager.clearCredentialState(ClearCredentialStateRequest())
-                                                            } catch (e: Exception) {
-                                                                // ignore
-                                                            }
-                                                            Firebase.auth.signOut()
-                                                        }
-                                                    }
-                                                )
-                                            }
-                                            SantoyaScreen.PERAWATAN -> {
-                                                if (!isKaryawan) {
-                                                    PerawatanScreen(viewModel = viewModel)
-                                                }
-                                            }
-                                        }
-                                    }
+                                    AppNavigation(
+                                        viewModel = viewModel,
+                                        auth = auth,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
                                 }
                             }
                         }

@@ -37,7 +37,7 @@ abstract class FirestoreEmulatorTestBase {
     open fun setUpFirebase() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         databaseId = try {
-            context.getString(com.aistudio.companion.kzpmrw.R.string.firestore_database_id)
+            context.getString(com.example.R.string.firestore_database_id)
         } catch (_: Exception) {
             val resId = context.resources.getIdentifier("firestore_database_id", "string", context.packageName)
             if (resId != 0) context.getString(resId) else "demo-database"

@@ -1,7 +1,7 @@
 package com.example.util
 
 import android.content.Context
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.google.firebase.firestore.FirebaseFirestore
 
 data class SyncSummary(

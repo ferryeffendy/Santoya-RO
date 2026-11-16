@@ -3,6 +3,7 @@ package com.example.data.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.util.SyncableEntity
 import java.util.UUID
 
 @Entity(
@@ -20,7 +21,7 @@ data class Kurir(
     val akses_aktif: Boolean = true,
     val skema_komisi: String = "TETAP",
     val aturan_komisi: String = "",
-    val updatedAt: Long = System.currentTimeMillis(),
-    val syncId: String = UUID.randomUUID().toString(),
+    override val updatedAt: Long = System.currentTimeMillis(),
+    override val syncId: String = UUID.randomUUID().toString(),
     val isDeleted: Boolean = false
-)
+) : SyncableEntity

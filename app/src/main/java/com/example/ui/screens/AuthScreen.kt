@@ -70,7 +70,7 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import com.aistudio.companion.kzpmrw.R
+import com.example.R
 import com.example.ui.theme.HeroOnSurface
 import com.example.ui.theme.PlusJakartaSansFontFamily
 import com.example.ui.theme.SantoyaRadius

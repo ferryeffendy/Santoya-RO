@@ -3,6 +3,7 @@ package com.example.data.entity
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.util.SyncableEntity
 import java.util.UUID
 
 /**
@@ -23,6 +24,6 @@ data class PerawatanLog(
     val biaya: Double = 0.0,
     val catatan: String = "",
     val pengeluaranSyncId: String? = null,
-    val updatedAt: Long = System.currentTimeMillis(),
-    val syncId: String = UUID.randomUUID().toString()
-)
+    override val updatedAt: Long = System.currentTimeMillis(),
+    override val syncId: String = UUID.randomUUID().toString()
+) : SyncableEntity

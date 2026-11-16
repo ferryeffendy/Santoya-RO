@@ -29,6 +29,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.paging.LoadState
+import androidx.paging.compose.LazyPagingItems
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
+import com.example.ui.components.TransaksiSkeletonItem
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -98,6 +103,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
+import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
@@ -111,9 +117,9 @@ import com.example.ui.components.SantoyaAdaptiveTabPillRow
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFormBottomSheet
-import com.example.ui.components.SantoyaLoadingSkeleton
 import com.example.ui.components.SantoyaSearchBar
 import com.example.ui.components.SantoyaTabPillItem
+import com.example.ui.components.SkeletonCrossfadeContainer
 import com.example.ui.components.bringIntoViewOnFocus
 import com.example.ui.components.rememberIsImeVisible
 import com.example.ui.theme.AccentAmber
@@ -2063,15 +2069,20 @@ fun RiwayatTransaksiTab(
     isKaryawan: Boolean = false,
     activeKaryawan: Kurir? = null
 ) {
+    val items: LazyPagingItems<Transaksi> = viewModel.transaksiPagingFlow.collectAsLazyPagingItems()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(RiwayatFilterOption.SEMUA) }
     var showAllHistory by remember { mutableStateOf(false) }
     var editingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
     var deletingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
     var markingLunasTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
+
+    val detailById = remember(transaksiList) { transaksiList.associateBy { it.transaksi.id } }
+    val pelangganById = remember(pelangganList) { pelangganList.associateBy { it.id } }
+    val kurirById = remember(kurirList) { kurirList.associateBy { it.id } }
+    val produkById = remember(produkList) { produkList.associateBy { it.id } }
 
     val nowMillis = remember(transaksiList) { System.currentTimeMillis() }
 
@@ -2249,6 +2260,23 @@ fun RiwayatTransaksiTab(
             }
         }
 
+        SkeletonCrossfadeContainer(
+            isLoading = items.loadState.refresh is LoadState.Loading,
+            skeletonContent = {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 88.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(6) {
+                        TransaksiSkeletonItem()
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize()
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -2398,16 +2426,54 @@ fun RiwayatTransaksiTab(
                 }
             }
 
-            if (!isInitialDataLoaded && transaksiList.isEmpty()) {
+            val hasActiveFilter = searchQuery.isNotBlank() || selectedFilter != RiwayatFilterOption.SEMUA
+            if (items.itemCount == 0 && items.loadState.refresh is LoadState.NotLoading) {
                 item {
-                    SantoyaLoadingSkeleton(
-                        itemCount = 4,
-                        message = "Memuat riwayat transaksi..."
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Tidak ada data",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else if (!hasActiveFilter && (!isKaryawan || activeTransactions.isNotEmpty())) {
+                items(
+                    count = items.itemCount,
+                    key = items.itemKey { it.id }
+                ) { index ->
+                    val tx = items[index] ?: return@items
+                    if (isKaryawan && KaryawanScopeHelper.isDeletedTransaksi(tx)) return@items
+                    val detail = detailById[tx.id] ?: TransaksiDetail(
+                        transaksi = tx,
+                        pelanggan = tx.id_pelanggan?.let { pelangganById[it] },
+                        kurir = tx.id_kurir?.let { kurirById[it] },
+                        produk = tx.id_produk?.let { produkById[it] }
                     )
+                    TransaksiHistoryCard(
+                        detail = detail,
+                        searchQuery = searchQuery,
+                        kurirList = kurirList,
+                        pelangganList = pelangganList,
+                        effectiveKasbonByCustomer = effectiveKasbonByCustomer,
+                        viewModel = viewModel,
+                        onEdit = { editingTransaksi = detail },
+                        onDelete = { deletingTransaksi = detail },
+                        onMarkLunas = { markingLunasTransaksi = detail }
+                    )
+                }
+                if (items.loadState.append is LoadState.Loading) {
+                    item {
+                        TransaksiSkeletonItem()
+                    }
                 }
             } else if (filtered.isEmpty()) {
                 item {
-                    val hasActiveFilter = searchQuery.isNotBlank() || selectedFilter != RiwayatFilterOption.SEMUA
                     SantoyaEmptyState(
                         emptyType = SantoyaEmptyType.TRANSAKSI,
                         title = if (searchQuery.isNotBlank()) "Transaksi Tidak Ditemukan" else "Belum Ada Riwayat",
@@ -2435,368 +2501,36 @@ fun RiwayatTransaksiTab(
                     )
                 }
             } else {
-            items(displayedHistory, key = { it.transaksi.id }) { detail ->
-                val isDeletedTx = KaryawanScopeHelper.isDeletedTransaksi(detail.transaksi)
-                val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(detail.transaksi)
-                val isKasbon = !isDeletedTx && detail.transaksi.status.equals("Kasbon", ignoreCase = true)
-                val santoyaColors = MaterialTheme.santoyaColors
-                val cardAccent = when {
-                    isDeletedTx -> MaterialTheme.colorScheme.error
-                    isKasbon -> santoyaColors.warning
-                    else -> santoyaColors.success
+                items(displayedHistory, key = { it.transaksi.id }) { detail ->
+                    TransaksiHistoryCard(
+                        detail = detail,
+                        searchQuery = searchQuery,
+                        kurirList = kurirList,
+                        pelangganList = pelangganList,
+                        effectiveKasbonByCustomer = effectiveKasbonByCustomer,
+                        viewModel = viewModel,
+                        onEdit = { editingTransaksi = detail },
+                        onDelete = { deletingTransaksi = detail },
+                        onMarkLunas = { markingLunasTransaksi = detail }
+                    )
                 }
-                HydroBentoCard(
-                    accentColor = cardAccent,
-                    cornerRadius = SantoyaRadius.lg,
-                    tintAlpha = if (isDeletedTx) 0.10f else 0.06f,
-                    showWaterRipple = false,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                if (filtered.size > 30) {
+                    item {
+                        OutlinedButton(
+                            onClick = { showAllHistory = !showAllHistory },
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(cardAccent)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = FormatUtils.formatDate(detail.transaksi.tanggal),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            if (isDeletedTx) {
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = MaterialTheme.colorScheme.errorContainer,
-                                    modifier = Modifier.widthIn(max = 175.dp)
-                                ) {
-                                    Text(
-                                        text = "DIHAPUS OLEH ${(deletedBy ?: "Karyawan").uppercase()}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.error,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            } else {
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
-                                ) {
-                                    Text(
-                                        text = detail.transaksi.status.uppercase(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
-                                        maxLines = 1,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                HydroGradientBadge(
-                                    gradientColors = when {
-                                        isDeletedTx -> listOf(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.error.copy(alpha = 0.75f))
-                                        isKasbon -> listOf(AccentAmber, santoyaColors.warning)
-                                        else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
-                                    },
-                                    size = 38.dp,
-                                    cornerRadius = 12.dp,
-                                    elevation = 2.dp
-                                ) {
-                                    ProdukCategoryIcon(
-                                        namaProduk = detail.produk?.nama_produk.orEmpty(),
-                                        tint = MaterialTheme.santoyaColors.onHero,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    HighlightedSearchText(
-                                        text = detail.pelanggan?.nama ?: "Pelanggan Umum",
-                                        query = searchQuery,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    HighlightedSearchText(
-                                        text = "${detail.produk?.nama_produk ?: "Air RO"} • ${detail.transaksi.jumlah} Galon",
-                                        query = searchQuery,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    val resolvedKurirName = detail.kurir?.nama?.takeIf { it.isNotBlank() }
-                                        ?: detail.transaksi.id_kurir?.let { kId ->
-                                            kurirList.find { it.id == kId }?.nama?.takeIf { it.isNotBlank() }
-                                        }
-                                    HighlightedSearchText(
-                                        text = "Kurir: ${resolvedKurirName ?: "Tanpa Kurir"}",
-                                        query = searchQuery,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = FontWeight.Normal,
-                                        color = if (resolvedKurirName != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            Column(
-                                horizontalAlignment = Alignment.End,
-                                modifier = Modifier.widthIn(max = 142.dp)
-                            ) {
-                                SantoyaAdaptiveCurrencyText(
-                                    amount = detail.transaksi.total_harga,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        textDecoration = if (isDeletedTx) TextDecoration.LineThrough else TextDecoration.None
-                                    ),
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isDeletedTx) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                                    minFontSize = 11.sp,
-                                    textAlign = TextAlign.End
-                                )
-                                Text(
-                                    text = when {
-                                        isDeletedTx -> "Tidak dihitung ke omzet"
-                                        isKasbon && detail.transaksi.uangMuka > 0L -> {
-                                            "Uang Muka: ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount())}"
-                                        }
-                                        isKasbon -> "Belum Dibayar"
-                                        else -> FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Normal,
-                                    color = when {
-                                        isDeletedTx -> MaterialTheme.colorScheme.error
-                                        isKasbon -> MaterialTheme.santoyaColors.warning
-                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    textAlign = TextAlign.End,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        if (isDeletedTx) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = { viewModel.restoreTransaksi(detail.transaksi) },
-                                    shape = RoundedCornerShape(10.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Restore,
-                                        contentDescription = "Pulihkan",
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Pulihkan",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                TextButton(
-                                    onClick = { deletingTransaksi = detail },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        contentColor = MaterialTheme.colorScheme.error
-                                    ),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.DeleteForever,
-                                        contentDescription = "Hapus Permanen",
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Hapus Permanen",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (isKasbon) {
-                                    Surface(
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = MaterialTheme.santoyaColors.success.copy(alpha = 0.16f),
-                                        border = BorderStroke(1.dp, MaterialTheme.santoyaColors.success.copy(alpha = 0.4f)),
-                                        modifier = Modifier.clickable {
-                                            markingLunasTransaksi = detail
-                                        }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Outlined.Check,
-                                                contentDescription = "Tandai Lunas",
-                                                tint = MaterialTheme.santoyaColors.onSuccessContainer,
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text(
-                                                text = "Lunasi Nota",
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.santoyaColors.onSuccessContainer,
-                                                maxLines = 1,
-                                                softWrap = false
-                                            )
-                                        }
-                                    }
+                            Text(
+                                text = if (showAllHistory) {
+                                    "Tampilkan 30 terbaru saja"
                                 } else {
-                                    Spacer(modifier = Modifier.width(1.dp))
-                                }
-
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.End),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(
-                                        onClick = { editingTransaksi = detail },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Edit,
-                                            contentDescription = "Edit",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
-                                                ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
-                                                ?: 0.0
-                                            val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                            viewModel.showReceiptDialog(
-                                                ActiveReceiptDialog(
-                                                    title = "Struk Transaksi Penjualan",
-                                                    receiptText = text,
-                                                    customerPhone = detail.pelanggan?.no_hp,
-                                                    data = detail
-                                                )
-                                            )
-                                        },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Print,
-                                            contentDescription = "Cetak",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
-                                                ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
-                                                ?: 0.0
-                                            val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                            SantoyaReceiptHelper.shareReceiptText(
-                                                context = viewModel.getApplication(),
-                                                text = text,
-                                                phoneNumber = detail.pelanggan?.no_hp
-                                            )
-                                        },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Share,
-                                            contentDescription = "Bagikan",
-                                            tint = MaterialTheme.colorScheme.secondary,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = { deletingTransaksi = detail },
-                                        modifier = Modifier.size(48.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.Delete,
-                                            contentDescription = "Hapus",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-                                }
-                            }
+                                    "Lihat semua (${filtered.size} transaksi)"
+                                },
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                    }
-                }
-            }
-
-            if (filtered.size > 30) {
-                item {
-                    OutlinedButton(
-                        onClick = { showAllHistory = !showAllHistory },
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = if (showAllHistory) {
-                                "Tampilkan 30 terbaru saja"
-                            } else {
-                                "Lihat semua (${filtered.size} transaksi)"
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
@@ -3451,6 +3185,361 @@ fun RiwayatTransaksiTab(
                                 )
                             }
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransaksiHistoryCard(
+    detail: TransaksiDetail,
+    searchQuery: String,
+    kurirList: List<Kurir>,
+    pelangganList: List<Pelanggan>,
+    effectiveKasbonByCustomer: Map<Int, Double>,
+    viewModel: SantoyaViewModel,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onMarkLunas: () -> Unit
+) {
+    val isDeletedTx = KaryawanScopeHelper.isDeletedTransaksi(detail.transaksi)
+    val deletedBy = KaryawanScopeHelper.extractDeletedByTransaksi(detail.transaksi)
+    val isKasbon = !isDeletedTx && detail.transaksi.status.equals("Kasbon", ignoreCase = true)
+    val santoyaColors = MaterialTheme.santoyaColors
+    val cardAccent = when {
+        isDeletedTx -> MaterialTheme.colorScheme.error
+        isKasbon -> santoyaColors.warning
+        else -> santoyaColors.success
+    }
+    HydroBentoCard(
+        accentColor = cardAccent,
+        cornerRadius = SantoyaRadius.lg,
+        tintAlpha = if (isDeletedTx) 0.10f else 0.06f,
+        showWaterRipple = false,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(cardAccent)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = FormatUtils.formatDate(detail.transaksi.tanggal),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                if (isDeletedTx) {
+                    Surface(
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.widthIn(max = 175.dp)
+                    ) {
+                        Text(
+                            text = "DIHAPUS OLEH ${(deletedBy ?: "Karyawan").uppercase()}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
+                        color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
+                    ) {
+                        Text(
+                            text = detail.transaksi.status.uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HydroGradientBadge(
+                        gradientColors = when {
+                            isDeletedTx -> listOf(MaterialTheme.colorScheme.error, MaterialTheme.colorScheme.error.copy(alpha = 0.75f))
+                            isKasbon -> listOf(AccentAmber, santoyaColors.warning)
+                            else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
+                        },
+                        size = 38.dp,
+                        cornerRadius = 12.dp,
+                        elevation = 2.dp
+                    ) {
+                        ProdukCategoryIcon(
+                            namaProduk = detail.produk?.nama_produk.orEmpty(),
+                            tint = MaterialTheme.santoyaColors.onHero,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        HighlightedSearchText(
+                            text = detail.pelanggan?.nama ?: "Pelanggan Umum",
+                            query = searchQuery,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        HighlightedSearchText(
+                            text = "${detail.produk?.nama_produk ?: "Air RO"} • ${detail.transaksi.jumlah} Galon",
+                            query = searchQuery,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val resolvedKurirName = detail.kurir?.nama?.takeIf { it.isNotBlank() }
+                            ?: detail.transaksi.id_kurir?.let { kId ->
+                                kurirList.find { it.id == kId }?.nama?.takeIf { it.isNotBlank() }
+                            }
+                        HighlightedSearchText(
+                            text = "Kurir: ${resolvedKurirName ?: "Tanpa Kurir"}",
+                            query = searchQuery,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Normal,
+                            color = if (resolvedKurirName != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.widthIn(max = 142.dp)
+                ) {
+                    SantoyaAdaptiveCurrencyText(
+                        amount = detail.transaksi.total_harga,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            textDecoration = if (isDeletedTx) TextDecoration.LineThrough else TextDecoration.None
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = if (isDeletedTx) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        minFontSize = 11.sp,
+                        textAlign = TextAlign.End
+                    )
+                    Text(
+                        text = when {
+                            isDeletedTx -> "Tidak dihitung ke omzet"
+                            isKasbon && detail.transaksi.uangMuka > 0L -> {
+                                "Uang Muka: ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(detail.transaksi.remainingKasbonAmount())}"
+                            }
+                            isKasbon -> "Belum Dibayar"
+                            else -> FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Normal,
+                        color = when {
+                            isDeletedTx -> MaterialTheme.colorScheme.error
+                            isKasbon -> MaterialTheme.santoyaColors.warning
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            if (isDeletedTx) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.restoreTransaksi(detail.transaksi) },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Restore,
+                            contentDescription = "Pulihkan",
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Pulihkan",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    TextButton(
+                        onClick = onDelete,
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteForever,
+                            contentDescription = "Hapus Permanen",
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Hapus Permanen",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (isKasbon) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.santoyaColors.success.copy(alpha = 0.16f),
+                            border = BorderStroke(1.dp, MaterialTheme.santoyaColors.success.copy(alpha = 0.4f)),
+                            modifier = Modifier.clickable(onClick = onMarkLunas)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Check,
+                                    contentDescription = "Tandai Lunas",
+                                    tint = MaterialTheme.santoyaColors.onSuccessContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Lunasi Nota",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.santoyaColors.onSuccessContainer,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.End),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onEdit,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Edit,
+                                contentDescription = "Edit",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
+                                    ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
+                                    ?: 0.0
+                                val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
+                                viewModel.showReceiptDialog(
+                                    ActiveReceiptDialog(
+                                        title = "Struk Transaksi Penjualan",
+                                        receiptText = text,
+                                        customerPhone = detail.pelanggan?.no_hp,
+                                        data = detail
+                                    )
+                                )
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Print,
+                                contentDescription = "Cetak",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
+                                    ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
+                                    ?: 0.0
+                                val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
+                                SantoyaReceiptHelper.shareReceiptText(
+                                    context = viewModel.getApplication(),
+                                    text = text,
+                                    phoneNumber = detail.pelanggan?.no_hp
+                                )
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Share,
+                                contentDescription = "Bagikan",
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Delete,
+                                contentDescription = "Hapus",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
                 }
             }
