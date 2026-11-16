@@ -25,10 +25,11 @@ interface PelangganDao {
 
     @Query("""
         SELECT p.* FROM pelanggan p
-        WHERE COALESCE(p.alamat, '') NOT LIKE '[DIHAPUS:%'
+        WHERE p.isDeleted = 0
+          AND COALESCE(p.alamat, '') NOT LIKE '[DIHAPUS:%'
           AND (
               COALESCE(p.sisa_kasbon, 0.0) > 0 
-              OR p.id IN (SELECT DISTINCT id_pelanggan FROM transaksi WHERE LOWER(status) = 'kasbon')
+              OR p.id IN (SELECT DISTINCT id_pelanggan FROM transaksi WHERE LOWER(status) = 'kasbon' AND isDeleted = 0)
           )
         ORDER BY p.sisa_kasbon DESC, p.nama ASC
     """)

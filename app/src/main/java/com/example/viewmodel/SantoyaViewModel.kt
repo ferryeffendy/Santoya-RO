@@ -107,6 +107,14 @@ data class ActiveReceiptDialog(
     val data: Any? = null
 )
 
+data class KasbonDiscrepancy(
+    val pelangganId: Int,
+    val namaPelanggan: String,
+    val saldoTercatat: Double,
+    val totalNotaBelumLunas: Double,
+    val selisih: Double
+)
+
 class SantoyaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
@@ -133,6 +141,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     ) {
         if (realtimeSyncState.value.status == SyncConnectionStatus.REVOKED) {
             showSnackbar("Akses Anda dicabut. Transaksi baru tidak diizinkan.")
+            return
+        }
+        if (realtimeSyncState.value.status == SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION) {
+            showSnackbar("Konfirmasi peran akun terlebih dahulu.")
             return
         }
         if (!busyActionGuard.compareAndSet(false, true)) return
@@ -304,24 +316,39 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             ) { _, _, _ -> true }.first()
             _isInitialDataLoaded.value = true
         }
-        viewModelScope.launch(Dispatchers.Default) {
-            repository.reconcileKasbonDiscrepancies()
-            combine(allPelanggan, allTransaksi) { pelangganList, transaksiList ->
-                val activeUnpaidByCust = transaksiList.asSequence()
-                    .filter {
-                        !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) &&
-                            it.transaksi.status.equals("Kasbon", ignoreCase = true)
-                    }
-                    .groupBy { it.transaksi.id_pelanggan }
-                pelangganList.any { p ->
-                    val unpaidSum = activeUnpaidByCust[p.id]?.sumOf { it.transaksi.remainingKasbonAmount() } ?: 0.0
-                    unpaidSum > p.sisa_kasbon.coerceAtLeast(0.0)
-                }
-            }.collect { hasDiscrepancy ->
-                if (hasDiscrepancy) {
-                    repository.reconcileKasbonDiscrepancies()
-                }
+    }
+
+    val kasbonDiscrepancies: StateFlow<List<KasbonDiscrepancy>> = combine(allPelanggan, allTransaksi) { pelangganList, transaksiList ->
+        val activeUnpaidByCust = transaksiList.asSequence()
+            .filter {
+                !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) &&
+                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
             }
+            .groupBy { it.transaksi.id_pelanggan }
+        pelangganList.mapNotNull { p ->
+            val unpaidSum = activeUnpaidByCust[p.id]?.sumOf { it.transaksi.remainingKasbonAmount() } ?: 0.0
+            val targetKasbon = p.sisa_kasbon.coerceAtLeast(0.0)
+            if (unpaidSum > targetKasbon) {
+                KasbonDiscrepancy(
+                    pelangganId = p.id,
+                    namaPelanggan = p.nama,
+                    saldoTercatat = targetKasbon,
+                    totalNotaBelumLunas = unpaidSum,
+                    selisih = unpaidSum - targetKasbon
+                )
+            } else null
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun reconcileKasbonDiscrepancies(onFinished: ((Int) -> Unit)? = null) {
+        launchGuardedAction("Menyelaraskan nota kasbon...") {
+            val count = repository.reconcileKasbonDiscrepancies()
+            if (count > 0) {
+                showSnackbar("Berhasil menyelaraskan nota kasbon ($count pelanggan)")
+            } else {
+                showSnackbar("Semua saldo kasbon dan nota sudah selaras")
+            }
+            onFinished?.invoke(count)
         }
     }
 
@@ -337,6 +364,45 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun stopRealtimeSync() {
         _currentUserEmail.value = null
         syncEngine.stop()
+    }
+
+    /**
+     * Mengonfirmasi bahwa akun yang sedang login adalah Pemilik Depot baru.
+     */
+    fun confirmAsNewOwner() {
+        syncEngine.confirmAsNewOwner()
+        showSnackbar("Depot baru siap digunakan")
+    }
+
+    /**
+     * Memeriksa ulang apakah email karyawan sudah ditautkan ke depot Pemilik di Cloud.
+     */
+    fun recheckStaffConnection(onResult: ((Boolean) -> Unit)? = null) {
+        viewModelScope.launch {
+            val connected = syncEngine.recheckStaffConnection()
+            if (connected) {
+                showSnackbar("Berhasil terhubung ke depot pemilik")
+            } else {
+                val email = _currentUserEmail.value.orEmpty()
+                showSnackbar("Belum ditemukan tautan depot untuk $email. Pastikan Pemilik sudah menyimpan email Anda.")
+            }
+            onResult?.invoke(connected)
+        }
+    }
+
+    /**
+     * Mengalihkan akun dari mode Pemilik bayangan ke mode Karyawan, membersihkan klaim tautan bayangan,
+     * dan menghubungkan ulang ke depot Pemilik asli.
+     */
+    fun switchToStaffWaitingMode() {
+        viewModelScope.launch {
+            val connected = syncEngine.switchToStaffWaitingMode()
+            if (connected) {
+                showSnackbar("Berhasil berpindah ke depot pemilik")
+            } else {
+                showSnackbar("Mode karyawan aktif. Menunggu tautan dari HP Pemilik.")
+            }
+        }
     }
 
     /**
@@ -604,14 +670,25 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             }
         }
 
-        val statusVal = if (isBayarSebagian) "Kasbon" else _txStatus.value
+        val isFullPaidByDp = isBayarSebagian && dpInput >= totalBelanjaLong
+        val statusVal = when {
+            isFullPaidByDp -> "Lunas"
+            isBayarSebagian -> "Kasbon"
+            else -> _txStatus.value
+        }
         val metodeVal = when {
+            isFullPaidByDp -> "Cash"
             isBayarSebagian -> "Bayar Sebagian"
             statusVal.equals("Kasbon", ignoreCase = true) -> "-"
             else -> _txMetodeBayar.value.ifBlank { "Cash" }
         }
-        val uangMukaVal = if (isBayarSebagian) dpInput else 0L
+        val uangMukaVal = when {
+            isFullPaidByDp -> totalBelanjaLong
+            isBayarSebagian -> dpInput
+            else -> 0L
+        }
         val sisaKasbonVal = when {
+            isFullPaidByDp -> 0L
             isBayarSebagian -> (totalBelanjaLong - dpInput).coerceAtLeast(0L)
             statusVal.equals("Kasbon", ignoreCase = true) -> totalBelanjaLong.coerceAtLeast(0L)
             else -> 0L
@@ -670,10 +747,10 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         submitTransaksi(onSuccess)
     }
 
-    fun markTransaksiLunas(transaksiId: Int) {
+    fun markTransaksiLunas(transaksiId: Int, metodeBayar: String = "Cash") {
         launchGuardedAction("Menandai lunas...") {
-            repository.markTransaksiLunas(transaksiId)
-            showSnackbar("Transaksi ditandai lunas")
+            repository.markTransaksiLunas(transaksiId, metodeBayar)
+            showSnackbar("Transaksi ditandai lunas ($metodeBayar)")
         }
     }
 
@@ -902,12 +979,13 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
                 Kurir(
                     nama = trimmedNama,
                     komisi_per_galon = komisi,
-                    email = email.trim(),
+                    email = email.trim().lowercase(),
                     akses_aktif = aksesAktif,
                     skema_komisi = "TETAP",
                     aturan_komisi = ""
                 )
             )
+            syncEngine.syncStaffLinksNow()
             showSnackbar("Kurir $trimmedNama ditambahkan")
         }
     }
@@ -918,7 +996,8 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         launchGuardedAction("Memperbarui data kurir...") {
-            repository.updateKurir(kurir)
+            repository.updateKurir(kurir.copy(email = kurir.email.trim().lowercase()))
+            syncEngine.syncStaffLinksNow()
             showSnackbar("Data kurir ${kurir.nama} diperbarui")
         }
     }
@@ -926,6 +1005,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     fun deleteKurir(kurir: Kurir) {
         launchGuardedAction("Menghapus kurir...") {
             repository.deleteKurir(kurir)
+            syncEngine.syncStaffLinksNow()
             showSnackbar("Kurir ${kurir.nama} dihapus")
         }
     }

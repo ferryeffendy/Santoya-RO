@@ -11,6 +11,7 @@ import com.example.util.SyncCollections
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -182,7 +183,11 @@ class AppDatabaseMigrationTest {
         createV13DatabaseWithExistingData()
 
         val db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_13_14)
+            .addMigrations(
+                AppDatabase.MIGRATION_13_14,
+                AppDatabase.MIGRATION_14_15,
+                AppDatabase.MIGRATION_15_16
+            )
             .allowMainThreadQueries()
             .build()
         roomDb = db
@@ -222,7 +227,11 @@ class AppDatabaseMigrationTest {
         createV13DatabaseWithExistingData()
 
         val db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_13_14)
+            .addMigrations(
+                AppDatabase.MIGRATION_13_14,
+                AppDatabase.MIGRATION_14_15,
+                AppDatabase.MIGRATION_15_16
+            )
             .allowMainThreadQueries()
             .build()
         roomDb = db
@@ -281,5 +290,48 @@ class AppDatabaseMigrationTest {
         val tdsLog = logsAfterZeroCost.first { it.perawatanSyncId == cekTds.syncId }
         assertNull(tdsLog.pengeluaranSyncId)
         assertEquals(2, db.pengeluaranDao().getAllOnce().size)
+    }
+
+    @Test
+    fun `migration 15 to 16 adds isDeleted and deletedBy and migrates legacy encoded records`() = runBlocking {
+        createV13DatabaseWithExistingData()
+
+        val dbFile = context.getDatabasePath(dbName)
+        val sqlite = SQLiteDatabase.openOrCreateDatabase(dbFile, null)
+        sqlite.use { db ->
+            db.execSQL("INSERT INTO `pelanggan` VALUES (2, 'Pak Ahmad', '[DIHAPUS:Budi] Gang Mawar No. 3', '0811', 0.0, NULL, NULL, 1000, 'pel_del_2')")
+            db.execSQL("INSERT INTO `pelanggan` VALUES (3, 'Bu Sari', 'Jl. Kenanga 12', '0812', 0.0, NULL, NULL, 1000, 'pel_act_3')")
+            db.execSQL("INSERT INTO `transaksi` VALUES (2, 1000, 2, NULL, 1, 2, 6000.0, 12000.0, 0.0, 'DEL:Fitri|C', 'Dihapus', 0, 0, 1000, 'tx_del_2')")
+            db.execSQL("INSERT INTO `transaksi` VALUES (3, 1000, 3, NULL, 1, 1, 6000.0, 6000.0, 0.0, 'Cash', 'Lunas', 0, 0, 1000, 'tx_act_3')")
+        }
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+            .addMigrations(
+                AppDatabase.MIGRATION_13_14,
+                AppDatabase.MIGRATION_14_15,
+                AppDatabase.MIGRATION_15_16
+            )
+            .allowMainThreadQueries()
+            .build()
+        roomDb = db
+
+        val pDel = db.pelangganDao().getById(2)
+        val pAct = db.pelangganDao().getById(3)
+        requireNotNull(pDel)
+        requireNotNull(pAct)
+        assertTrue(pDel.isDeleted)
+        assertEquals("Budi", pDel.deletedBy)
+        assertEquals("Gang Mawar No. 3", pDel.alamat)
+
+        assertFalse(pAct.isDeleted)
+        assertNull(pAct.deletedBy)
+        assertEquals("Jl. Kenanga 12", pAct.alamat)
+
+        val txDel = db.transaksiDao().getAllOnce().first { it.id == 2 }
+        val txAct = db.transaksiDao().getAllOnce().first { it.id == 3 }
+        assertTrue(txDel.isDeleted)
+        assertEquals("Fitri", txDel.deletedBy)
+        assertFalse(txAct.isDeleted)
+        assertNull(txAct.deletedBy)
     }
 }

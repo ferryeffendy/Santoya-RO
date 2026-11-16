@@ -17,3 +17,5 @@ local.properties
 .env
 debug.keystore
 *-debug.log
+app/google-services.json
+gradle/firebase-google-services.json

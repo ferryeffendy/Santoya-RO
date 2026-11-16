@@ -228,14 +228,37 @@ test("unverified staff email is rejected (email spoofing protection)", async () 
   await assertFails(unverifiedStaffDb.collection("depots").doc(DEPOT_ID).collection("transaksi").get());
 });
 
-test("outsider cannot read or write depot data or shadow-update fields", async () => {
+test("outsider cannot read or write depot data, enumerate non-existent staff_links, or shadow-update fields", async () => {
   await seedDepotWithStaff();
   const oDb = outsiderDb();
   await assertFails(oDb.collection("depots").doc(DEPOT_ID).get());
   await assertFails(oDb.collection("staff_links").doc(STAFF_EMAIL).get());
+  await assertFails(oDb.collection("staff_links").doc("nonexistent@santoya.test").get());
   await assertFails(oDb.collection("depots").doc(DEPOT_ID).collection("pelanggan").get());
 
   const oDbOwner = ownerDb();
+  await assertSucceeds(
+    oDbOwner.collection("depots").doc(DEPOT_ID).collection("transaksi").doc("tx_v16").set({
+      syncId: "tx_v16",
+      tanggal: 1700000000000,
+      pelangganSyncId: "cust_1",
+      jumlah: 2,
+      harga_satuan: 6000,
+      total_harga: 12000,
+      total_komisi: 2000,
+      metode_bayar: "Cash",
+      status: "Lunas",
+      uangMuka: 0,
+      sisaKasbon: 0,
+      tanggalBayar: 1700000050000,
+      deletedBy: null,
+      _hardDeleted: false,
+      updatedAt: 1700000050000,
+      isDeleted: false,
+      serverUpdatedAt: ts(),
+    })
+  );
+
   await assertFails(
     oDbOwner.collection("depots").doc(DEPOT_ID).collection("produk").doc("prod_bad").set({
       syncId: "prod_bad",
@@ -249,7 +272,7 @@ test("outsider cannot read or write depot data or shadow-update fields", async (
   );
 });
 
-test("revoking staff removes access immediately", async () => {
+test("revoking staff removes access immediately and real owner can reclaim hijacked staff_link", async () => {
   await seedDepotWithStaff();
   const oDb = ownerDb();
   await assertSucceeds(
@@ -260,6 +283,39 @@ test("revoking staff removes access immediately", async () => {
   );
   const sDb = staffDb(true);
   await assertFails(sDb.collection("depots").doc(DEPOT_ID).collection("transaksi").get());
+
+  // Simulate another account (outsider acting as fake owner) having created a staff_link for STAFF_EMAIL
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const adminDb = ctx.firestore();
+    await adminDb.collection("staff_links").doc(STAFF_EMAIL).set({
+      depotId: `depot_${OUTSIDER_UID}`,
+      ownerUid: OUTSIDER_UID,
+      ownerEmail: OUTSIDER_EMAIL,
+      staffEmail: STAFF_EMAIL,
+      active: true,
+      createdAt: ts(),
+      updatedAt: ts(),
+    });
+  });
+
+  // Real owner adds STAFF_EMAIL back to their depot memberEmails and reclaims staff_links/STAFF_EMAIL
+  await assertSucceeds(
+    oDb.collection("depots").doc(DEPOT_ID).update({
+      memberEmails: [STAFF_EMAIL],
+      updatedAt: ts(),
+    })
+  );
+  await assertSucceeds(
+    oDb.collection("staff_links").doc(STAFF_EMAIL).set({
+      depotId: DEPOT_ID,
+      ownerUid: OWNER_UID,
+      ownerEmail: OWNER_EMAIL,
+      staffEmail: STAFF_EMAIL,
+      active: true,
+      createdAt: ts(),
+      updatedAt: ts(),
+    })
+  );
 });
 
 test("owner can CRUD perawatan_jadwal and perawatan_log while staff, outsider, and unauthenticated users are denied", async () => {

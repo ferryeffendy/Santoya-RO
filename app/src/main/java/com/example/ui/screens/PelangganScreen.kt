@@ -2495,6 +2495,7 @@ private fun PelunasanKasbonDialog(
     val keyboardController = LocalSoftwareKeyboardController.current
     val inputNominal = nominalStr.toDoubleOrNull() ?: 0.0
     val sisaSetelahBayar = (pelanggan.sisa_kasbon - inputNominal).coerceAtLeast(0.0)
+    val kembalian = (inputNominal - pelanggan.sisa_kasbon).coerceAtLeast(0.0)
     val isLunasPenuh = inputNominal >= pelanggan.sisa_kasbon && pelanggan.sisa_kasbon > 0
 
     val submitPelunasan = {
@@ -2502,9 +2503,6 @@ private fun PelunasanKasbonDialog(
         when {
             nominal == null || nominal <= 0 -> {
                 errorMessage = "Nominal pembayaran tidak valid"
-            }
-            nominal > pelanggan.sisa_kasbon -> {
-                errorMessage = "Nominal melebihi total kasbon"
             }
             else -> {
                 focusManager.clearFocus()
@@ -2662,22 +2660,47 @@ private fun PelunasanKasbonDialog(
             else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            Column(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = "Sisa setelah bayar:",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = if (isLunasPenuh) "LUNAS" else FormatUtils.formatRupiah(sisaSetelahBayar),
-                    style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                    fontWeight = FontWeight.Bold,
-                    color = if (isLunasPenuh) santoyaColors.onSuccessContainer else santoyaColors.danger
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Sisa setelah bayar:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = if (isLunasPenuh) "LUNAS" else FormatUtils.formatRupiah(sisaSetelahBayar),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
+                        color = if (isLunasPenuh) santoyaColors.onSuccessContainer else santoyaColors.danger
+                    )
+                }
+                if (kembalian > 0.0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Kembalian:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = santoyaColors.onSuccessContainer
+                        )
+                        Text(
+                            text = FormatUtils.formatRupiah(kembalian),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Bold,
+                            color = santoyaColors.onSuccessContainer
+                        )
+                    }
+                }
             }
         }
 

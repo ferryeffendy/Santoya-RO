@@ -86,8 +86,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aistudio.companion.kzpmrw.R
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize
@@ -144,7 +146,7 @@ fun RealtimeSyncStatusPill(
             santoyaColors.warningContainer.copy(alpha = 0.6f),
             santoyaColors.warning.copy(alpha = 0.45f)
         )
-        SyncConnectionStatus.REVOKED -> Tuple5(
+        SyncConnectionStatus.REVOKED, SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION -> Tuple5(
             Icons.Outlined.Block,
             "Dibatasi",
             MaterialTheme.colorScheme.error,
@@ -212,7 +214,8 @@ fun SantoyaSyncInfoBottomSheet(
     syncState: RealtimeSyncState,
     onDismiss: () -> Unit,
     onSyncNow: () -> Unit,
-    onNavigateToSettings: (() -> Unit)? = null
+    onNavigateToSettings: (() -> Unit)? = null,
+    onSwitchToStaffWaiting: (() -> Unit)? = null
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
     val isSyncing = syncState.status == SyncConnectionStatus.SYNCING ||
@@ -240,7 +243,7 @@ fun SantoyaSyncInfoBottomSheet(
             santoyaColors.warningContainer.copy(alpha = 0.5f),
             Icons.Outlined.CloudOff
         )
-        SyncConnectionStatus.REVOKED -> Tuple5(
+        SyncConnectionStatus.REVOKED, SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION -> Tuple5(
             "Akses Dibatasi",
             "Akun ini belum memiliki izin akses depot atau dinonaktifkan oleh Pemilik.",
             MaterialTheme.colorScheme.error,
@@ -404,6 +407,24 @@ fun SantoyaSyncInfoBottomSheet(
                     text = "Buka Pengaturan Lengkap",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        if (onSwitchToStaffWaiting != null) {
+            OutlinedButton(
+                onClick = onSwitchToStaffWaiting,
+                shape = RoundedCornerShape(SantoyaRadius.md),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .testTag("btn_switch_to_staff_waiting")
+            ) {
+                Text(
+                    text = stringResource(R.string.sync_sheet_switch_to_staff_btn),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }

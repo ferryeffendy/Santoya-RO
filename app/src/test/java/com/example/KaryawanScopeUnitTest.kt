@@ -82,15 +82,18 @@ class KaryawanScopeUnitTest {
     }
 
     @Test
-    fun `normalizeEmail and resolveActiveKaryawan handle bare usernames and active preference`() {
+    fun `normalizeEmail and resolveActiveKaryawan reject bare usernames and respect active preference`() {
         assertEquals("", KaryawanScopeHelper.normalizeEmail(null))
         assertEquals("", KaryawanScopeHelper.normalizeEmail("   "))
-        assertEquals("fitri@gmail.com", KaryawanScopeHelper.normalizeEmail("  Fitri "))
+        assertEquals("", KaryawanScopeHelper.normalizeEmail("  Fitri "))
+        assertEquals("", KaryawanScopeHelper.normalizeEmail("fitri@"))
+        assertEquals("", KaryawanScopeHelper.normalizeEmail("@gmail.com"))
+        assertEquals("fitri@gmail.com", KaryawanScopeHelper.normalizeEmail("  Fitri@gmail.com "))
         assertEquals("budi@santoya.id", KaryawanScopeHelper.normalizeEmail("BUDI@santoya.id "))
 
-        val inactiveFitri = sampleKurir(id = 1, nama = "Fitri Lama", email = "fitri", aksesAktif = false)
+        val inactiveFitri = sampleKurir(id = 1, nama = "Fitri Lama", email = "fitri@gmail.com", aksesAktif = false)
         val activeFitri = sampleKurir(id = 2, nama = "Fitri Aktif", email = "Fitri@gmail.com", aksesAktif = true)
-        val kurirBudi = sampleKurir(id = 3, nama = "Budi", email = "budi", aksesAktif = true)
+        val kurirBudi = sampleKurir(id = 3, nama = "Budi", email = "budi@gmail.com", aksesAktif = true)
 
         val resolved = KaryawanScopeHelper.resolveActiveKaryawan(
             userEmail = "fitri@gmail.com",
@@ -109,22 +112,43 @@ class KaryawanScopeUnitTest {
 
     @Test
     fun `isKaryawanRole detects STAFF sync role and active courier emails accurately`() {
-        val activeFitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri", aksesAktif = true)
+        val activeFitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri@gmail.com", aksesAktif = true)
         val inactiveRudi = sampleKurir(id = 2, nama = "Rudi", email = "rudi@gmail.com", aksesAktif = false)
-        val couriers = listOf(activeFitri, inactiveRudi)
+        val bareUsernameKurir = sampleKurir(id = 3, nama = "Budi Lokal", email = "budi", aksesAktif = true)
+        val couriers = listOf(activeFitri, inactiveRudi, bareUsernameKurir)
 
         assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.STAFF, "any@gmail.com", "pemilik@gmail.com", couriers))
         // Pemilik yang emailnya juga terdaftar sebagai kurir tetap owner.
         assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "FITRI@GMAIL.COM", "fitri@gmail.com", couriers))
         // Karyawan yang emailnya ada di daftar kurir tetap dikenali sebagai karyawan.
         assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "FITRI@GMAIL.COM", "pemilik@gmail.com", couriers))
+        // Kurir tanpa domain email penuh ("budi") tidak pernah memberikan akses ke budi@gmail.com.
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "budi@gmail.com", "pemilik@gmail.com", couriers))
         assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "rudi@gmail.com", "pemilik@gmail.com", couriers))
         assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "pemilik@gmail.com", "pemilik@gmail.com", couriers))
+
+        // Ketiga email karyawan utama selalu dikenali sebagai karyawan bahkan sebelum daftar kurir lokal dimuat
+        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("mumus8800@gmail.com"))
+        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("RADIJAYA168@GMAIL.COM "))
+        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("fitriazizaheffendy@gmail.com"))
+        assertFalse(KaryawanScopeHelper.isDesignatedStaffEmail("ferryeffendy@gmail.com"))
+        assertTrue(KaryawanScopeHelper.isPrimaryOwnerEmail("FerryEffendy@gmail.com "))
+        assertFalse(KaryawanScopeHelper.isPrimaryOwnerEmail("radijaya168@gmail.com"))
+
+        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "radijaya168@gmail.com", "radijaya168@gmail.com", emptyList()))
+        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "mumus8800@gmail.com", "ferryeffendy@gmail.com", emptyList()))
+        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "fitriazizaheffendy@gmail.com", "ferryeffendy@gmail.com", emptyList()))
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "ferryeffendy@gmail.com", "ferryeffendy@gmail.com", couriers))
+
+        assertEquals("Mumus8800", KaryawanScopeHelper.defaultStaffDisplayName("mumus8800@gmail.com"))
+        assertEquals("Radijaya168", KaryawanScopeHelper.defaultStaffDisplayName("radijaya168@gmail.com"))
+        assertEquals("Fitriazizaheffendy", KaryawanScopeHelper.defaultStaffDisplayName("fitriazizaheffendy@gmail.com"))
+        assertEquals("kurir_staff_mumus8800", KaryawanScopeHelper.defaultStaffSyncId("mumus8800@gmail.com"))
     }
 
     @Test
     fun `filterPelangganForRole isolates customers per Karyawan and gives Owner full list`() {
-        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri")
+        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri@gmail.com")
         val p1 = samplePelanggan(1, "Warung A", idKurirLangganan = 1)
         val p2 = samplePelanggan(2, "Warung B", idKurirLangganan = 2)
         val p3 = samplePelanggan(3, "Warung Umum", idKurirLangganan = null)
@@ -137,8 +161,8 @@ class KaryawanScopeUnitTest {
 
     @Test
     fun `filterTransaksiForRole and filterCustomerHistoryForRole enforce courier isolation`() {
-        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri")
-        val budi = sampleKurir(id = 2, nama = "Budi", email = "budi")
+        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri@gmail.com")
+        val budi = sampleKurir(id = 2, nama = "Budi", email = "budi@gmail.com")
         val pFitri = samplePelanggan(10, "Bu Ani", idKurirLangganan = 1)
         val pBudi = samplePelanggan(20, "Pak Joko", idKurirLangganan = 2)
         val now = System.currentTimeMillis()
@@ -167,8 +191,8 @@ class KaryawanScopeUnitTest {
 
     @Test
     fun `summarizeKaryawanDashboardMetrics calculates today cash handover plus today and month gallons and commissions`() {
-        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri", rate = 1_000.0)
-        val budi = sampleKurir(id = 2, nama = "Budi", email = "budi", rate = 1_500.0)
+        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri@gmail.com", rate = 1_000.0)
+        val budi = sampleKurir(id = 2, nama = "Budi", email = "budi@gmail.com", rate = 1_500.0)
         val pFitri = samplePelanggan(10, "Bu Ani", idKurirLangganan = 1)
 
         val nowCal = Calendar.getInstance().apply {
@@ -279,7 +303,7 @@ class KaryawanScopeUnitTest {
 
     @Test
     fun `soft delete pelanggan helpers encode clean restore alamat and exclude from karyawan scope and metrics`() {
-        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri", rate = 1_000.0)
+        val fitri = sampleKurir(id = 1, nama = "Fitri", email = "fitri@gmail.com", rate = 1_000.0)
         val activePelanggan = samplePelanggan(10, "Warung Maju", idKurirLangganan = 1)
         val softDeletedAlamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(activePelanggan.alamat, "Fitri")
         assertTrue(softDeletedAlamat.length <= 300)

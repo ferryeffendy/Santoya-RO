@@ -50,6 +50,7 @@ enum class SyncConnectionStatus {
     SYNCING,
     LIVE,
     REVOKED,
+    AWAITING_ROLE_CONFIRMATION,
     ERROR
 }
 
@@ -116,6 +117,7 @@ class RealtimeSyncEngine(
     private var hasSeededInitialOwnerPush: Boolean = false
 
     private var staffLinkListener: ListenerRegistration? = null
+    private var lastStaffLinkSnapshot: DocumentSnapshot? = null
     private val collectionListeners = mutableListOf<ListenerRegistration>()
     private var pendingObserverJob: Job? = null
     private var flushJob: Job? = null
@@ -125,6 +127,13 @@ class RealtimeSyncEngine(
 
     private val cachedSnapshots = mutableMapOf<String, List<DocumentSnapshot>>()
     private val receivedInitialCollections = mutableSetOf<String>()
+
+    private fun isTerminalBlockingStatus(status: SyncConnectionStatus): Boolean {
+        return status == SyncConnectionStatus.REVOKED ||
+            status == SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION
+    }
+
+    private fun keyConfirmedOwner(uid: String): String = "${KEY_CONFIRMED_OWNER_PREFIX}$uid"
 
     fun start(uid: String, email: String?) {
         val cleanEmail = email?.trim()?.lowercase().orEmpty()
@@ -204,59 +213,347 @@ class RealtimeSyncEngine(
                 recordReads(1)
                 if (error != null) {
                     handleFirestoreError(error, OperationType.GET, staffLinkPath)
-                    // Fallback gracefully to personal owner depot only if lookup is denied
-                    switchToDepot(
-                        depotId = "depot_$uid",
-                        role = DepotRole.OWNER,
-                        ownerEmail = cleanEmail
-                    )
+                    scope.launch {
+                        resolveAndApplyDepotRole(firestore, uid, cleanEmail, null)
+                    }
                     return@addSnapshotListener
                 }
 
-                val targetDepotId = snapshot?.getString("depotId").orEmpty()
-                val ownerUid = snapshot?.getString("ownerUid").orEmpty()
-                val ownerEmail = snapshot?.getString("ownerEmail").orEmpty()
-                val isActive = snapshot?.getBoolean("active") == true
-
-                if (snapshot != null && snapshot.exists() && targetDepotId.isNotBlank() && ownerUid != uid) {
-                    if (isActive) {
-                        switchToDepot(
-                            depotId = targetDepotId,
-                            role = DepotRole.STAFF,
-                            ownerEmail = ownerEmail
-                        )
-                    } else {
-                        val wasRevoked = _state.value.status == SyncConnectionStatus.REVOKED
-                        detachCollectionListeners()
-                        activeDepotId = ""
-                        activeRole = DepotRole.STAFF
-                        _state.update {
-                            it.copy(
-                                status = SyncConnectionStatus.REVOKED,
-                                role = DepotRole.STAFF,
-                                depotId = targetDepotId,
-                                ownerEmail = ownerEmail,
-                                errorMessage = "Akses akun karyawan dinonaktifkan oleh pemilik"
-                            )
-                        }
-                        if (!wasRevoked) {
-                            // Data depot tidak boleh tetap bisa dibaca setelah akses dicabut.
-                            scope.launch { clearLocalDataInternal() }
-                        }
-                    }
-                } else {
-                    switchToDepot(
-                        depotId = "depot_$uid",
-                        role = DepotRole.OWNER,
-                        ownerEmail = cleanEmail
-                    )
+                lastStaffLinkSnapshot = snapshot
+                scope.launch {
+                    resolveAndApplyDepotRole(firestore, uid, cleanEmail, snapshot)
                 }
             }
+    }
+
+    /**
+     * Menentukan depot dan peran otoritatif bagi akun yang sedang login:
+     * 1. Memeriksa dokumen `depots` yang mendaftarkan `cleanEmail` di dalam `memberEmails` serta menyaring
+     *    depot bayangan (depot milik sesama karyawan yang email pemiliknya juga terdaftar sebagai anggota).
+     * 2. Memeriksa dokumen `staff_links/{cleanEmail}`.
+     * 3. Jika belum terdaftar sebagai karyawan di depot mana pun dan belum memiliki depot pemilik sah,
+     *    menampilkan gerbang `AWAITING_ROLE_CONFIRMATION` agar karyawan tidak otomatis menjadi pemilik bayangan.
+     */
+    private suspend fun resolveAndApplyDepotRole(
+        firestore: FirebaseFirestore,
+        uid: String,
+        cleanEmail: String,
+        snapshot: DocumentSnapshot?
+    ): Boolean {
+        if (activeUid != uid) return false
+
+        if (KaryawanScopeHelper.isPrimaryOwnerEmail(cleanEmail)) {
+            prefs.edit().putBoolean(keyConfirmedOwner(uid), true).apply()
+            switchToDepot(
+                depotId = "depot_$uid",
+                role = DepotRole.OWNER,
+                ownerEmail = cleanEmail
+            )
+            return true
+        }
+
+        val isDesignatedStaff = KaryawanScopeHelper.isDesignatedStaffEmail(cleanEmail)
+        if (isDesignatedStaff) {
+            prefs.edit().remove(keyConfirmedOwner(uid)).apply()
+            cleanupShadowStaffLinks(firestore, uid, cleanEmail)
+        }
+
+        val memberDepots = if (cleanEmail.isNotBlank() && checkIsOnline()) {
+            try {
+                val snap = withTimeout(6_000L) {
+                    firestore.collection("depots")
+                        .whereArrayContains("memberEmails", cleanEmail)
+                        .get()
+                        .await()
+                }
+                recordReads(snap.documents.size.coerceAtLeast(1))
+                snap.documents.filter { doc ->
+                    val dOwnerUid = doc.getString("ownerUid").orEmpty()
+                    dOwnerUid.isNotBlank() && dOwnerUid != uid
+                }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+
+        val allStaffEmailsAcrossDepots = memberDepots
+            .flatMap { doc ->
+                (doc.get("memberEmails") as? List<*>)
+                    ?.mapNotNull { (it as? String)?.trim()?.lowercase() }
+                    .orEmpty()
+            }
+            .toSet()
+
+        val validMemberDepots = memberDepots.filter { doc ->
+            val docOwnerEmail = doc.getString("ownerEmail")?.trim()?.lowercase().orEmpty()
+            !KaryawanScopeHelper.isDesignatedStaffEmail(docOwnerEmail)
+        }
+
+        val nonShadowDepots = validMemberDepots.filter { doc ->
+            val docOwnerEmail = doc.getString("ownerEmail")?.trim()?.lowercase().orEmpty()
+            docOwnerEmail.isBlank() || docOwnerEmail !in allStaffEmailsAcrossDepots
+        }.ifEmpty { validMemberDepots }
+
+        val authoritativeDepotDoc = nonShadowDepots.firstOrNull { doc ->
+            KaryawanScopeHelper.isPrimaryOwnerEmail(doc.getString("ownerEmail"))
+        } ?: nonShadowDepots.maxByOrNull { doc ->
+            doc.getTimestamp("updatedAt")?.toDate()?.time ?: 0L
+        }
+
+        val targetDepotId = snapshot?.getString("depotId").orEmpty()
+        val linkOwnerUid = snapshot?.getString("ownerUid").orEmpty()
+        val linkOwnerEmail = snapshot?.getString("ownerEmail").orEmpty()
+        val isActive = snapshot?.getBoolean("active") == true
+        val hasExternalStaffLink = snapshot != null &&
+            snapshot.exists() &&
+            targetDepotId.isNotBlank() &&
+            linkOwnerUid != uid &&
+            !KaryawanScopeHelper.isDesignatedStaffEmail(linkOwnerEmail)
+
+        if (activeUid != uid) return false
+
+        if (authoritativeDepotDoc != null) {
+            val authDepotId = authoritativeDepotDoc.getString("depotId").orEmpty()
+                .ifBlank { authoritativeDepotDoc.id }
+            val authOwnerEmail = authoritativeDepotDoc.getString("ownerEmail").orEmpty()
+
+            if (hasExternalStaffLink && targetDepotId == authDepotId && !isActive) {
+                transitionToRevoked(authDepotId, authOwnerEmail)
+                return true
+            }
+
+            prefs.edit().remove(keyConfirmedOwner(uid)).apply()
+            cleanupShadowStaffLinks(firestore, uid, cleanEmail)
+            switchToDepot(
+                depotId = authDepotId,
+                role = DepotRole.STAFF,
+                ownerEmail = authOwnerEmail
+            )
+            return true
+        }
+
+        if (hasExternalStaffLink) {
+            if (isActive) {
+                prefs.edit().remove(keyConfirmedOwner(uid)).apply()
+                cleanupShadowStaffLinks(firestore, uid, cleanEmail)
+                switchToDepot(
+                    depotId = targetDepotId,
+                    role = DepotRole.STAFF,
+                    ownerEmail = linkOwnerEmail
+                )
+            } else {
+                transitionToRevoked(targetDepotId, linkOwnerEmail)
+            }
+            return true
+        }
+
+        if (!isDesignatedStaff) {
+            val isConfirmedOwner = prefs.getBoolean(keyConfirmedOwner(uid), false)
+            if (isConfirmedOwner) {
+                switchToDepot(
+                    depotId = "depot_$uid",
+                    role = DepotRole.OWNER,
+                    ownerEmail = cleanEmail
+                )
+                return true
+            }
+
+            val ownDepotExists = if (checkIsOnline()) {
+                try {
+                    val ownDoc = withTimeout(5_000L) {
+                        firestore.collection("depots").document("depot_$uid").get().await()
+                    }
+                    recordReads(1)
+                    ownDoc.exists()
+                } catch (_: Exception) {
+                    prefs.getString(KEY_LAST_DEPOT_ID, null) == "depot_$uid"
+                }
+            } else {
+                prefs.getString(KEY_LAST_DEPOT_ID, null) == "depot_$uid"
+            }
+
+            if (ownDepotExists) {
+                prefs.edit().putBoolean(keyConfirmedOwner(uid), true).apply()
+                switchToDepot(
+                    depotId = "depot_$uid",
+                    role = DepotRole.OWNER,
+                    ownerEmail = cleanEmail
+                )
+                return true
+            }
+        }
+
+        detachCollectionListeners()
+        activeDepotId = ""
+        activeRole = DepotRole.STAFF
+        _state.update {
+            it.copy(
+                status = SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION,
+                role = DepotRole.STAFF,
+                depotId = "",
+                ownerEmail = "",
+                errorMessage = null
+            )
+        }
+        return false
+    }
+
+    private fun transitionToRevoked(targetDepotId: String, ownerEmail: String) {
+        val wasRevoked = _state.value.status == SyncConnectionStatus.REVOKED
+        detachCollectionListeners()
+        activeDepotId = ""
+        activeRole = DepotRole.STAFF
+        _state.update {
+            it.copy(
+                status = SyncConnectionStatus.REVOKED,
+                role = DepotRole.STAFF,
+                depotId = targetDepotId,
+                ownerEmail = ownerEmail,
+                errorMessage = "Akses akun karyawan dinonaktifkan oleh pemilik"
+            )
+        }
+        if (!wasRevoked) {
+            // Data depot tidak boleh tetap bisa dibaca setelah akses dicabut.
+            scope.launch { clearLocalDataInternal() }
+        }
+    }
+
+    private suspend fun cleanupShadowStaffLinks(
+        firestore: FirebaseFirestore,
+        uid: String,
+        userEmail: String = activeEmail
+    ) {
+        if (!checkIsOnline()) return
+        try {
+            val snap = withTimeout(5_000L) {
+                firestore.collection("staff_links")
+                    .whereEqualTo("ownerUid", uid)
+                    .get()
+                    .await()
+            }
+            recordReads(snap.documents.size.coerceAtLeast(1))
+            for (doc in snap.documents) {
+                try {
+                    doc.reference.delete().await()
+                    recordWrites(1)
+                } catch (_: Exception) {
+                }
+            }
+        } catch (_: Exception) {
+        }
+
+        if (KaryawanScopeHelper.isDesignatedStaffEmail(userEmail)) {
+            try {
+                withTimeout(5_000L) {
+                    firestore.collection("depots").document("depot_$uid").delete().await()
+                    recordWrites(1)
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Dipanggil saat pengguna mengonfirmasi secara eksplisit bahwa akun ini adalah Pemilik Depot baru.
+     */
+    fun confirmAsNewOwner() {
+        val uid = activeUid ?: return
+        if (KaryawanScopeHelper.isDesignatedStaffEmail(activeEmail)) {
+            scope.launch { recheckStaffConnection() }
+            return
+        }
+        prefs.edit().putBoolean(keyConfirmedOwner(uid), true).apply()
+        switchToDepot(
+            depotId = "depot_$uid",
+            role = DepotRole.OWNER,
+            ownerEmail = activeEmail
+        )
+    }
+
+    /**
+     * Memeriksa ulang apakah akun karyawan sudah didaftarkan oleh Pemilik Depot di Cloud.
+     */
+    suspend fun recheckStaffConnection(): Boolean {
+        val uid = activeUid ?: return false
+        val cleanEmail = activeEmail
+        val firestore = firestoreProvider()
+        val freshLinkSnap = if (cleanEmail.isNotBlank() && isValidEmailKey(cleanEmail) && checkIsOnline()) {
+            try {
+                val doc = withTimeout(5_000L) {
+                    firestore.collection("staff_links").document(cleanEmail).get().await()
+                }
+                recordReads(1)
+                lastStaffLinkSnapshot = doc
+                doc
+            } catch (_: Exception) {
+                lastStaffLinkSnapshot
+            }
+        } else {
+            lastStaffLinkSnapshot
+        }
+        return resolveAndApplyDepotRole(firestore, uid, cleanEmail, freshLinkSnap)
+    }
+
+    /**
+     * Mengubah akun yang sebelumnya terlanjur masuk sebagai Pemilik bayangan menjadi mode Karyawan,
+     * menghapus klaim `staff_links` bayangan di Cloud, membersihkan data lokal, dan mencari depot Pemilik asli.
+     */
+    suspend fun switchToStaffWaitingMode(): Boolean {
+        val uid = activeUid ?: return false
+        prefs.edit()
+            .remove(keyConfirmedOwner(uid))
+            .remove(KEY_LAST_DEPOT_ID)
+            .apply()
+        detachCollectionListeners()
+        activeDepotId = ""
+        activeRole = DepotRole.STAFF
+        val firestore = firestoreProvider()
+        cleanupShadowStaffLinks(firestore, uid)
+        clearLocalDataInternal()
+        val linked = recheckStaffConnection()
+        if (!linked) {
+            _state.update {
+                it.copy(
+                    status = SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION,
+                    role = DepotRole.STAFF,
+                    depotId = "",
+                    ownerEmail = "",
+                    errorMessage = null
+                )
+            }
+        }
+        return linked
+    }
+
+    /**
+     * Memaksa pembaruan dokumen depot (`memberEmails`) dan klaim ulang `staff_links`
+     * segera setelah Pemilik menambah, mengubah, atau menghapus data kurir.
+     */
+    suspend fun syncStaffLinksNow() {
+        val uid = activeUid ?: return
+        if (activeRole != DepotRole.OWNER) return
+        val depotId = activeDepotId.ifBlank { "depot_$uid" }
+        if (!checkIsOnline()) {
+            scheduleFlush(delayMs = 150L)
+            return
+        }
+        val firestore = firestoreProvider()
+        try {
+            withTimeout(10_000L) {
+                ensureDepotAndStaffLinks(firestore, depotId, uid, activeEmail)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Immediate staff_links sync deferred: ${e.message}")
+        }
+        scheduleFlush(delayMs = 100L)
     }
 
     fun stop() {
         staffLinkListener?.remove()
         staffLinkListener = null
+        lastStaffLinkSnapshot = null
         detachCollectionListeners()
         pendingObserverJob?.cancel()
         pendingObserverJob = null
@@ -307,7 +604,7 @@ class RealtimeSyncEngine(
 
     fun scheduleFlush(delayMs: Long = 250L) {
         if (activeUid == null || activeDepotId.isBlank()) return
-        if (_state.value.status == SyncConnectionStatus.REVOKED) return
+        if (isTerminalBlockingStatus(_state.value.status)) return
         flushJob?.cancel()
         flushJob = scope.launch {
             delay(delayMs)
@@ -317,7 +614,7 @@ class RealtimeSyncEngine(
 
     private fun scheduleAutoRetry() {
         if (activeUid == null || activeDepotId.isBlank()) return
-        if (_state.value.status == SyncConnectionStatus.REVOKED) return
+        if (isTerminalBlockingStatus(_state.value.status)) return
         if (autoRetryCount >= 3 || autoRetryJob?.isActive == true) return
         autoRetryCount++
         val delayMs = 2_000L * autoRetryCount
@@ -376,7 +673,7 @@ class RealtimeSyncEngine(
                     val snap = depotRef.collection(col).get().await()
                     recordReads(snap.documents.size.coerceAtLeast(1))
                     applyMutex.withLock {
-                        cachedSnapshots[col] = snap.documents.take(MAX_INITIAL_SNAPSHOT_DOCS_PER_COL)
+                        cachedSnapshots[col] = snap.documents
                         receivedInitialCollections.add(col)
                     }
                 }
@@ -455,9 +752,13 @@ class RealtimeSyncEngine(
             val sessionUid = activeUid ?: return@launch
             // Setiap perpindahan depot wajib mengirim antrean yang masih valid milik depot lama
             // terlebih dahulu (best-effort), lalu menghapus data depot lama agar tidak tercampur.
-            if (previousDepot != null && previousDepot != depotId) {
+            if (previousDepot != depotId) {
                 val lastOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
-                if (lastOwnerUid == sessionUid && checkIsOnline()) {
+                if (previousDepot != null &&
+                    lastOwnerUid == sessionUid &&
+                    !KaryawanScopeHelper.isDesignatedStaffEmail(activeEmail) &&
+                    checkIsOnline()
+                ) {
                     try {
                         withTimeout(5_000L) {
                             flushPendingQueueInternal(
@@ -469,19 +770,21 @@ class RealtimeSyncEngine(
                         Log.w(TAG, "Best-effort flush before switching depot skipped: ${e.message}")
                     }
                 }
-                db.withTransaction {
-                    db.perawatanLogDao().deleteAll()
-                    db.perawatanDao().deleteAll()
-                    db.pengeluaranDao().deleteAll()
-                    db.transaksiDao().deleteAll()
-                    db.kasbonLogDao().deleteAll()
-                    db.pelangganDao().deleteAll()
-                    db.kurirDao().deleteAll()
-                    db.produkDao().deleteAll()
-                    db.pendingSyncDao().deleteAll()
+                if (previousDepot != null || role == DepotRole.STAFF) {
+                    db.withTransaction {
+                        db.perawatanLogDao().deleteAll()
+                        db.perawatanDao().deleteAll()
+                        db.pengeluaranDao().deleteAll()
+                        db.transaksiDao().deleteAll()
+                        db.kasbonLogDao().deleteAll()
+                        db.pelangganDao().deleteAll()
+                        db.kurirDao().deleteAll()
+                        db.produkDao().deleteAll()
+                        db.pendingSyncDao().deleteAll()
+                    }
+                    cachedSnapshots.clear()
+                    receivedInitialCollections.clear()
                 }
-                cachedSnapshots.clear()
-                receivedInitialCollections.clear()
             } else if (role == DepotRole.STAFF) {
                 // Karyawan tidak boleh memiliki data pengeluaran maupun jadwal/riwayat perawatan pemilik di cache lokal.
                 db.withTransaction {
@@ -497,6 +800,11 @@ class RealtimeSyncEngine(
             val uid = sessionUid
 
             if (role == DepotRole.OWNER) {
+                try {
+                    ensureDesignatedStaffKurirsForOwner(activeEmail)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Local designated staff seed skipped: ${e.message}")
+                }
                 try {
                     withTimeout(10_000L) {
                         ensureDepotAndStaffLinks(firestore, depotId, uid, activeEmail)
@@ -563,8 +871,7 @@ class RealtimeSyncEngine(
                             autoRetryCount = 0
                             if (isInitialForCollection) {
                                 applyMutex.withLock {
-                                    cachedSnapshots[colName] =
-                                        snapshot.documents.take(MAX_INITIAL_SNAPSHOT_DOCS_PER_COL)
+                                    cachedSnapshots[colName] = snapshot.documents
                                     receivedInitialCollections.add(colName)
                                 }
                                 applyAllSnapshotsInOrder()
@@ -619,7 +926,7 @@ class RealtimeSyncEngine(
                 val isOnline = checkIsOnline()
                 _state.update {
                     val nextStatus = when {
-                        it.status == SyncConnectionStatus.REVOKED -> SyncConnectionStatus.REVOKED
+                        isTerminalBlockingStatus(it.status) -> it.status
                         !isOnline -> SyncConnectionStatus.OFFLINE
                         count > 0 -> SyncConnectionStatus.SYNCING
                         activeDepotId.isNotBlank() && collectionListeners.isNotEmpty() -> SyncConnectionStatus.LIVE
@@ -847,9 +1154,18 @@ class RealtimeSyncEngine(
         }
     }
 
+    private fun extractCloudTimestamp(doc: DocumentSnapshot): Long {
+        val serverTs = try {
+            doc.getTimestamp("serverUpdatedAt")?.toDate()?.time
+        } catch (_: Exception) {
+            null
+        }
+        return serverTs ?: (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+    }
+
     private suspend fun applyProdukDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -888,7 +1204,7 @@ class RealtimeSyncEngine(
 
     private suspend fun applyKurirDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -917,6 +1233,17 @@ class RealtimeSyncEngine(
         val aturan = doc.getString("aturan_komisi") ?: ""
 
         if (local == null) {
+            val normalizedIncomingEmail = KaryawanScopeHelper.normalizeEmail(email)
+            val duplicateSeeded = if (normalizedIncomingEmail.isNotBlank()) {
+                val seededSyncId = KaryawanScopeHelper.defaultStaffSyncId(normalizedIncomingEmail)
+                if (seededSyncId != syncId) db.kurirDao().getBySyncId(seededSyncId) else null
+            } else {
+                null
+            }
+            if (duplicateSeeded != null) {
+                db.pendingSyncDao().remove(SyncCollections.KURIR, duplicateSeeded.syncId)
+                db.kurirDao().deleteBySyncId(duplicateSeeded.syncId)
+            }
             db.kurirDao().insert(
                 Kurir(
                     nama = nama,
@@ -952,21 +1279,25 @@ class RealtimeSyncEngine(
         pending: PendingSyncEntity?
     ) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
+        val deletedBy = doc.getString("deletedBy")
         val local = db.pelangganDao().getBySyncId(syncId)
 
         if (isDeleted) {
             if (local != null && cloudUpdatedAt >= local.updatedAt) {
                 if (db.transaksiDao().countByPelanggan(local.id) > 0) {
                     // Pelanggan dihapus di perangkat lain, tetapi transaksi lama
-                    // masih merujuk ke baris ini. Tandai soft-delete, jangan hapus.
-                    if (!KaryawanScopeHelper.isSoftDeletedPelanggan(local)) {
+                    // masih merujuk ke baris ini. Tandai soft-delete lokal, jangan hapus.
+                    if (!local.isDeleted) {
+                        val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(local.alamat)
                         db.pelangganDao().update(
                             local.copy(
-                                alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(local.alamat, "Pemilik"),
+                                alamat = cleanAlamat,
+                                isDeleted = true,
+                                deletedBy = deletedBy ?: "Pemilik",
                                 updatedAt = cloudUpdatedAt
                             )
                         )
@@ -996,7 +1327,9 @@ class RealtimeSyncEngine(
                     harga_khusus = hargaKhusus,
                     id_kurir_langganan = idKurirLangganan,
                     updatedAt = cloudUpdatedAt,
-                    syncId = syncId
+                    syncId = syncId,
+                    isDeleted = false,
+                    deletedBy = null
                 )
             )
         } else if (cloudUpdatedAt > local.updatedAt) {
@@ -1008,7 +1341,9 @@ class RealtimeSyncEngine(
                     sisa_kasbon = sisaKasbon,
                     harga_khusus = hargaKhusus,
                     id_kurir_langganan = idKurirLangganan,
-                    updatedAt = cloudUpdatedAt
+                    updatedAt = cloudUpdatedAt,
+                    isDeleted = false,
+                    deletedBy = null
                 )
             )
         }
@@ -1024,11 +1359,13 @@ class RealtimeSyncEngine(
         return db.pelangganDao().insert(
             Pelanggan(
                 nama = "Pelanggan Dihapus",
-                alamat = "[DIHAPUS:Pemilik]",
+                alamat = "",
                 no_hp = "",
                 sisa_kasbon = 0.0,
                 updatedAt = 0L,
-                syncId = pelangganSyncId
+                syncId = pelangganSyncId,
+                isDeleted = true,
+                deletedBy = "Pemilik"
             )
         ).toInt()
     }
@@ -1041,13 +1378,14 @@ class RealtimeSyncEngine(
         pending: PendingSyncEntity?
     ) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
-        val isDeleted = doc.getBoolean("isDeleted") == true
+        val isHardDeleted = doc.getBoolean("_hardDeleted") == true ||
+            (doc.getBoolean("isDeleted") == true && doc.getString("pelangganSyncId") == "deleted")
         val local = db.transaksiDao().getBySyncId(syncId)
 
-        if (isDeleted) {
+        if (isHardDeleted) {
             if (local != null && cloudUpdatedAt >= local.updatedAt) {
                 db.transaksiDao().deleteBySyncId(syncId)
             }
@@ -1070,6 +1408,9 @@ class RealtimeSyncEngine(
         val status = doc.getString("status") ?: "Lunas"
         val uangMuka = (doc.get("uangMuka") as? Number)?.toLong() ?: 0L
         val sisaKasbon = (doc.get("sisaKasbon") as? Number)?.toLong() ?: 0L
+        val tanggalBayar = (doc.get("tanggalBayar") as? Number)?.toLong()
+        val isSoftDeleted = doc.getBoolean("isDeleted") == true || status.equals("Dihapus", ignoreCase = true)
+        val deletedBy = doc.getString("deletedBy")
 
         if (local == null) {
             db.transaksiDao().insert(
@@ -1086,8 +1427,11 @@ class RealtimeSyncEngine(
                     status = status,
                     uangMuka = uangMuka,
                     sisaKasbon = sisaKasbon,
+                    tanggalBayar = tanggalBayar,
                     updatedAt = cloudUpdatedAt,
-                    syncId = syncId
+                    syncId = syncId,
+                    isDeleted = isSoftDeleted,
+                    deletedBy = deletedBy
                 )
             )
         } else if (cloudUpdatedAt > local.updatedAt) {
@@ -1105,7 +1449,10 @@ class RealtimeSyncEngine(
                     status = status,
                     uangMuka = uangMuka,
                     sisaKasbon = sisaKasbon,
-                    updatedAt = cloudUpdatedAt
+                    tanggalBayar = tanggalBayar ?: local.tanggalBayar,
+                    updatedAt = cloudUpdatedAt,
+                    isDeleted = isSoftDeleted,
+                    deletedBy = deletedBy
                 )
             )
         }
@@ -1117,7 +1464,7 @@ class RealtimeSyncEngine(
         pending: PendingSyncEntity?
     ) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -1171,7 +1518,7 @@ class RealtimeSyncEngine(
 
     private suspend fun applyPengeluaranDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -1215,7 +1562,7 @@ class RealtimeSyncEngine(
 
     private suspend fun applyPerawatanJadwalDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -1260,7 +1607,7 @@ class RealtimeSyncEngine(
 
     private suspend fun applyPerawatanLogDoc(doc: DocumentSnapshot, pending: PendingSyncEntity?) {
         val syncId = doc.getString("syncId") ?: doc.id
-        val cloudUpdatedAt = (doc.get("updatedAt") as? Number)?.toLong() ?: 0L
+        val cloudUpdatedAt = extractCloudTimestamp(doc)
         if (pending != null && pending.updatedAt >= cloudUpdatedAt) return
 
         val isDeleted = doc.getBoolean("isDeleted") == true
@@ -1314,7 +1661,7 @@ class RealtimeSyncEngine(
     ) {
         val uid = activeUid ?: return
         val depotId = targetDepotId.ifBlank { return }
-        if (_state.value.status == SyncConnectionStatus.REVOKED) return
+        if (isTerminalBlockingStatus(_state.value.status)) return
         if (!checkIsOnline()) {
             _state.update { it.copy(isOnline = false, status = SyncConnectionStatus.OFFLINE) }
             return
@@ -1493,6 +1840,7 @@ class RealtimeSyncEngine(
                         "kurirSyncId" to null,
                         "updatedAt" to item.updatedAt,
                         "isDeleted" to true,
+                        "_hardDeleted" to true,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()
                     )
                 } else {
@@ -1507,7 +1855,8 @@ class RealtimeSyncEngine(
                         "harga_khusus" to p.harga_khusus?.takeIf { it >= 0.0 },
                         "kurirSyncId" to kurirSyncId,
                         "updatedAt" to p.updatedAt,
-                        "isDeleted" to false,
+                        "isDeleted" to p.isDeleted,
+                        "deletedBy" to p.deletedBy,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()
                     )
                 }
@@ -1530,6 +1879,7 @@ class RealtimeSyncEngine(
                         "sisaKasbon" to 0L,
                         "updatedAt" to item.updatedAt,
                         "isDeleted" to true,
+                        "_hardDeleted" to true,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()
                     )
                 } else {
@@ -1551,8 +1901,10 @@ class RealtimeSyncEngine(
                         "status" to tx.status.take(40),
                         "uangMuka" to tx.uangMuka.coerceAtLeast(0L),
                         "sisaKasbon" to tx.sisaKasbon.coerceAtLeast(0L),
+                        "tanggalBayar" to tx.tanggalBayar,
                         "updatedAt" to tx.updatedAt,
-                        "isDeleted" to false,
+                        "isDeleted" to tx.isDeleted,
+                        "deletedBy" to tx.deletedBy,
                         "serverUpdatedAt" to FieldValue.serverTimestamp()
                     )
                 }
@@ -1676,32 +2028,96 @@ class RealtimeSyncEngine(
         }
     }
 
+    /**
+     * Memastikan ketiga email karyawan resmi terdaftar otomatis di tabel `kurir` lokal dan antrean sinkronisasi
+     * ketika pemilik utama (`ferryeffendy@gmail.com`) aktif, tanpa menimpa nama atau komisi yang sudah diubah pemilik.
+     */
+    internal suspend fun ensureDesignatedStaffKurirsForOwner(ownerEmail: String) {
+        if (!KaryawanScopeHelper.isPrimaryOwnerEmail(ownerEmail)) return
+        val existingKurirs = db.kurirDao().getAllOnce()
+        val seedTimestamp = 1_000L
+
+        for (staffEmail in KaryawanScopeHelper.DESIGNATED_STAFF_EMAILS) {
+            val normalizedTarget = KaryawanScopeHelper.normalizeEmail(staffEmail)
+            if (normalizedTarget.isBlank()) continue
+
+            val matchedByEmail = existingKurirs.firstOrNull {
+                !it.isDeleted && KaryawanScopeHelper.normalizeEmail(it.email) == normalizedTarget
+            }
+            if (matchedByEmail != null) {
+                continue
+            }
+
+            val defaultSyncId = KaryawanScopeHelper.defaultStaffSyncId(normalizedTarget)
+            val existingBySyncId = db.kurirDao().getBySyncId(defaultSyncId)
+            val softDeletedByEmail = existingKurirs.firstOrNull {
+                it.isDeleted && KaryawanScopeHelper.normalizeEmail(it.email) == normalizedTarget
+            }
+            val targetExisting = existingBySyncId ?: softDeletedByEmail
+
+            if (targetExisting == null) {
+                val newKurir = Kurir(
+                    nama = KaryawanScopeHelper.defaultStaffDisplayName(normalizedTarget),
+                    komisi_per_galon = KaryawanScopeHelper.DEFAULT_STAFF_COMMISSION_PER_GALON,
+                    email = normalizedTarget,
+                    password = "",
+                    akses_aktif = true,
+                    skema_komisi = "TETAP",
+                    aturan_komisi = "",
+                    updatedAt = seedTimestamp,
+                    syncId = defaultSyncId,
+                    isDeleted = false
+                )
+                db.kurirDao().insert(newKurir)
+                db.pendingSyncDao().enqueue(
+                    PendingSyncEntity(
+                        collectionName = SyncCollections.KURIR,
+                        syncId = defaultSyncId,
+                        operation = SyncOperations.UPSERT,
+                        updatedAt = seedTimestamp
+                    )
+                )
+            } else if (targetExisting.isDeleted) {
+                val restoredTimestamp = System.currentTimeMillis()
+                db.kurirDao().update(
+                    targetExisting.copy(
+                        email = normalizedTarget,
+                        akses_aktif = true,
+                        isDeleted = false,
+                        updatedAt = restoredTimestamp
+                    )
+                )
+                db.pendingSyncDao().enqueue(
+                    PendingSyncEntity(
+                        collectionName = SyncCollections.KURIR,
+                        syncId = targetExisting.syncId,
+                        operation = SyncOperations.UPSERT,
+                        updatedAt = restoredTimestamp
+                    )
+                )
+            }
+        }
+    }
+
     private suspend fun ensureDepotAndStaffLinks(
         firestore: FirebaseFirestore,
         depotId: String,
         ownerUid: String,
         ownerEmail: String
     ) {
-        val rawKurirs = db.kurirDao().getAllOnce()
-        val kurirs = rawKurirs.map { k ->
-            val rawEm = k.email.trim().lowercase()
-            if (rawEm.isNotBlank() && !rawEm.contains("@")) {
-                val upgraded = "$rawEm@gmail.com"
-                val updatedKurir = k.copy(email = upgraded)
-                db.kurirDao().update(updatedKurir)
-                updatedKurir
+        ensureDesignatedStaffKurirsForOwner(ownerEmail)
+        val rawKurirs = db.kurirDao().getAllOnce().filter { !it.isDeleted }
+        val validKurirs = rawKurirs.mapNotNull { k ->
+            val em = KaryawanScopeHelper.normalizeEmail(k.email)
+            if (em.isNotBlank() && em != ownerEmail && isValidEmailKey(em)) {
+                if (k.email != em) k.copy(email = em) else k
             } else {
-                k
+                null
             }
-        }
-
-        val validKurirs = kurirs.filter {
-            val em = it.email.trim().lowercase()
-            em.isNotBlank() && em.contains("@") && em != ownerEmail && isValidEmailKey(em)
         }
         val activeMemberEmails = validKurirs
             .filter { it.akses_aktif }
-            .map { it.email.trim().lowercase() }
+            .map { it.email }
             .distinct()
             .take(30)
 
@@ -1790,7 +2206,13 @@ class RealtimeSyncEngine(
                     } else {
                         val curActive = existing.getBoolean("active") ?: true
                         val curOwnerEmail = existing.getString("ownerEmail").orEmpty()
-                        if (curActive != kurir.akses_aktif || curOwnerEmail != ownerEmail) {
+                        val curDepotId = existing.getString("depotId").orEmpty()
+                        val curOwnerUid = existing.getString("ownerUid").orEmpty()
+                        if (curActive != kurir.akses_aktif ||
+                            curOwnerEmail != ownerEmail ||
+                            curDepotId != depotId ||
+                            curOwnerUid != ownerUid
+                        ) {
                             val linkCreatedAt = existing.getTimestamp("createdAt") ?: FieldValue.serverTimestamp()
                             linkRef.set(
                                 mapOf(
@@ -1822,8 +2244,8 @@ class RealtimeSyncEngine(
                 _state.update {
                     it.copy(
                         isOnline = true,
-                        status = if (it.status == SyncConnectionStatus.REVOKED) {
-                            SyncConnectionStatus.REVOKED
+                        status = if (isTerminalBlockingStatus(it.status)) {
+                            it.status
                         } else if (it.pendingCount > 0) {
                             SyncConnectionStatus.SYNCING
                         } else {
@@ -1839,8 +2261,8 @@ class RealtimeSyncEngine(
                 _state.update {
                     it.copy(
                         isOnline = stillOnline,
-                        status = if (it.status == SyncConnectionStatus.REVOKED) {
-                            SyncConnectionStatus.REVOKED
+                        status = if (isTerminalBlockingStatus(it.status)) {
+                            it.status
                         } else if (!stillOnline) {
                             SyncConnectionStatus.OFFLINE
                         } else {
@@ -1898,7 +2320,7 @@ class RealtimeSyncEngine(
         private const val PREFS_NAME = "santoya_sync_prefs"
         private const val KEY_LAST_DEPOT_ID = "last_depot_id"
         private const val KEY_LAST_OWNER_UID = "last_owner_uid"
-        private const val MAX_INITIAL_SNAPSHOT_DOCS_PER_COL = 5_000
+        private const val KEY_CONFIRMED_OWNER_PREFIX = "confirmed_owner_"
         private val EMAIL_KEY_REGEX = Regex("^[a-zA-Z0-9_.+\\-@]+$")
     }
 }

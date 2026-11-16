@@ -201,12 +201,20 @@ fun LaporanScreen(
             .sortedWith(compareByDescending<Pengeluaran> { it.tanggal }.thenByDescending { it.id })
     }
 
-    val pendapatanLunas = remember(filteredTx) {
+    val totalOmzetPenjualan = remember(filteredTx) {
+        filteredTx.sumOf { it.transaksi.total_harga }
+    }
+    val penjualanTunaiLangsung = remember(filteredTx) {
         filteredTx.sumOf {
-            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
-                it.transaksi.total_harga
-            } else {
-                it.transaksi.uangMuka.toDouble()
+            when {
+                it.transaksi.status.equals("Lunas", ignoreCase = true) &&
+                    (it.transaksi.tanggalBayar == null || it.transaksi.tanggalBayar == it.transaksi.tanggal) -> {
+                    it.transaksi.total_harga
+                }
+                it.transaksi.uangMuka > 0L -> {
+                    it.transaksi.uangMuka.toDouble()
+                }
+                else -> 0.0
             }
         }
     }
@@ -220,6 +228,8 @@ fun LaporanScreen(
             .filter { it.tanggal in startTime..endTime && it.jumlah_bayar > 0 }
             .sumOf { it.jumlah_bayar }
     }
+    val totalKasMasuk = penjualanTunaiLangsung + pelunasanKasbonPeriode
+    val pendapatanLunas = totalKasMasuk
     val totalKomisiKurir = remember(filteredTx) {
         filteredTx.sumOf { it.transaksi.total_komisi }
     }
@@ -227,10 +237,10 @@ fun LaporanScreen(
         filteredExp.sumOf { it.nominal }
     }
     val totalBebanKeluar = totalKomisiKurir + totalPengeluaran
-    val labaBersih = pendapatanLunas - totalKomisiKurir - totalPengeluaran
+    val labaBersih = totalKasMasuk - totalKomisiKurir - totalPengeluaran
     val isProfit = labaBersih >= 0
-    val marginLabaPersen = if (pendapatanLunas > 0.0) {
-        (labaBersih / pendapatanLunas) * 100.0
+    val marginLabaPersen = if (totalKasMasuk > 0.0) {
+        (labaBersih / totalKasMasuk) * 100.0
     } else {
         0.0
     }

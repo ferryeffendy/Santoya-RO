@@ -250,3 +250,210 @@ fun RevokedAccessDialog(
         }
     }
 }
+
+/**
+ * Layar konfirmasi peran ketika akun Google baru login dan belum terdaftar di `staff_links` maupun `depots`.
+ * Mencegah akun karyawan secara tidak sengaja membuat depot bayangan sendiri.
+ */
+@Composable
+fun RoleConfirmationDialog(
+    userEmail: String,
+    onRecheckStaffLink: ((Boolean) -> Unit) -> Unit,
+    onConfirmAsOwner: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    var isChecking by remember { mutableStateOf(false) }
+    var showOwnerConfirmDialog by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Column(
+                    modifier = Modifier.widthIn(max = 460.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Info,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = stringResource(R.string.role_confirm_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.role_confirm_subtitle, userEmail.ifBlank { "-" }),
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(20.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(SantoyaRadius.lg),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.role_confirm_staff_card_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = stringResource(R.string.role_confirm_staff_card_desc, userEmail.ifBlank { "-" }),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Button(
+                                onClick = {
+                                    if (!isChecking) {
+                                        isChecking = true
+                                        onRecheckStaffLink {
+                                            isChecking = false
+                                        }
+                                    }
+                                },
+                                enabled = !isChecking,
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("btn_role_recheck_staff")
+                            ) {
+                                if (isChecking) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.role_confirm_btn_checking),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.role_confirm_btn_recheck),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    if (!com.example.util.KaryawanScopeHelper.isDesignatedStaffEmail(userEmail)) {
+                        TextButton(
+                            onClick = { showOwnerConfirmDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_role_choose_owner")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.role_confirm_owner_btn),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    TextButton(
+                        onClick = onSignOut,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = SantoyaSize.touchTarget)
+                            .testTag("btn_role_sign_out")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Logout,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.role_confirm_sign_out_btn),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+
+        if (showOwnerConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showOwnerConfirmDialog = false },
+                title = {
+                    Text(
+                        text = stringResource(R.string.role_confirm_owner_dialog_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Text(
+                        text = stringResource(R.string.role_confirm_owner_dialog_msg, userEmail.ifBlank { "-" }),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showOwnerConfirmDialog = false
+                            onConfirmAsOwner()
+                        },
+                        modifier = Modifier.testTag("btn_confirm_role_owner")
+                    ) {
+                        Text(
+                            text = stringResource(R.string.role_confirm_owner_dialog_confirm),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showOwnerConfirmDialog = false },
+                        modifier = Modifier.testTag("btn_cancel_role_owner")
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_cancel),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+

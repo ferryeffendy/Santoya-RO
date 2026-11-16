@@ -41,8 +41,8 @@ import kotlinx.coroutines.launch
         PerawatanItem::class,
         PerawatanLog::class
     ],
-    version = 14,
-    exportSchema = false
+    version = 16,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -230,6 +230,46 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transaksi` ADD COLUMN `tanggalBayar` INTEGER")
+                db.execSQL("UPDATE `transaksi` SET `tanggalBayar` = `tanggal` WHERE LOWER(`status`) = 'lunas'")
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `pelanggan` ADD COLUMN `isDeleted` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `pelanggan` ADD COLUMN `deletedBy` TEXT DEFAULT NULL")
+                db.execSQL(
+                    """
+                    UPDATE `pelanggan`
+                    SET `isDeleted` = 1,
+                        `deletedBy` = TRIM(SUBSTR(`alamat`, INSTR(`alamat`, '[DIHAPUS:') + 9, INSTR(`alamat`, ']') - (INSTR(`alamat`, '[DIHAPUS:') + 9))),
+                        `alamat` = TRIM(SUBSTR(`alamat`, INSTR(`alamat`, ']') + 1))
+                    WHERE `alamat` LIKE '[DIHAPUS:%]%'
+                    """.trimIndent()
+                )
+
+                db.execSQL("ALTER TABLE `transaksi` ADD COLUMN `isDeleted` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `transaksi` ADD COLUMN `deletedBy` TEXT DEFAULT NULL")
+                db.execSQL(
+                    """
+                    UPDATE `transaksi`
+                    SET `isDeleted` = 1,
+                        `deletedBy` = CASE
+                            WHEN `metode_bayar` LIKE 'DEL:%|%' THEN
+                                TRIM(SUBSTR(`metode_bayar`, 5, INSTR(`metode_bayar`, '|') - 5))
+                            WHEN `metode_bayar` LIKE 'DEL:%' THEN
+                                TRIM(SUBSTR(`metode_bayar`, 5))
+                            ELSE 'Karyawan'
+                        END
+                    WHERE LOWER(`status`) = 'dihapus'
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -237,6 +277,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "santoya_ro_database"
                 )
+                    .fallbackToDestructiveMigrationFrom(1, 2, 3)
                     .addMigrations(
                         MIGRATION_4_5,
                         MIGRATION_5_6,
@@ -247,9 +288,11 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_10_11,
                         MIGRATION_11_12,
                         MIGRATION_12_13,
-                        MIGRATION_13_14
+                        MIGRATION_13_14,
+                        MIGRATION_14_15,
+                        MIGRATION_15_16
                     )
-                    .addCallback(DatabaseCallback(context.applicationContext))
+                    .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
                 instance
@@ -257,37 +300,19 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 
-    private class DatabaseCallback(
-        private val context: Context
-    ) : RoomDatabase.Callback() {
+    private class DatabaseCallback : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
-            CoroutineScope(Dispatchers.IO).launch {
-                kotlinx.coroutines.delay(500)
-                var retries = 0
-                while (INSTANCE == null && retries < 50) {
-                    kotlinx.coroutines.delay(100)
-                    retries++
-                }
-                INSTANCE?.let { populateInitialData(it) }
-            }
-        }
-
-        private suspend fun populateInitialData(db: AppDatabase) {
-            if (db.perawatanDao().count() == 0) {
-                db.perawatanDao().insertAllIgnore(PerawatanScheduler.buildDefaultItems())
-            }
-            if (db.pelangganDao().count() > 0 || db.produkDao().count() > 0) {
-                return
-            }
-            db.produkDao().insert(
-                Produk(
-                    nama_produk = "Galon Air RO 19L",
-                    harga = 6000.0,
-                    updatedAt = 1L,
-                    syncId = "default_galon_ro_19l"
-                )
+            db.execSQL(
+                "INSERT OR IGNORE INTO `produk` (`id`, `nama_produk`, `harga`, `updatedAt`, `syncId`) VALUES (1, 'Galon Air RO 19L', 6000.0, 1, 'default_galon_ro_19l')"
             )
+            val now = System.currentTimeMillis()
+            PerawatanScheduler.buildDefaultItems(now).forEach { item ->
+                db.execSQL(
+                    "INSERT OR IGNORE INTO `perawatan_item` (`nama`, `intervalHari`, `terakhirSelesai`, `jadwalBerikutnya`, `updatedAt`, `syncId`) VALUES (?, ?, NULL, ?, ?, ?)",
+                    arrayOf<Any>(item.nama, item.intervalHari, item.jadwalBerikutnya, item.updatedAt, item.syncId)
+                )
+            }
         }
     }
 }

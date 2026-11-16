@@ -196,4 +196,44 @@ class OfflineSyncQueueUnitTest {
         assertEquals(3_000L, tx2After.sisaKasbon)
         assertEquals(3_000L, tx2After.uangMuka)
     }
+
+    @Test
+    fun ensureDesignatedStaffKurirsForOwner_seedsThreeStaffEmailsWithoutOverwritingCustomOwnerEdits() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = com.example.util.RealtimeSyncEngine(context, db)
+
+        // Pre-populate one customized courier for mumus8800@gmail.com
+        val customMumus = com.example.data.entity.Kurir(
+            nama = "Kang Mumus",
+            komisi_per_galon = 1_500.0,
+            email = "mumus8800@gmail.com",
+            akses_aktif = true,
+            syncId = "custom_mumus_sync",
+            updatedAt = 50_000L
+        )
+        db.kurirDao().insert(customMumus)
+
+        engine.ensureDesignatedStaffKurirsForOwner("ferryeffendy@gmail.com")
+
+        val allKurirs = db.kurirDao().getAllOnce().filter { !it.isDeleted }
+        assertEquals(3, allKurirs.size)
+
+        val mumusAfter = allKurirs.first { it.email == "mumus8800@gmail.com" }
+        assertEquals("Kang Mumus", mumusAfter.nama)
+        assertEquals(1_500.0, mumusAfter.komisi_per_galon, 0.01)
+
+        val radiAfter = allKurirs.first { it.email == "radijaya168@gmail.com" }
+        assertEquals("Radijaya168", radiAfter.nama)
+        assertEquals(1_000.0, radiAfter.komisi_per_galon, 0.01)
+        assertTrue(radiAfter.akses_aktif)
+
+        val fitriAfter = allKurirs.first { it.email == "fitriazizaheffendy@gmail.com" }
+        assertEquals("Fitriazizaheffendy", fitriAfter.nama)
+        assertEquals(1_000.0, fitriAfter.komisi_per_galon, 0.01)
+        assertTrue(fitriAfter.akses_aktif)
+
+        // Running again is idempotent (still 3 rows)
+        engine.ensureDesignatedStaffKurirsForOwner("ferryeffendy@gmail.com")
+        assertEquals(3, db.kurirDao().getAllOnce().count { !it.isDeleted })
+    }
 }

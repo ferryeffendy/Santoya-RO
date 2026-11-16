@@ -26,13 +26,75 @@ data class RestoredTransaksiPayment(
 object KaryawanScopeHelper {
 
     const val STATUS_DIHAPUS = "Dihapus"
+    const val PRIMARY_OWNER_EMAIL = "ferryeffendy@gmail.com"
+    const val DEFAULT_STAFF_COMMISSION_PER_GALON = 1000.0
+
+    val DESIGNATED_STAFF_EMAILS: List<String> = listOf(
+        "mumus8800@gmail.com",
+        "radijaya168@gmail.com",
+        "fitriazizaheffendy@gmail.com"
+    )
+
+    private val DESIGNATED_STAFF_EMAIL_SET: Set<String> = DESIGNATED_STAFF_EMAILS.toSet()
+
     private const val TX_DEL_PREFIX = "DEL:"
     private const val PELANGGAN_DEL_PREFIX = "[DIHAPUS:"
 
+    private val STRICT_EMAIL_REGEX = Regex("^[a-z0-9_.+\\-]+@[a-z0-9\\-]+(\\.[a-z0-9\\-]+)+$")
+
+    /**
+     * Memvalidasi apakah string merupakan alamat email penuh yang sah (wajib mengandung `@` dan domain).
+     */
+    fun isValidEmail(raw: String?): Boolean {
+        val clean = raw?.trim()?.lowercase().orEmpty()
+        return clean.isNotBlank() && clean.length <= 160 && STRICT_EMAIL_REGEX.matches(clean)
+    }
+
+    /**
+     * Menormalisasi alamat email menjadi huruf kecil tanpa spasi.
+     * Mengembalikan string kosong bila input bukan alamat email penuh yang valid (tanpa auto-append `@gmail.com`).
+     */
     fun normalizeEmail(raw: String?): String {
         val clean = raw?.trim()?.lowercase().orEmpty()
-        if (clean.isBlank()) return ""
-        return if (!clean.contains("@")) "$clean@gmail.com" else clean
+        if (!isValidEmail(clean)) return ""
+        return clean
+    }
+
+    /**
+     * Memeriksa apakah email merupakan akun pemilik utama Santoya RO (`ferryeffendy@gmail.com`).
+     */
+    fun isPrimaryOwnerEmail(raw: String?): Boolean {
+        return normalizeEmail(raw) == PRIMARY_OWNER_EMAIL
+    }
+
+    /**
+     * Memeriksa apakah email termasuk dalam daftar karyawan resmi depot yang wajib ditautkan sebagai karyawan.
+     */
+    fun isDesignatedStaffEmail(raw: String?): Boolean {
+        val normalized = normalizeEmail(raw)
+        return normalized.isNotBlank() && normalized in DESIGNATED_STAFF_EMAIL_SET
+    }
+
+    /**
+     * Menghasilkan nama tampilan sementara dari bagian lokal alamat email karyawan (mis. `Mumus8800`).
+     */
+    fun defaultStaffDisplayName(email: String): String {
+        val localPart = email.trim().substringBefore("@").trim()
+        if (localPart.isBlank()) return "Karyawan"
+        return localPart.replaceFirstChar { ch ->
+            if (ch.isLowerCase()) ch.titlecase() else ch.toString()
+        }.take(120)
+    }
+
+    /**
+     * Menghasilkan `syncId` deterministik untuk entri kurir bawaan berdasarkan alamat email karyawan.
+     */
+    fun defaultStaffSyncId(email: String): String {
+        val localPart = email.trim().lowercase().substringBefore("@")
+            .replace(Regex("[^a-z0-9_\\-]"), "_")
+            .trim('_')
+            .ifBlank { "staff" }
+        return "kurir_staff_${localPart.take(80)}"
     }
 
     fun resolveActiveKaryawan(userEmail: String?, kurirList: List<Kurir>): Kurir? {
@@ -54,6 +116,7 @@ object KaryawanScopeHelper {
         if (syncRole == DepotRole.STAFF) return true
         val normalizedUser = normalizeEmail(userEmail)
         if (normalizedUser.isBlank()) return false
+        if (isDesignatedStaffEmail(normalizedUser)) return true
 
         // Pemilik depot selalu owner, walaupun emailnya juga terdaftar sebagai kurir.
         val normalizedOwner = normalizeEmail(ownerEmail)
@@ -67,7 +130,7 @@ object KaryawanScopeHelper {
     }
 
     fun isDeletedTransaksi(transaksi: Transaksi): Boolean {
-        return transaksi.status.equals(STATUS_DIHAPUS, ignoreCase = true)
+        return transaksi.isDeleted || transaksi.status.equals(STATUS_DIHAPUS, ignoreCase = true)
     }
 
     fun encodeDeletedTransaksiMetadata(transaksi: Transaksi, karyawanName: String): String {
@@ -92,6 +155,7 @@ object KaryawanScopeHelper {
 
     fun extractDeletedByTransaksi(transaksi: Transaksi): String? {
         if (!isDeletedTransaksi(transaksi)) return null
+        transaksi.deletedBy?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
         val meta = transaksi.metode_bayar.trim()
         if (meta.startsWith(TX_DEL_PREFIX)) {
             val payload = meta.removePrefix(TX_DEL_PREFIX)
@@ -151,11 +215,12 @@ object KaryawanScopeHelper {
     }
 
     fun isSoftDeletedPelanggan(pelanggan: Pelanggan): Boolean {
-        return pelanggan.alamat.trimStart().startsWith(PELANGGAN_DEL_PREFIX)
+        return pelanggan.isDeleted || pelanggan.alamat.trimStart().startsWith(PELANGGAN_DEL_PREFIX)
     }
 
     fun extractDeletedByPelanggan(pelanggan: Pelanggan): String? {
         if (!isSoftDeletedPelanggan(pelanggan)) return null
+        pelanggan.deletedBy?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
         val trimmed = pelanggan.alamat.trimStart()
         val endIdx = trimmed.indexOf(']')
         if (endIdx > PELANGGAN_DEL_PREFIX.length) {

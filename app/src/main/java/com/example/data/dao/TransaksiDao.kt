@@ -39,10 +39,10 @@ interface TransaksiDao {
     @Query("SELECT * FROM transaksi WHERE id = :id LIMIT 1")
     suspend fun getDetailById(id: Int): TransaksiDetail?
 
-    @Query("SELECT * FROM transaksi WHERE id_pelanggan = :pelangganId AND LOWER(status) = 'kasbon' ORDER BY tanggal ASC, id ASC")
+    @Query("SELECT * FROM transaksi WHERE id_pelanggan = :pelangganId AND LOWER(status) = 'kasbon' AND isDeleted = 0 ORDER BY tanggal ASC, id ASC")
     suspend fun getUnpaidByPelanggan(pelangganId: Int): List<Transaksi>
 
-    @Query("SELECT * FROM transaksi WHERE LOWER(status) = 'kasbon' ORDER BY tanggal ASC, id ASC")
+    @Query("SELECT * FROM transaksi WHERE LOWER(status) = 'kasbon' AND isDeleted = 0 ORDER BY tanggal ASC, id ASC")
     suspend fun getAllUnpaidOnce(): List<Transaksi>
 
     @Query("SELECT * FROM transaksi ORDER BY tanggal DESC")
@@ -78,7 +78,7 @@ interface TransaksiDao {
     @Query("UPDATE transaksi SET id_kurir = NULL, updatedAt = :updatedAt WHERE id_kurir = :kurirId")
     suspend fun clearKurirFromTransaksi(kurirId: Int, updatedAt: Long = System.currentTimeMillis())
 
-    @Query("SELECT tanggal, SUM(total_harga) as total FROM transaksi WHERE tanggal >= :startTime AND LOWER(status) != 'dihapus' GROUP BY tanggal ORDER BY tanggal ASC")
+    @Query("SELECT tanggal, SUM(total_harga) as total FROM transaksi WHERE tanggal >= :startTime AND LOWER(status) != 'dihapus' AND isDeleted = 0 GROUP BY tanggal ORDER BY tanggal ASC")
     fun getDailyRevenueLast30Days(startTime: Long): Flow<List<DailyRevenue>>
 
     @Query(
@@ -90,7 +90,7 @@ interface TransaksiDao {
             END
         ), 0.0)
         FROM transaksi
-        WHERE tanggal >= :startTime AND tanggal <= :endTime AND LOWER(status) != 'dihapus'
+        WHERE tanggal >= :startTime AND tanggal <= :endTime AND LOWER(status) != 'dihapus' AND isDeleted = 0
         """
     )
     fun getTotalPendapatanByDateRange(startTime: Long, endTime: Long): Flow<Double>

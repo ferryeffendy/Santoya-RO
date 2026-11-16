@@ -99,7 +99,7 @@ tanpa memerlukan secret.
 
 ## Catatan migrasi database
 
-Database Room saat ini berada di versi 13. Semua perubahan skema harus disertai
+Database Room saat ini berada di versi 16 (`exportSchema = true` di `app/schemas/`). Semua perubahan skema harus disertai
 `Migration` eksplisit di `AppDatabase.kt`; `fallbackToDestructiveMigration()`
 sengaja tidak dipakai agar data pengguna tidak terhapus otomatis.
 

@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: "21"
@@ -30,36 +33,69 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Cek ketersediaan secret Firebase
-        id: firebase_secret
+      - name: Pastikan gradlew executable
+        run: chmod +x gradlew
+
+      - name: Siapkan google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            echo "Menggunakan GOOGLE_SERVICES_JSON dari GitHub Secrets."
+          elif [ -f "gradle/firebase-google-services.json" ]; then
+            cp gradle/firebase-google-services.json app/google-services.json
+            echo "::warning::Secret GOOGLE_SERVICES_JSON belum diisi; menggunakan fallback gradle/firebase-google-services.json."
           else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Secret GOOGLE_SERVICES_JSON belum diisi. Build APK dilewati."
+            cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "santoya-offline-build",
+              "storage_bucket": "santoya-offline-build.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000001",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.santoyaro.kxmpzq"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "000000000000-dummy.apps.googleusercontent.com",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDUMMYDUMMYDUMMYDUMMYDUMMYDUMMY"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": []
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
+            echo "::warning::Secret GOOGLE_SERVICES_JSON belum diisi; membangun APK dengan konfigurasi Firebase dummy (mode offline)."
             {
-              echo "### Build APK dilewati"
+              echo "### Perhatian: Konfigurasi Firebase Fallback"
               echo ""
-              echo "Secret \`GOOGLE_SERVICES_JSON\` belum diisi."
-              echo "Tambahkan di **Settings > Secrets and variables > Actions**, lalu jalankan ulang workflow ini."
+              echo "Secret \`GOOGLE_SERVICES_JSON\` belum diisi di **Settings > Secrets and variables > Actions**."
+              echo "APK debug tetap dibangun menggunakan konfigurasi fallback agar artefak siap diuji secara offline."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Siapkan google-services.json
-        if: steps.firebase_secret.outputs.available == 'true'
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
-
       - name: Build Debug APK
-        if: steps.firebase_secret.outputs.available == 'true'
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK
-        if: steps.firebase_secret.outputs.available == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: app-debug

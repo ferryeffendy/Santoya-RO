@@ -2805,27 +2805,53 @@ fun RiwayatTransaksiTab(
     }
 
     markingLunasTransaksi?.let { target ->
+        var selectedMetodePelunasan by remember(target) { mutableStateOf("Cash") }
         AlertDialog(
             onDismissRequest = { markingLunasTransaksi = null },
             shape = RoundedCornerShape(SantoyaRadius.lg),
             title = {
                 Text(
-                    text = "Tandai Nota Lunas?",
+                    text = "Tandai Nota Lunas",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
-                Text(
-                    text = "Tandai sisa kasbon ${target.pelanggan?.nama ?: "Pelanggan Umum"} sebesar ${FormatUtils.formatRupiah(target.transaksi.remainingKasbonAmount())} (${target.transaksi.jumlah} galon) sebagai Lunas?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Tandai sisa kasbon ${target.pelanggan?.nama ?: "Pelanggan Umum"} sebesar ${FormatUtils.formatRupiah(target.transaksi.remainingKasbonAmount())} (${target.transaksi.jumlah} galon) sebagai Lunas?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Metode Pelunasan:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedMetodePelunasan == "Cash",
+                            onClick = { selectedMetodePelunasan = "Cash" },
+                            label = { Text("Tunai") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = selectedMetodePelunasan == "Transfer",
+                            onClick = { selectedMetodePelunasan = "Transfer" },
+                            label = { Text("Transfer") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.markTransaksiLunas(target.transaksi.id)
+                        viewModel.markTransaksiLunas(target.transaksi.id, selectedMetodePelunasan)
                         markingLunasTransaksi = null
                     },
                     colors = ButtonDefaults.buttonColors(
@@ -2944,7 +2970,7 @@ fun RiwayatTransaksiTab(
         val isEditBayarSebagian = editMetode.equals("Bayar Sebagian", ignoreCase = true)
         val parsedEditDp = editUangMuka.toLongOrNull() ?: 0L
         val isValidEdit = parsedJumlah > 0 && parsedHarga > 0.0 &&
-            (!isEditBayarSebagian || (parsedEditDp > 0L && parsedEditDp <= previewTotalHarga.toLong()))
+            (!isEditBayarSebagian || (parsedEditDp > 0L && parsedEditDp < previewTotalHarga.toLong()))
 
         val jumlahFocus = remember { FocusRequester() }
         val hargaFocus = remember { FocusRequester() }
@@ -2958,11 +2984,22 @@ fun RiwayatTransaksiTab(
             confirmEnabled = isValidEdit,
             onConfirm = {
                 if (isValidEdit) {
-                    val finalStatus = if (isEditBayarSebagian) "Kasbon" else editStatus
+                    val isFullPaidByDp = isEditBayarSebagian && parsedEditDp >= previewTotalHarga.toLong()
+                    val finalStatus = when {
+                        isFullPaidByDp -> "Lunas"
+                        isEditBayarSebagian -> "Kasbon"
+                        else -> editStatus
+                    }
                     val finalMetode = when {
+                        isFullPaidByDp -> "Cash"
                         isEditBayarSebagian -> "Bayar Sebagian"
                         finalStatus.equals("Kasbon", ignoreCase = true) -> "-"
                         else -> editMetode.ifBlank { "Cash" }
+                    }
+                    val finalUangMuka = when {
+                        isFullPaidByDp -> previewTotalHarga.toLong()
+                        isEditBayarSebagian -> parsedEditDp
+                        else -> 0L
                     }
                     focusManager.clearFocus()
                     keyboardController?.hide()
@@ -2976,7 +3013,7 @@ fun RiwayatTransaksiTab(
                         hargaSatuan = parsedHarga,
                         metodeBayar = finalMetode,
                         status = finalStatus,
-                        uangMuka = if (isEditBayarSebagian) parsedEditDp else 0L,
+                        uangMuka = finalUangMuka,
                         onSuccess = { editingTransaksi = null }
                     )
                 }
@@ -3268,6 +3305,21 @@ fun RiwayatTransaksiTab(
                     ),
                     modifier = Modifier.weight(1f).heightIn(min = 40.dp)
                 )
+            }
+
+            if (detail.transaksi.uangMuka > 0L && isEditKasbonPenuh) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Perhatian: Transaksi ini sebelumnya memiliki DP ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())}. Memilih Kasbon Penuh akan membatalkan DP ini.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
             }
 
             if (isEditBayarSebagian) {

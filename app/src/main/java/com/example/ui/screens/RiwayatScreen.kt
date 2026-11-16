@@ -39,10 +39,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -110,6 +112,7 @@ fun RiwayatScreen(
     var pairedDevices by remember { mutableStateOf<List<BluetoothDevice>>(emptyList()) }
     var pendingReceiptText by remember { mutableStateOf("") }
     var transaksiToDelete by remember { mutableStateOf<Transaksi?>(null) }
+    var transaksiToMarkLunas by remember { mutableStateOf<Transaksi?>(null) }
 
     @SuppressLint("MissingPermission")
     fun printReceipt(receiptText: String) {
@@ -291,8 +294,7 @@ fun RiwayatScreen(
                                 )
                             },
                             onTandaiLunas = {
-                                viewModel.markTransaksiLunas(trx.id)
-                                Toast.makeText(context, "Transaksi #TRX-${trx.id} ditandai Lunas", Toast.LENGTH_SHORT).show()
+                                transaksiToMarkLunas = trx
                             },
                             onDelete = {
                                 transaksiToDelete = trx
@@ -328,6 +330,69 @@ fun RiwayatScreen(
             dismissButton = {
                 TextButton(onClick = { transaksiToDelete = null }) {
                     Text("Batal")
+                }
+            }
+        )
+    }
+
+    transaksiToMarkLunas?.let { trx ->
+        var selectedMetode by remember(trx) { mutableStateOf("Cash") }
+        AlertDialog(
+            onDismissRequest = { transaksiToMarkLunas = null },
+            shape = RoundedCornerShape(SantoyaRadius.lg),
+            title = { Text("Tandai Nota Lunas", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Tandai transaksi #TRX-${trx.id} sebesar ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())} sebagai Lunas?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Metode Pelunasan:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = selectedMetode == "Cash",
+                            onClick = { selectedMetode = "Cash" },
+                            label = { Text("Tunai") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = selectedMetode == "Transfer",
+                            onClick = { selectedMetode = "Transfer" },
+                            label = { Text("Transfer") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.markTransaksiLunas(trx.id, selectedMetode)
+                        transaksiToMarkLunas = null
+                        Toast.makeText(context, "Transaksi #TRX-${trx.id} ditandai Lunas ($selectedMetode)", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.santoyaColors.success,
+                        contentColor = MaterialTheme.santoyaColors.onSuccess
+                    ),
+                    shape = RoundedCornerShape(SantoyaRadius.md)
+                ) {
+                    Text("Tandai Lunas", fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { transaksiToMarkLunas = null },
+                    shape = RoundedCornerShape(SantoyaRadius.md)
+                ) {
+                    Text("Batal", fontWeight = FontWeight.SemiBold)
                 }
             }
         )

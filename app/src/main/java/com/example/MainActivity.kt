@@ -61,6 +61,7 @@ import com.example.ui.screens.PengeluaranScreen
 import com.example.ui.screens.PerawatanScreen
 import com.example.ui.screens.ProdukScreen
 import com.example.ui.screens.RevokedAccessDialog
+import com.example.ui.screens.RoleConfirmationDialog
 import com.example.ui.screens.SessionPreparingDialog
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.TransaksiScreen
@@ -141,6 +142,30 @@ class MainActivity : ComponentActivity() {
                         if (syncState.status == SyncConnectionStatus.REVOKED) {
                             RevokedAccessDialog(
                                 ownerEmail = syncState.ownerEmail,
+                                onSignOut = {
+                                    coroutineScope.launch {
+                                        viewModel.clearLocalDataForLogout()
+                                        try {
+                                            val credentialManager = CredentialManager.create(this@MainActivity)
+                                            credentialManager.clearCredentialState(ClearCredentialStateRequest())
+                                        } catch (_: Exception) {
+                                        }
+                                        Firebase.auth.signOut()
+                                    }
+                                }
+                            )
+                        }
+
+                        // Tampilkan gerbang konfirmasi peran bagi akun baru yang belum terdaftar di depot mana pun.
+                        if (syncState.status == SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION) {
+                            RoleConfirmationDialog(
+                                userEmail = activeUser?.email.orEmpty(),
+                                onRecheckStaffLink = { onDone ->
+                                    viewModel.recheckStaffConnection(onDone)
+                                },
+                                onConfirmAsOwner = {
+                                    viewModel.confirmAsNewOwner()
+                                },
                                 onSignOut = {
                                     coroutineScope.launch {
                                         viewModel.clearLocalDataForLogout()
@@ -420,6 +445,8 @@ class MainActivity : ComponentActivity() {
 
                         if (showSyncInfoSheet) {
                             val activeUser = currentUser
+                            val canSwitchToStaffWaiting = !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(activeUser?.email) &&
+                                (!isKaryawan || !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
                             SantoyaSyncInfoBottomSheet(
                                 syncState = syncState,
                                 onDismiss = { showSyncInfoSheet = false },
@@ -432,6 +459,12 @@ class MainActivity : ComponentActivity() {
                                     {
                                         viewModel.navigateTo(SantoyaScreen.SETTINGS)
                                         showSyncInfoSheet = false
+                                    }
+                                } else null,
+                                onSwitchToStaffWaiting = if (canSwitchToStaffWaiting) {
+                                    {
+                                        showSyncInfoSheet = false
+                                        viewModel.switchToStaffWaitingMode()
                                     }
                                 } else null
                             )

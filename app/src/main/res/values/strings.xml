@@ -174,6 +174,20 @@
     <string name="revoked_access_confirm_message">Akun akan keluar dan seluruh salinan data depot di perangkat ini akan dihapus.</string>
     <string name="revoked_access_confirm_button">Ya, Keluar</string>
 
+    <!-- Role Confirmation (Unregistered Account Gate) -->
+    <string name="role_confirm_title">Pilih Peran Akun Ini</string>
+    <string name="role_confirm_subtitle">Email Google %1$s belum terhubung ke depot mana pun di Cloud.</string>
+    <string name="role_confirm_staff_card_title">Saya Karyawan / Kurir Depot</string>
+    <string name="role_confirm_staff_card_desc">Minta Pemilik Depot menambahkan email %1$s di menu Karyawan &amp; Komisi pada HP Pemilik. Layar ini akan otomatis masuk begitu email Anda disimpan.</string>
+    <string name="role_confirm_btn_recheck">Cek Ulang Sambungan Depot</string>
+    <string name="role_confirm_btn_checking">Memeriksa tautan depot…</string>
+    <string name="role_confirm_owner_btn">Saya Pemilik Depot Baru (Buat Depot)</string>
+    <string name="role_confirm_owner_dialog_title">Buat Depot Baru?</string>
+    <string name="role_confirm_owner_dialog_msg">Pilih opsi ini HANYA jika Anda adalah pemilik usaha depot air minum (%1$s). Jika Anda kurir/karyawan, pilih Batal lalu minta Pemilik mendaftarkan email Anda.</string>
+    <string name="role_confirm_owner_dialog_confirm">Ya, Saya Pemilik Depot</string>
+    <string name="role_confirm_sign_out_btn">Ganti Akun Google</string>
+    <string name="sync_sheet_switch_to_staff_btn">Akun Ini Karyawan? Hubungkan ke Depot Pemilik</string>
+
     <!-- Dialogs -->
     <string name="kasbon_dialog_title">Pelunasan Kasbon</string>
     <string name="kasbon_dialog_confirm">Simpan Pembayaran</string>

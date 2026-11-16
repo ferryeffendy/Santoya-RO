@@ -104,6 +104,45 @@ class DepotFirestoreRuleTest : FirestoreEmulatorTestBase() {
         }
         assertTrue(snap.exists())
         assertEquals("Galon RO", snap.getString("nama_produk"))
+
+        // Simulate shadow owner hijacking staff_links/{STAFF_EMAIL}, then real owner reclaiming it
+        val shadowOwnerUid = signInTestUser(OUTSIDER_EMAIL, verifyEmail = true)
+        val shadowDepotId = setupOwnerDepot(shadowOwnerUid, OUTSIDER_EMAIL, listOf(STAFF_EMAIL))
+        withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("staff_links").document(STAFF_EMAIL).set(
+                mapOf(
+                    "depotId" to shadowDepotId,
+                    "ownerUid" to shadowOwnerUid,
+                    "ownerEmail" to OUTSIDER_EMAIL,
+                    "staffEmail" to STAFF_EMAIL,
+                    "active" to true,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        }
+
+        // Real owner signs back in and reclaims staff_links/{STAFF_EMAIL} pointing to real depotId
+        signInTestUser(OWNER_EMAIL, verifyEmail = true)
+        withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("staff_links").document(STAFF_EMAIL).set(
+                mapOf(
+                    "depotId" to depotId,
+                    "ownerUid" to ownerUid,
+                    "ownerEmail" to OWNER_EMAIL,
+                    "staffEmail" to STAFF_EMAIL,
+                    "active" to true,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            ).await()
+        }
+
+        val reclaimedSnap = withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("staff_links").document(STAFF_EMAIL).get().await()
+        }
+        assertEquals(depotId, reclaimedSnap.getString("depotId"))
+        assertEquals(OWNER_EMAIL, reclaimedSnap.getString("ownerEmail"))
     }
 
     @Test
@@ -204,6 +243,16 @@ class DepotFirestoreRuleTest : FirestoreEmulatorTestBase() {
                     .collection("pelanggan").get().await()
             }
             fail("Expected PERMISSION_DENIED for outsider")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        try {
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("staff_links").document("nonexistent_probe@test.com").get().await()
+            }
+            fail("Expected PERMISSION_DENIED for outsider probing non-existent staff_links")
         } catch (e: Exception) {
             val ffe = e.unwrapFirestoreException() ?: throw e
             assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)

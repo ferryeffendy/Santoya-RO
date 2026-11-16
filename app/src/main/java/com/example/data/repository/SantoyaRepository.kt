@@ -13,6 +13,7 @@ import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
+import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
 import com.example.util.KomisiCalculator
 import com.example.util.PerawatanScheduler
@@ -191,9 +192,12 @@ class SantoyaRepository(
                 // Tetap simpan baris lokal (tersembunyi) agar relasi transaksi lama
                 // tidak menggantung. Cloud menerima tombstone.
                 if (!KaryawanScopeHelper.isSoftDeletedPelanggan(latest)) {
+                    val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(latest.alamat)
                     db.pelangganDao().update(
                         latest.copy(
-                            alamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(latest.alamat, "Pemilik"),
+                            alamat = cleanAlamat,
+                            isDeleted = true,
+                            deletedBy = "Pemilik",
                             updatedAt = now
                         )
                     )
@@ -219,8 +223,13 @@ class SantoyaRepository(
                 softDeleted = true
                 return@withTransaction
             }
-            val updatedAlamat = KaryawanScopeHelper.formatDeletedPelangganAlamat(latest.alamat, karyawanName)
-            val updated = latest.copy(alamat = updatedAlamat, updatedAt = now)
+            val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(latest.alamat)
+            val updated = latest.copy(
+                alamat = cleanAlamat,
+                isDeleted = true,
+                deletedBy = karyawanName.trim().ifBlank { "Karyawan" },
+                updatedAt = now
+            )
             db.pelangganDao().update(updated)
             enqueueUpsert(SyncCollections.PELANGGAN, updated.syncId, now)
             softDeleted = true
@@ -236,7 +245,12 @@ class SantoyaRepository(
             val latest = db.pelangganDao().getById(pelanggan.id) ?: pelanggan
             if (!KaryawanScopeHelper.isSoftDeletedPelanggan(latest)) return@withTransaction
             val cleanAlamat = KaryawanScopeHelper.cleanPelangganAlamat(latest.alamat)
-            val updated = latest.copy(alamat = cleanAlamat, updatedAt = now)
+            val updated = latest.copy(
+                alamat = cleanAlamat,
+                isDeleted = false,
+                deletedBy = null,
+                updatedAt = now
+            )
             db.pelangganDao().update(updated)
             enqueueUpsert(SyncCollections.PELANGGAN, updated.syncId, now)
             restored = true
@@ -267,8 +281,8 @@ class SantoyaRepository(
                 val fixedTx = tx.copy(
                     status = "Lunas",
                     metode_bayar = tx.metode_bayar.takeIf { it.isNotBlank() && it != "-" } ?: cleanMetode,
-                    uangMuka = tx.total_harga.toLong().coerceAtLeast(0L),
                     sisaKasbon = 0L,
+                    tanggalBayar = tx.tanggalBayar ?: now,
                     updatedAt = now
                 )
                 db.transaksiDao().update(fixedTx)
@@ -286,6 +300,7 @@ class SantoyaRepository(
                     metode_bayar = cleanMetode,
                     uangMuka = tx.total_harga.toLong().coerceAtLeast(0L),
                     sisaKasbon = 0L,
+                    tanggalBayar = now,
                     updatedAt = now
                 )
                 db.transaksiDao().update(settledTx)
@@ -300,6 +315,7 @@ class SantoyaRepository(
                     metode_bayar = "Bayar Sebagian",
                     uangMuka = newNoteDp,
                     sisaKasbon = newNoteSisa,
+                    tanggalBayar = null,
                     updatedAt = now
                 )
                 db.transaksiDao().update(partialTx)
@@ -344,6 +360,18 @@ class SantoyaRepository(
                     )
                     if (settledIds.isNotEmpty()) {
                         reconciledCustomers++
+                        val auditLog = KasbonLog(
+                            id_pelanggan = pelanggan.id,
+                            tanggal = now,
+                            jumlah_bayar = 0.0,
+                            sisa_kasbon_sebelum = unpaidTotal,
+                            sisa_kasbon_sesudah = targetKasbon,
+                            metode_bayar = latestPaymentMethod,
+                            catatan = "Rekonsiliasi Saldo Kasbon • Penyesuaian Nota " + settledIds.joinToString(", ") { "#$it" },
+                            updatedAt = now
+                        )
+                        db.kasbonLogDao().insert(auditLog)
+                        enqueueUpsert(SyncCollections.KASBON_LOGS, auditLog.syncId, now)
                     }
                 }
             }
@@ -370,9 +398,12 @@ class SantoyaRepository(
             } else {
                 unpaidTotal.coerceAtLeast(0.0)
             }
-            val newKasbon = (currentKasbon - nominalBayar).coerceAtLeast(0.0)
+            val effectiveBayar = nominalBayar.coerceAtMost(currentKasbon)
+            val kembalian = (nominalBayar - currentKasbon).coerceAtLeast(0.0)
+            val newKasbon = (currentKasbon - effectiveBayar).coerceAtLeast(0.0)
+
             val priorDiscrepancy = (unpaidTotal - currentKasbon).toLong().coerceAtLeast(0L)
-            val totalToAllocateOnNotes = priorDiscrepancy + nominalBayar.toLong().coerceAtLeast(0L)
+            val totalToAllocateOnNotes = priorDiscrepancy + effectiveBayar.toLong().coerceAtLeast(0L)
             val affectedNoteIds = allocatePaymentToUnpaidNotesFifo(
                 unpaidNotes = unpaidNotes,
                 amountToSettle = totalToAllocateOnNotes,
@@ -389,14 +420,19 @@ class SantoyaRepository(
             } else {
                 ""
             }
+            val kembalianSummary = if (kembalian > 0.0) {
+                " (Diterima ${FormatUtils.formatRupiah(nominalBayar)}, Kembalian ${FormatUtils.formatRupiah(kembalian)})"
+            } else {
+                ""
+            }
             val log = KasbonLog(
                 id_pelanggan = pelangganId,
                 tanggal = now,
-                jumlah_bayar = nominalBayar,
+                jumlah_bayar = effectiveBayar,
                 sisa_kasbon_sebelum = currentKasbon,
                 sisa_kasbon_sesudah = newKasbon,
                 metode_bayar = cleanMetode,
-                catatan = "Pelunasan Kasbon ($cleanMetode)$noteSummary",
+                catatan = "Pelunasan Kasbon ($cleanMetode)$kembalianSummary$noteSummary",
                 updatedAt = now
             )
             db.kasbonLogDao().insert(log)
@@ -616,6 +652,32 @@ class SantoyaRepository(
         val totalKomisi = breakdown.totalKomisi
 
         val txId = db.withTransaction {
+            val isBayarSebagian = metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
+            val isFullPaidByDp = isBayarSebagian && uangMuka >= totalBelanja.toLong()
+            val statusVal = when {
+                isFullPaidByDp -> "Lunas"
+                isBayarSebagian -> "Kasbon"
+                else -> status
+            }
+            val metodeVal = when {
+                isFullPaidByDp -> "Cash"
+                isBayarSebagian -> "Bayar Sebagian"
+                statusVal.equals("Kasbon", ignoreCase = true) -> "-"
+                else -> metodeBayar.ifBlank { "Cash" }
+            }
+            val uangMukaVal = when {
+                isFullPaidByDp -> totalBelanja.toLong()
+                isBayarSebagian -> uangMuka
+                else -> 0L
+            }
+            val sisaKasbonVal = when {
+                isFullPaidByDp -> 0L
+                isBayarSebagian -> (totalBelanja.toLong() - uangMuka).coerceAtLeast(0L)
+                statusVal.equals("Kasbon", ignoreCase = true) -> totalBelanja.toLong().coerceAtLeast(0L)
+                else -> 0L
+            }
+            val tanggalBayarVal = if (statusVal.equals("Lunas", ignoreCase = true)) tanggal else null
+
             val transaksi = Transaksi(
                 tanggal = tanggal,
                 id_pelanggan = idPelanggan,
@@ -625,16 +687,17 @@ class SantoyaRepository(
                 harga_satuan = hargaSatuan,
                 total_harga = totalBelanja,
                 total_komisi = totalKomisi,
-                metode_bayar = metodeBayar,
-                status = status,
-                uangMuka = uangMuka,
-                sisaKasbon = sisaKasbon,
+                metode_bayar = metodeVal,
+                status = statusVal,
+                uangMuka = uangMukaVal,
+                sisaKasbon = sisaKasbonVal,
+                tanggalBayar = tanggalBayarVal,
                 updatedAt = now
             )
             val insertedTxId = db.transaksiDao().insert(transaksi)
             enqueueUpsert(SyncCollections.TRANSAKSI, transaksi.syncId, now)
 
-            if (status.equals("Kasbon", ignoreCase = true) && sisaKasbon > 0) {
+            if (statusVal.equals("Kasbon", ignoreCase = true) && sisaKasbonVal > 0) {
                 val pelanggan = db.pelangganDao().getById(idPelanggan)
                 if (pelanggan != null) {
                     val oldKasbon = pelanggan.sisa_kasbon
@@ -700,8 +763,9 @@ class SantoyaRepository(
         )
     }
 
-    suspend fun markTransaksiLunas(transaksiId: Int) {
+    suspend fun markTransaksiLunas(transaksiId: Int, metodeBayar: String = "Cash") {
         val now = System.currentTimeMillis()
+        val cleanMetode = metodeBayar.trim().ifBlank { "Cash" }
         var changed = false
         db.withTransaction {
             val detail = db.transaksiDao().getDetailById(transaksiId) ?: return@withTransaction
@@ -723,19 +787,25 @@ class SantoyaRepository(
                     jumlah_bayar = sisa,
                     sisa_kasbon_sebelum = oldKasbon,
                     sisa_kasbon_sesudah = newKasbon,
-                    metode_bayar = "Cash",
-                    catatan = "Pelunasan Nota #${tx.id}",
+                    metode_bayar = cleanMetode,
+                    catatan = "Pelunasan Nota #${tx.id} ($cleanMetode)",
                     updatedAt = now
                 )
                 db.kasbonLogDao().insert(log)
                 enqueueUpsert(SyncCollections.KASBON_LOGS, log.syncId, now)
             }
 
+            val finalMetode = if (tx.metode_bayar.equals("Kasbon", ignoreCase = true) || tx.metode_bayar == "-") {
+                cleanMetode
+            } else {
+                tx.metode_bayar
+            }
+
             val updatedTx = tx.copy(
                 status = "Lunas",
-                metode_bayar = "Cash",
-                uangMuka = tx.total_harga.toLong(),
+                metode_bayar = finalMetode,
                 sisaKasbon = 0L,
+                tanggalBayar = now,
                 updatedAt = now
             )
             db.transaksiDao().update(updatedTx)
@@ -765,13 +835,11 @@ class SantoyaRepository(
                 }
             }
 
-            val encodedMetode = KaryawanScopeHelper.encodeDeletedTransaksiMetadata(latest, karyawanName)
             val softDeletedTx = latest.copy(
                 status = KaryawanScopeHelper.STATUS_DIHAPUS,
-                metode_bayar = encodedMetode,
+                isDeleted = true,
+                deletedBy = karyawanName.trim().ifBlank { "Karyawan" },
                 total_komisi = 0.0,
-                uangMuka = 0L,
-                sisaKasbon = 0L,
                 updatedAt = now
             )
             db.transaksiDao().update(softDeletedTx)
@@ -788,25 +856,44 @@ class SantoyaRepository(
             val latest = db.transaksiDao().getDetailById(transaksi.id)?.transaksi ?: transaksi
             if (!KaryawanScopeHelper.isDeletedTransaksi(latest)) return@withTransaction
 
-            val restoredPayment = KaryawanScopeHelper.decodeRestoredTransaksiPayment(latest)
             val kurir = latest.id_kurir?.let { db.kurirDao().getById(it) }
             val breakdown = KomisiCalculator.calculateTransactionCommission(kurir, latest.jumlah)
 
+            val (restoredStatus, restoredMetode, restoredUangMuka, restoredSisa) = if (latest.metode_bayar.startsWith("DEL:")) {
+                val decoded = KaryawanScopeHelper.decodeRestoredTransaksiPayment(latest)
+                listOf(decoded.status, decoded.metodeBayar, decoded.uangMuka, decoded.sisaKasbon)
+            } else {
+                val sisa = latest.sisaKasbon
+                val dp = latest.uangMuka
+                val total = latest.total_harga.toLong()
+                val isKasbon = sisa > 0L || (latest.metode_bayar.equals("Bayar Sebagian", ignoreCase = true) && dp < total)
+                val st = if (isKasbon) "Kasbon" else "Lunas"
+                val finalSisa = if (isKasbon && sisa == 0L) (total - dp).coerceAtLeast(0L) else sisa
+                listOf(st, latest.metode_bayar, dp, finalSisa)
+            }
+
+            val statusStr = restoredStatus as String
+            val metodeStr = restoredMetode as String
+            val dpLong = restoredUangMuka as Long
+            val sisaLong = restoredSisa as Long
+
             val restoredTx = latest.copy(
-                status = restoredPayment.status,
-                metode_bayar = restoredPayment.metodeBayar,
-                uangMuka = restoredPayment.uangMuka,
-                sisaKasbon = restoredPayment.sisaKasbon,
+                status = statusStr,
+                metode_bayar = metodeStr,
+                uangMuka = dpLong,
+                sisaKasbon = sisaLong,
+                isDeleted = false,
+                deletedBy = null,
                 total_komisi = breakdown.totalKomisi,
                 updatedAt = now
             )
             db.transaksiDao().update(restoredTx)
             enqueueUpsert(SyncCollections.TRANSAKSI, restoredTx.syncId, now)
 
-            if (restoredPayment.status.equals("Kasbon", ignoreCase = true) && restoredPayment.sisaKasbon > 0L) {
+            if (statusStr.equals("Kasbon", ignoreCase = true) && sisaLong > 0L) {
                 val pelanggan = db.pelangganDao().getById(latest.id_pelanggan)
                 if (pelanggan != null) {
-                    val newKasbon = pelanggan.sisa_kasbon + restoredPayment.sisaKasbon.toDouble()
+                    val newKasbon = pelanggan.sisa_kasbon + sisaLong.toDouble()
                     val updatedPelanggan = pelanggan.copy(sisa_kasbon = newKasbon, updatedAt = now)
                     db.pelangganDao().update(updatedPelanggan)
                     enqueueUpsert(SyncCollections.PELANGGAN, updatedPelanggan.syncId, now)
@@ -873,11 +960,47 @@ class SantoyaRepository(
             val breakdown = KomisiCalculator.calculateTransactionCommission(kurir, jumlah)
             val totalKomisi = breakdown.totalKomisi
             val isBayarSebagian = metodeBayar.equals("Bayar Sebagian", ignoreCase = true)
-            val statusVal = if (isBayarSebagian) "Kasbon" else status
+            val isFullPaidByDp = isBayarSebagian && uangMuka >= totalBelanja.toLong()
+            val statusVal = when {
+                isFullPaidByDp -> "Lunas"
+                isBayarSebagian -> "Kasbon"
+                else -> status
+            }
             val sisaKasbonVal: Long = when {
+                isFullPaidByDp -> 0L
                 isBayarSebagian -> ((totalBelanja - uangMuka.toDouble()).toLong()).coerceAtLeast(0L)
                 statusVal.equals("Kasbon", ignoreCase = true) -> totalBelanja.toLong().coerceAtLeast(0L)
                 else -> 0L
+            }
+            val finalMetode = when {
+                isFullPaidByDp -> "Cash"
+                isBayarSebagian -> "Bayar Sebagian"
+                statusVal.equals("Kasbon", ignoreCase = true) -> "-"
+                else -> metodeBayar.ifBlank { "Cash" }
+            }
+            val finalUangMuka = when {
+                isFullPaidByDp -> totalBelanja.toLong()
+                isBayarSebagian -> uangMuka
+                else -> 0L
+            }
+            val tanggalBayarVal: Long? = when {
+                statusVal.equals("Lunas", ignoreCase = true) -> oldTx.tanggalBayar ?: now
+                else -> null
+            }
+
+            if (oldTx.uangMuka > 0L && finalUangMuka == 0L && statusVal.equals("Kasbon", ignoreCase = true)) {
+                val auditLog = KasbonLog(
+                    id_pelanggan = idPelanggan,
+                    tanggal = now,
+                    jumlah_bayar = 0.0,
+                    sisa_kasbon_sebelum = oldTx.remainingKasbonAmount(),
+                    sisa_kasbon_sesudah = sisaKasbonVal.toDouble(),
+                    metode_bayar = "Kasbon",
+                    catatan = "Koreksi Nota #${oldTx.id}: DP ${FormatUtils.formatRupiah(oldTx.uangMuka.toDouble())} dibatalkan menjadi Kasbon Penuh",
+                    updatedAt = now
+                )
+                db.kasbonLogDao().insert(auditLog)
+                enqueueUpsert(SyncCollections.KASBON_LOGS, auditLog.syncId, now)
             }
 
             val updatedTx = oldTx.copy(
@@ -889,10 +1012,11 @@ class SantoyaRepository(
                 harga_satuan = hargaSatuan,
                 total_harga = totalBelanja,
                 total_komisi = totalKomisi,
-                metode_bayar = metodeBayar,
+                metode_bayar = finalMetode,
                 status = statusVal,
-                uangMuka = if (isBayarSebagian) uangMuka else 0L,
+                uangMuka = finalUangMuka,
                 sisaKasbon = sisaKasbonVal,
+                tanggalBayar = tanggalBayarVal,
                 updatedAt = now
             )
             db.transaksiDao().update(updatedTx)

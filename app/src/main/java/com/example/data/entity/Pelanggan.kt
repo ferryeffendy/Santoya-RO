@@ -18,5 +18,7 @@ data class Pelanggan(
     val harga_khusus: Double? = null,
     val id_kurir_langganan: Int? = null,
     val updatedAt: Long = System.currentTimeMillis(),
-    val syncId: String = UUID.randomUUID().toString()
+    val syncId: String = UUID.randomUUID().toString(),
+    val isDeleted: Boolean = false,
+    val deletedBy: String? = null
 )

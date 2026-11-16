@@ -165,15 +165,26 @@ fun KasbonPelunasanDialog(
 
         if (nominalDouble > 0) {
             val sisaSetelahBayar = (pelanggan.sisa_kasbon - nominalDouble).coerceAtLeast(0.0)
-            Text(
-                text = stringResource(
-                    R.string.kasbon_remaining_after,
-                    FormatUtils.formatRupiah(sisaSetelahBayar)
-                ),
-                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.SemiBold,
-                color = if (sisaSetelahBayar == 0.0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            val kembalian = (nominalDouble - pelanggan.sisa_kasbon).coerceAtLeast(0.0)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(
+                        R.string.kasbon_remaining_after,
+                        FormatUtils.formatRupiah(sisaSetelahBayar)
+                    ),
+                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (sisaSetelahBayar == 0.0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (kembalian > 0.0) {
+                    Text(
+                        text = "Kembalian: ${FormatUtils.formatRupiah(kembalian)}",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
     }
 }

@@ -39,12 +39,16 @@ service cloud.firestore {
              (request.auth.token.email.lower() in emailList);
     }
 
+    function depotData(depotId) {
+      return get(/databases/$(database)/documents/depots/$(depotId)).data;
+    }
+
     // Cukup satu get(); jika dokumen tidak ada, evaluasi gagal dan akses ditolak.
     function isDepotOwner(depotId) {
       return isSignedIn() &&
              (
                depotId == 'depot_' + request.auth.uid ||
-               get(/databases/$(database)/documents/depots/$(depotId)).data.ownerUid == request.auth.uid
+               depotData(depotId).ownerUid == request.auth.uid
              );
     }
 
@@ -58,7 +62,7 @@ service cloud.firestore {
       return isSignedIn() &&
              (
                depotId == 'depot_' + request.auth.uid ||
-               isDepotMemberData(get(/databases/$(database)/documents/depots/$(depotId)).data)
+               isDepotMemberData(depotData(depotId))
              );
     }
 
@@ -116,19 +120,21 @@ service cloud.firestore {
 
     function isValidPelanggan(data, docId) {
       return data.keys().hasAll(['syncId', 'nama', 'alamat', 'no_hp', 'sisa_kasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
-             data.keys().hasOnly(['syncId', 'nama', 'alamat', 'no_hp', 'sisa_kasbon', 'harga_khusus', 'kurirSyncId', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'nama', 'alamat', 'no_hp', 'sisa_kasbon', 'harga_khusus', 'kurirSyncId', 'updatedAt', 'isDeleted', 'deletedBy', '_hardDeleted', 'serverUpdatedAt']) &&
              hasValidSyncMeta(data, docId) &&
              data.nama is string && data.nama.size() >= 1 && data.nama.size() <= 120 &&
              data.alamat is string && data.alamat.size() <= 300 &&
              data.no_hp is string && data.no_hp.size() <= 40 &&
              data.sisa_kasbon is number && data.sisa_kasbon >= 0 &&
              (!('harga_khusus' in data) || data.harga_khusus == null || (data.harga_khusus is number && data.harga_khusus >= 0)) &&
-             (!('kurirSyncId' in data) || data.kurirSyncId == null || (data.kurirSyncId is string && data.kurirSyncId.size() <= 128));
+             (!('kurirSyncId' in data) || data.kurirSyncId == null || (data.kurirSyncId is string && data.kurirSyncId.size() <= 128)) &&
+             (!('deletedBy' in data) || data.deletedBy == null || (data.deletedBy is string && data.deletedBy.size() <= 120)) &&
+             (!('_hardDeleted' in data) || data._hardDeleted == null || data._hardDeleted is bool);
     }
 
     function isValidTransaksi(data, docId) {
       return data.keys().hasAll(['syncId', 'tanggal', 'pelangganSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
-             data.keys().hasOnly(['syncId', 'tanggal', 'pelangganSyncId', 'kurirSyncId', 'produkSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'tanggal', 'pelangganSyncId', 'kurirSyncId', 'produkSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'tanggalBayar', 'updatedAt', 'isDeleted', 'deletedBy', '_hardDeleted', 'serverUpdatedAt']) &&
              hasValidSyncMeta(data, docId) &&
              data.tanggal is number && data.tanggal >= 0 &&
              data.pelangganSyncId is string && data.pelangganSyncId.size() >= 1 && data.pelangganSyncId.size() <= 128 &&
@@ -141,7 +147,10 @@ service cloud.firestore {
              data.metode_bayar is string && data.metode_bayar.size() <= 40 &&
              data.status is string && data.status.size() <= 40 &&
              data.uangMuka is number && data.uangMuka >= 0 &&
-             data.sisaKasbon is number && data.sisaKasbon >= 0;
+             data.sisaKasbon is number && data.sisaKasbon >= 0 &&
+             (!('tanggalBayar' in data) || data.tanggalBayar == null || (data.tanggalBayar is number && data.tanggalBayar >= 0)) &&
+             (!('deletedBy' in data) || data.deletedBy == null || (data.deletedBy is string && data.deletedBy.size() <= 120)) &&
+             (!('_hardDeleted' in data) || data._hardDeleted == null || data._hardDeleted is bool);
     }
 
     function isValidPengeluaran(data, docId) {
@@ -193,9 +202,8 @@ service cloud.firestore {
       allow get: if isSignedIn() &&
                     isValidEmailKey(emailKey) &&
                     (
-                      resource == null ||
                       (hasVerifiedEmail() && request.auth.token.email.lower() == emailKey) ||
-                      existing().ownerUid == request.auth.uid
+                      (resource != null && existing().ownerUid == request.auth.uid)
                     );
 
       allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
@@ -212,11 +220,20 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                        isValidEmailKey(emailKey) &&
                        isValidStaffLink(incoming()) &&
-                       existing().ownerUid == request.auth.uid &&
-                       incoming().ownerUid == existing().ownerUid &&
-                       incoming().depotId == existing().depotId &&
-                       incoming().staffEmail == existing().staffEmail &&
-                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().staffEmail == emailKey &&
+                       incoming().updatedAt is timestamp && incoming().updatedAt <= request.time &&
+                       (
+                         (
+                           existing().ownerUid == request.auth.uid &&
+                           incoming().depotId == existing().depotId
+                         ) ||
+                         (
+                           isDepotOwner(incoming().depotId) &&
+                           incoming().active == true &&
+                           emailKey in depotData(incoming().depotId).memberEmails
+                         )
+                       );
 
       allow delete: if isSignedIn() &&
                        isValidEmailKey(emailKey) &&

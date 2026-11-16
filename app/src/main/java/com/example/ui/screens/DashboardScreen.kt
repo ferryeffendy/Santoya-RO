@@ -158,6 +158,7 @@ fun DashboardScreen(
     val santoyaColors = MaterialTheme.santoyaColors
     val scopedTransactionsFromVm by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
     val scopedPelangganFromVm by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
+    val allKasbonLogsFromVm by viewModel.allKasbonLogs.collectAsStateWithLifecycle()
     val scopedPelangganUiModelsFromVm by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
     val perawatanRemindersFromVm by viewModel.perawatanReminders.collectAsStateWithLifecycle()
@@ -208,16 +209,30 @@ fun DashboardScreen(
         )
     }
 
-    // 1. Pendapatan Tunai Hari Ini (termasuk Uang Muka/DP dari transaksi Bayar Sebagian)
-    val pendapatanLunasHariIni = remember(todayTransactions) {
+    // 1. Pendapatan Tunai Langsung Hari Ini (dari transaksi hari ini: tunai lunas di awal & DP bayar sebagian)
+    val penjualanTunaiLangsungHariIni = remember(todayTransactions) {
         todayTransactions.sumOf {
-            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
-                it.transaksi.total_harga
-            } else {
-                it.transaksi.uangMuka.toDouble()
+            when {
+                it.transaksi.status.equals("Lunas", ignoreCase = true) &&
+                    (it.transaksi.tanggalBayar == null || it.transaksi.tanggalBayar == it.transaksi.tanggal) -> {
+                    it.transaksi.total_harga
+                }
+                it.transaksi.uangMuka > 0L -> {
+                    it.transaksi.uangMuka.toDouble()
+                }
+                else -> 0.0
             }
         }
     }
+
+    // 1B. Pelunasan Kasbon Hari Ini (dari log pelunasan kasbon hari ini)
+    val pelunasanKasbonHariIni = remember(allKasbonLogsFromVm, todayStart, todayEnd) {
+        allKasbonLogsFromVm.filter { it.tanggal in todayStart..todayEnd && it.jumlah_bayar > 0.0 }
+            .sumOf { it.jumlah_bayar }
+    }
+
+    // Total Kas Masuk Hari Ini
+    val pendapatanLunasHariIni = penjualanTunaiLangsungHariIni + pelunasanKasbonHariIni
 
     // 2. Laba Bersih Hari Ini (Pendapatan Tunai - Pengeluaran Operasional - Komisi Kurir)
     val totalKomisiHariIni = remember(todayTransactions) {
@@ -1671,7 +1686,10 @@ fun DashboardScreen(
 
     if (showSyncInfoSheet) {
         val context = LocalContext.current
-        val currentUserId = Firebase.auth.currentUser?.uid
+        val currentUser = Firebase.auth.currentUser
+        val currentUserId = currentUser?.uid
+        val canSwitchToStaffWaiting = !KaryawanScopeHelper.isPrimaryOwnerEmail(currentUser?.email) &&
+            (!isKaryawan || !KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
         SantoyaSyncInfoBottomSheet(
             syncState = syncState,
             onDismiss = { showSyncInfoSheet = false },
@@ -1684,6 +1702,12 @@ fun DashboardScreen(
                 {
                     showSyncInfoSheet = false
                     onNavigateToSettings()
+                }
+            } else null,
+            onSwitchToStaffWaiting = if (canSwitchToStaffWaiting) {
+                {
+                    showSyncInfoSheet = false
+                    viewModel.switchToStaffWaitingMode()
                 }
             } else null
         )

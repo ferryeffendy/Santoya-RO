@@ -319,7 +319,7 @@ fun KurirScreen(
                             if (kurir.email.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 val isActive = kurir.akses_aktif
-                                val displayEmail = if (kurir.email.contains("@")) kurir.email else "${kurir.email}@gmail.com"
+                                val displayEmail = kurir.email.trim()
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (isActive) colors.successContainer.copy(alpha = 0.55f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
@@ -467,9 +467,7 @@ private fun KurirFormDialog(
         )
     }
     var emailInput by remember(initialKurir) {
-        val raw = initialKurir?.email?.trim().orEmpty()
-        val display = if (raw.isNotBlank() && !raw.contains("@")) "$raw@gmail.com" else raw
-        mutableStateOf(display)
+        mutableStateOf(initialKurir?.email?.trim().orEmpty())
     }
     var aksesAktif by remember(initialKurir) { mutableStateOf(initialKurir?.akses_aktif ?: true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -481,24 +479,18 @@ private fun KurirFormDialog(
     val validateAndSubmit = {
         val trimmedNama = nama.trim()
         val komisi = komisiStr.toDoubleOrNull()
-        val rawEmail = emailInput.trim().removePrefix("@").lowercase()
-        val cleanEmail = when {
-            rawEmail.isBlank() -> ""
-            !rawEmail.contains("@") -> "$rawEmail@gmail.com"
-            else -> rawEmail
-        }
+        val rawEmail = emailInput.trim().lowercase()
+        val cleanEmail = if (rawEmail.isBlank()) "" else rawEmail
         val targetId = initialKurir?.id
         val isDuplicate = cleanEmail.isNotBlank() && existingKurirList.any { existing ->
             if (existing.id == targetId) return@any false
-            val exRaw = existing.email.trim().lowercase()
-            val exNormalized = if (exRaw.isNotBlank() && !exRaw.contains("@")) "$exRaw@gmail.com" else exRaw
-            exNormalized == cleanEmail
+            KaryawanScopeHelper.normalizeEmail(existing.email) == cleanEmail
         }
         when {
             trimmedNama.isBlank() -> errorMessage = "Nama karyawan wajib diisi"
             komisi == null || komisi < 0.0 -> errorMessage = "Nominal komisi tidak valid"
-            cleanEmail.isNotBlank() && (cleanEmail.length < 5 || !cleanEmail.contains("@") || cleanEmail.endsWith("@")) ->
-                errorMessage = "Format email Google tidak valid"
+            cleanEmail.isNotBlank() && !KaryawanScopeHelper.isValidEmail(cleanEmail) ->
+                errorMessage = "Masukkan alamat email Google lengkap (contoh: nama@gmail.com)"
             isDuplicate -> errorMessage = "Email '$cleanEmail' sudah dipakai karyawan lain"
             else -> onSubmit(trimmedNama, komisi, cleanEmail, aksesAktif)
         }
