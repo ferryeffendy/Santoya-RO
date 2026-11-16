@@ -564,6 +564,35 @@ class SantoyaRepository(
         onLocalMutation?.invoke()
     }
 
+    /**
+     * Menyimpan catatan pemeriksaan atau perawatan mandiri (seperti cek kesehatan membran RO)
+     * ke riwayat perawatan tanpa memengaruhi catatan Pengeluaran.
+     */
+    suspend fun recordStandalonePerawatanLog(
+        namaPerawatan: String,
+        tanggalSelesai: Long,
+        catatan: String
+    ): Boolean {
+        val cleanName = namaPerawatan.trim()
+        if (cleanName.isEmpty()) return false
+        val now = System.currentTimeMillis()
+        val log = PerawatanLog(
+            perawatanSyncId = "",
+            namaPerawatan = cleanName,
+            tanggalSelesai = tanggalSelesai,
+            biaya = 0.0,
+            catatan = catatan.trim(),
+            pengeluaranSyncId = null,
+            updatedAt = now
+        )
+        db.withTransaction {
+            db.perawatanLogDao().insert(log)
+            enqueueUpsert(SyncCollections.PERAWATAN_LOG, log.syncId, now)
+        }
+        onLocalMutation?.invoke()
+        return true
+    }
+
     // --- Transaksi ---
     val allTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllWithDetail()
     val allKasbonTransaksiWithDetail: Flow<List<TransaksiDetail>> = db.transaksiDao().getAllKasbonWithDetail()

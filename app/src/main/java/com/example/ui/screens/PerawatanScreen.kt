@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -75,6 +76,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -82,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aistudio.companion.kzpmrw.R
 import com.example.data.entity.PerawatanItem
 import com.example.data.entity.PerawatanLog
 import com.example.ui.components.HydroBentoCard
@@ -182,7 +185,7 @@ fun PerawatanScreen(
                     onClick = { selectedTab = 0 },
                     text = {
                         Text(
-                            text = "Jadwal (${evaluations.size})",
+                            text = stringResource(R.string.perawatan_tab_jadwal, evaluations.size),
                             fontWeight = if (selectedTab == 0) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -202,7 +205,7 @@ fun PerawatanScreen(
                     onClick = { selectedTab = 1 },
                     text = {
                         Text(
-                            text = "Riwayat (${logs.size})",
+                            text = stringResource(R.string.perawatan_tab_riwayat, logs.size),
                             fontWeight = if (selectedTab == 1) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -217,9 +220,32 @@ fun PerawatanScreen(
                     },
                     modifier = Modifier.testTag("tab_riwayat_perawatan")
                 )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.perawatan_tab_cek_membran),
+                            fontWeight = if (selectedTab == 2) FontWeight.SemiBold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Speed,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    },
+                    modifier = Modifier.testTag("tab_cek_membran_perawatan")
+                )
             }
 
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            if (selectedTab == 2) {
+                MembranCalculatorTab(viewModel = viewModel)
+            } else {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val columns = if (maxWidth >= 600.dp) 2 else 1
 
                 if (selectedTab == 0) {
@@ -301,6 +327,7 @@ fun PerawatanScreen(
                         }
                     }
                 }
+            }
             }
         }
     }

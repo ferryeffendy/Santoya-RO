@@ -22,6 +22,12 @@ import com.example.util.PerawatanEvaluation
 import com.example.util.PerawatanScheduler
 import com.example.util.RealtimeSyncEngine
 import com.example.util.RealtimeSyncState
+import com.example.util.RoMembraneCalculator
+import com.example.util.RoMembraneCategory
+import com.example.util.RoMembraneEvaluationOutcome
+import com.example.util.RoMembranePreset
+import com.example.util.RoMembraneResult
+import com.example.util.RoValidationFieldError
 import com.example.util.SearchField
 import com.example.util.SearchMatcher
 import com.example.util.SyncConnectionStatus
@@ -59,6 +65,25 @@ enum class KasbonSortOption {
     TERLAMA,
     TERBARU
 }
+
+/**
+ * State tampilan untuk tab Kalkulator Kesehatan Membran RO (khusus pemilik depot).
+ */
+data class RoMembraneUiState(
+    val tdsBakuInput: String = "",
+    val tdsJadiInput: String = "",
+    val selectedCategory: RoMembraneCategory = RoMembraneCategory.SIZE_4040,
+    val parallelCount: Int = RoMembraneCalculator.MIN_PARALLEL_MEMBRANES,
+    val selectedPresetId: String? = "4040_ulp",
+    val gpdPerUnitInput: String = "2400",
+    val actualFlowLpmInput: String = "",
+    val tdsBakuError: RoValidationFieldError? = null,
+    val tdsJadiError: RoValidationFieldError? = null,
+    val gpdError: RoValidationFieldError? = null,
+    val flowAktualError: RoValidationFieldError? = null,
+    val result: RoMembraneResult? = null,
+    val isSavedToHistory: Boolean = false
+)
 
 enum class LaporanPeriode(val label: String) {
     HARI_INI("Hari Ini"),
@@ -262,6 +287,13 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         if (karyawan) emptyList() else logs
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val roCalcPrefs by lazy {
+        getApplication<Application>().getSharedPreferences("santoya_ro_calc_prefs", Context.MODE_PRIVATE)
+    }
+
+    private val _roMembraneUiState = MutableStateFlow(loadSavedRoMembraneState())
+    val roMembraneUiState: StateFlow<RoMembraneUiState> = _roMembraneUiState.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.Default) {
@@ -1032,6 +1064,302 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         launchGuardedAction("Menghapus riwayat perawatan...") {
             repository.deletePerawatanLog(log)
             showSnackbar("Riwayat perawatan dihapus")
+        }
+    }
+
+    /**
+     * Memperbarui input TDS Air Baku (ppm) pada kalkulator membran RO.
+     */
+    fun updateRoTdsBaku(value: String) {
+        _roMembraneUiState.update { state ->
+            state.copy(
+                tdsBakuInput = value,
+                tdsBakuError = null,
+                tdsJadiError = if (state.tdsJadiError == RoValidationFieldError.TDS_JADI_EXCEEDS_BAKU) {
+                    null
+                } else {
+                    state.tdsJadiError
+                },
+                result = null,
+                isSavedToHistory = false
+            )
+        }
+    }
+
+    /**
+     * Memperbarui input TDS Air Jadi (ppm) pada kalkulator membran RO.
+     */
+    fun updateRoTdsJadi(value: String) {
+        _roMembraneUiState.update {
+            it.copy(
+                tdsJadiInput = value,
+                tdsJadiError = null,
+                result = null,
+                isSavedToHistory = false
+            )
+        }
+    }
+
+    /**
+     * Memilih ukuran membran RO (4040, 4021, 8040, atau Rumahan).
+     * Jika beralih ke 4040, preset otomatis disetel ke 4040 ULP (2.400 GPD) sebagai standar utama depot AMIU.
+     */
+    fun selectRoCategory(category: RoMembraneCategory) {
+        _roMembraneUiState.update { state ->
+            if (state.selectedCategory == category) return@update state
+            val defaultPreset = if (category == RoMembraneCategory.SIZE_4040) {
+                RoMembraneCalculator.findPresetById("4040_ulp")
+            } else null
+            val updated = state.copy(
+                selectedCategory = category,
+                selectedPresetId = defaultPreset?.id,
+                gpdPerUnitInput = defaultPreset?.gpdPerUnit?.toString() ?: "",
+                gpdError = null,
+                flowAktualError = null,
+                result = null,
+                isSavedToHistory = false
+            )
+            persistRoMembraneConfig(updated)
+            updated
+        }
+    }
+
+    /**
+     * Mengatur jumlah membran paralel pada kalkulator kesehatan membran RO.
+     */
+    fun updateRoParallelCount(count: Int) {
+        val clamped = count.coerceIn(
+            RoMembraneCalculator.MIN_PARALLEL_MEMBRANES,
+            RoMembraneCalculator.MAX_PARALLEL_MEMBRANES
+        )
+        _roMembraneUiState.update { state ->
+            val updated = state.copy(
+                parallelCount = clamped,
+                result = null,
+                isSavedToHistory = false
+            )
+            persistRoMembraneConfig(updated)
+            updated
+        }
+    }
+
+    /**
+     * Memilih atau membatalkan pilihan chip preset kapasitas membran populer Indonesia.
+     * Saat dipilih, nilai GPD otomatis terisi ke input kalkulasi.
+     */
+    fun toggleRoPreset(preset: RoMembranePreset) {
+        _roMembraneUiState.update { state ->
+            val isDeselecting = state.selectedPresetId == preset.id
+            val updated = if (isDeselecting) {
+                state.copy(
+                    selectedPresetId = null,
+                    gpdPerUnitInput = "",
+                    gpdError = null,
+                    flowAktualError = if (state.flowAktualError == RoValidationFieldError.PAIR_REQUIRED_WITH_GPD) null else state.flowAktualError,
+                    result = null,
+                    isSavedToHistory = false
+                )
+            } else {
+                state.copy(
+                    selectedCategory = preset.category,
+                    selectedPresetId = preset.id,
+                    gpdPerUnitInput = preset.gpdPerUnit.toString(),
+                    gpdError = null,
+                    flowAktualError = null,
+                    result = null,
+                    isSavedToHistory = false
+                )
+            }
+            persistRoMembraneConfig(updated)
+            updated
+        }
+    }
+
+    /**
+     * Memperbarui input kapasitas GPD per membran dan menyinkronkan chip preset khusus di kategori aktif.
+     */
+    fun updateRoGpdPerUnit(value: String) {
+        _roMembraneUiState.update { state ->
+            val trimmed = value.trim()
+            val categoryPresets = RoMembraneCalculator.presetsForCategory(state.selectedCategory)
+            val matchedPreset = categoryPresets.firstOrNull {
+                it.gpdPerUnit.toString() == trimmed && it.id == state.selectedPresetId
+            } ?: categoryPresets.firstOrNull {
+                it.gpdPerUnit.toString() == trimmed
+            }
+            val updated = state.copy(
+                gpdPerUnitInput = value,
+                selectedPresetId = matchedPreset?.id,
+                gpdError = null,
+                flowAktualError = if (state.flowAktualError == RoValidationFieldError.PAIR_REQUIRED_WITH_GPD) null else state.flowAktualError,
+                result = null,
+                isSavedToHistory = false
+            )
+            persistRoMembraneConfig(updated)
+            updated
+        }
+    }
+
+    /**
+     * Memperbarui input Flow Rate Aktual Total (LPM).
+     */
+    fun updateRoActualFlowLpm(value: String) {
+        _roMembraneUiState.update { state ->
+            state.copy(
+                actualFlowLpmInput = value,
+                flowAktualError = null,
+                gpdError = if (state.gpdError == RoValidationFieldError.PAIR_REQUIRED_WITH_FLOW) null else state.gpdError,
+                result = null,
+                isSavedToHistory = false
+            )
+        }
+    }
+
+    /**
+     * Memvalidasi input dan menghitung status kesehatan membran RO.
+     */
+    fun calculateRoMembraneHealth() {
+        val state = _roMembraneUiState.value
+        val activePreset = RoMembraneCalculator.findPresetById(state.selectedPresetId)
+        when (
+            val outcome = RoMembraneCalculator.evaluateInputs(
+                tdsBakuRaw = state.tdsBakuInput,
+                tdsJadiRaw = state.tdsJadiInput,
+                gpdPerUnitRaw = state.gpdPerUnitInput,
+                actualFlowLpmRaw = state.actualFlowLpmInput,
+                parallelCount = state.parallelCount,
+                presetTypeName = activePreset?.typeName,
+                presetPsiHint = activePreset?.psiHint,
+                presetMaxFeedTdsPpm = activePreset?.maxFeedTdsPpm
+            )
+        ) {
+            is RoMembraneEvaluationOutcome.ValidationError -> {
+                _roMembraneUiState.update {
+                    it.copy(
+                        tdsBakuError = outcome.tdsBakuError,
+                        tdsJadiError = outcome.tdsJadiError,
+                        gpdError = outcome.gpdError,
+                        flowAktualError = outcome.flowAktualError,
+                        result = null,
+                        isSavedToHistory = false
+                    )
+                }
+            }
+            is RoMembraneEvaluationOutcome.Success -> {
+                _roMembraneUiState.update {
+                    it.copy(
+                        tdsBakuError = null,
+                        tdsJadiError = null,
+                        gpdError = null,
+                        flowAktualError = null,
+                        result = outcome.result,
+                        isSavedToHistory = false
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Membersihkan angka pengukuran sementara (TDS & Flow Aktual) sambil mempertahankan konfigurasi membran.
+     */
+    fun resetRoMembraneCalculator() {
+        _roMembraneUiState.update { state ->
+            state.copy(
+                tdsBakuInput = "",
+                tdsJadiInput = "",
+                actualFlowLpmInput = "",
+                tdsBakuError = null,
+                tdsJadiError = null,
+                gpdError = null,
+                flowAktualError = null,
+                result = null,
+                isSavedToHistory = false
+            )
+        }
+    }
+
+    private fun loadSavedRoMembraneState(): RoMembraneUiState {
+        return try {
+            val savedCategoryName = roCalcPrefs.getString("ro_calc_category", null)
+            val savedCategory = RoMembraneCategory.fromLegacyOrName(savedCategoryName)
+            val savedParallel = roCalcPrefs.getInt(
+                "ro_calc_parallel_count",
+                RoMembraneCalculator.MIN_PARALLEL_MEMBRANES
+            ).coerceIn(
+                RoMembraneCalculator.MIN_PARALLEL_MEMBRANES,
+                RoMembraneCalculator.MAX_PARALLEL_MEMBRANES
+            )
+            val rawPresetId = roCalcPrefs.getString("ro_calc_preset_id", null)
+            val matchedPreset = RoMembraneCalculator.findPresetById(rawPresetId)
+                ?.takeIf { it.category == savedCategory }
+            val savedPresetId = matchedPreset?.id
+                ?: if (savedCategory == RoMembraneCategory.SIZE_4040 && rawPresetId == null) "4040_ulp" else null
+            val savedGpd = roCalcPrefs.getString("ro_calc_gpd", "") ?: ""
+            val resolvedGpd = if (savedGpd.isBlank() && savedPresetId != null) {
+                RoMembraneCalculator.findPresetById(savedPresetId)?.gpdPerUnit?.toString() ?: ""
+            } else if (savedGpd.isBlank() && savedCategory == RoMembraneCategory.SIZE_4040) {
+                "2400"
+            } else {
+                savedGpd
+            }
+            RoMembraneUiState(
+                selectedCategory = savedCategory,
+                parallelCount = savedParallel,
+                selectedPresetId = savedPresetId,
+                gpdPerUnitInput = resolvedGpd
+            )
+        } catch (_: Exception) {
+            RoMembraneUiState()
+        }
+    }
+
+    private fun persistRoMembraneConfig(state: RoMembraneUiState) {
+        try {
+            roCalcPrefs.edit()
+                .putString("ro_calc_category", state.selectedCategory.name)
+                .putInt("ro_calc_parallel_count", state.parallelCount)
+                .putString("ro_calc_preset_id", state.selectedPresetId)
+                .putString("ro_calc_gpd", state.gpdPerUnitInput)
+                .apply()
+        } catch (_: Exception) {
+            // Abaikan jika penyimpanan preferensi lokal gagal
+        }
+    }
+
+    /**
+     * Menyimpan hasil pengecekan kesehatan membran RO ke Riwayat Perawatan (khusus pemilik depot).
+     */
+    fun saveRoMembraneCheckToHistory(
+        namaPerawatan: String,
+        statusLabel: String,
+        diagnosisText: String
+    ) {
+        if (isUserKaryawan()) {
+            showSnackbar("Hanya pemilik depot yang dapat menyimpan riwayat cek membran.")
+            return
+        }
+        val currentState = _roMembraneUiState.value
+        val result = currentState.result ?: return
+        if (currentState.isSavedToHistory) return
+
+        val catatan = RoMembraneCalculator.buildHistoryNote(
+            result = result,
+            statusLabel = statusLabel,
+            diagnosisText = diagnosisText
+        )
+        launchGuardedAction("Menyimpan hasil cek membran...") {
+            val saved = repository.recordStandalonePerawatanLog(
+                namaPerawatan = namaPerawatan,
+                tanggalSelesai = System.currentTimeMillis(),
+                catatan = catatan
+            )
+            if (saved) {
+                _roMembraneUiState.update { it.copy(isSavedToHistory = true) }
+                showSnackbar("Hasil cek membran disimpan ke Riwayat Perawatan")
+            } else {
+                showSnackbar("Gagal menyimpan hasil cek membran")
+            }
         }
     }
 
