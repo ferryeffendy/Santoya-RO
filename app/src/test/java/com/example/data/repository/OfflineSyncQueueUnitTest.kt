@@ -291,5 +291,83 @@ class OfflineSyncQueueUnitTest {
         assertEquals("ok", result)
         assertEquals(3, attempts)
     }
+
+    @Test
+    fun deleteTransaksi_performsSoftDeleteForDeltaSyncAndUpdatesKasbon() = runBlocking {
+        val produkId = repo.insertProduk(Produk(nama_produk = "Galon RO", harga = 6000.0)).toInt()
+        val pelangganId = repo.insertPelanggan(Pelanggan(nama = "Pak Anto", alamat = "Blok D", no_hp = "0819")).toInt()
+
+        val txId = repo.recordTransaksi(
+            tanggal = 3_000L,
+            idPelanggan = pelangganId,
+            idKurir = null,
+            idProduk = produkId,
+            jumlah = 2,
+            hargaSatuan = 6000.0,
+            metodeBayar = "-",
+            status = "Kasbon",
+            uangMuka = 0L,
+            sisaKasbon = 12_000L
+        ).toInt()
+
+        val savedTx = db.transaksiDao().getDetailById(txId)!!.transaksi
+        repo.deleteTransaksi(savedTx)
+
+        val softDeleted = db.transaksiDao().getBySyncId(savedTx.syncId)
+        assertNotNull(softDeleted)
+        assertTrue(softDeleted!!.isDeleted)
+        assertEquals(com.example.util.KaryawanScopeHelper.STATUS_DIHAPUS, softDeleted.status)
+
+        val custAfterSoftDelete = db.pelangganDao().getById(pelangganId)!!
+        assertEquals(0.0, custAfterSoftDelete.sisa_kasbon, 0.01)
+
+        val queueAfterSoftDelete = db.pendingSyncDao().getByKey(SyncCollections.TRANSAKSI, savedTx.syncId)
+        assertNotNull(queueAfterSoftDelete)
+        assertEquals(SyncOperations.UPSERT, queueAfterSoftDelete!!.operation)
+
+        repo.permanentDeleteTransaksi(softDeleted)
+        assertNull(db.transaksiDao().getBySyncId(savedTx.syncId))
+
+        val queueAfterPermanentDelete = db.pendingSyncDao().getByKey(SyncCollections.TRANSAKSI, savedTx.syncId)
+        assertNotNull(queueAfterPermanentDelete)
+        assertEquals(SyncOperations.DELETE, queueAfterPermanentDelete!!.operation)
+    }
+
+    @Test
+    fun deltaCursor_ignoresCacheAndAdvancesOrResetsCleanly() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val engine = com.example.util.RealtimeSyncEngine(context, db)
+        val depotId = "depot_test_1"
+
+        engine.clearAllDeltaCursors()
+        assertNull(engine.getDeltaCursor(depotId, SyncCollections.TRANSAKSI))
+
+        // Cache-only empty snapshot must not initialize cursor
+        engine.advanceDeltaCursor(
+            depotId = depotId,
+            colName = SyncCollections.TRANSAKSI,
+            docs = emptyList(),
+            isFromCache = true,
+            markInitializedIfEmpty = true
+        )
+        assertNull(engine.getDeltaCursor(depotId, SyncCollections.TRANSAKSI))
+
+        // Server empty bootstrap snapshot initializes sentinel cursor > 0 nanoseconds
+        engine.advanceDeltaCursor(
+            depotId = depotId,
+            colName = SyncCollections.TRANSAKSI,
+            docs = emptyList(),
+            isFromCache = false,
+            markInitializedIfEmpty = true
+        )
+        val initialized = engine.getDeltaCursor(depotId, SyncCollections.TRANSAKSI)
+        assertNotNull(initialized)
+        assertEquals(0L, initialized!!.seconds)
+        assertEquals(1, initialized.nanoseconds)
+
+        engine.clearDeltaCursorsForDepot(depotId)
+        assertNull(engine.getDeltaCursor(depotId, SyncCollections.TRANSAKSI))
+    }
 }
+
 

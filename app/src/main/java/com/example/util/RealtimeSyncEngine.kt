@@ -19,6 +19,7 @@ import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
 import com.example.data.entity.Transaksi
 import com.google.firebase.FirebaseApp
+import com.google.firebase.Timestamp
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.DocumentSnapshot
@@ -657,6 +658,7 @@ class RealtimeSyncEngine(
         }
         cachedSnapshots.clear()
         receivedInitialCollections.clear()
+        clearAllDeltaCursors()
     }
 
     fun scheduleFlush(delayMs: Long = 250L) {
@@ -704,7 +706,7 @@ class RealtimeSyncEngine(
         return try {
             _state.update { it.copy(status = SyncConnectionStatus.SYNCING, errorMessage = null) }
             if (activeRole == DepotRole.OWNER) {
-                if (pushLocalFirst) enqueueMissingLocalRecordsForOwner()
+                if (pushLocalFirst) enqueueMissingLocalRecordsForOwner(emptyMap(), null)
                 ensureDepotAndStaffLinks(firestore, depotId, uid, activeEmail)
             }
             // Mode "Ambil Data" tidak boleh mengirim antrean lokal sebelum cloud
@@ -726,17 +728,24 @@ class RealtimeSyncEngine(
             }
 
             withTimeout(15_000L) {
+                val fullSnapshots = mutableMapOf<String, List<DocumentSnapshot>>()
                 for (col in cols) {
                     val snap = depotRef.collection(col).get().await()
-                    recordReads(snap.documents.size.coerceAtLeast(1))
-                    applyMutex.withLock {
-                        cachedSnapshots[col] = snap.documents
-                        receivedInitialCollections.add(col)
-                    }
+                    recordReads(snap.documents.size)
+                    fullSnapshots[col] = snap.documents
                 }
-                applyAllSnapshotsInOrder()
-                applyMutex.withLock {
-                    cachedSnapshots.clear()
+                applySnapshotsInOrder(
+                    snapshotsByCollection = fullSnapshots,
+                    seedDefaultPerawatanIfEmpty = activeRole == DepotRole.OWNER
+                )
+                for (col in cols) {
+                    advanceDeltaCursor(
+                        depotId = depotId,
+                        colName = col,
+                        docs = fullSnapshots[col].orEmpty(),
+                        isFromCache = false,
+                        markInitializedIfEmpty = true
+                    )
                 }
             }
 
@@ -841,6 +850,8 @@ class RealtimeSyncEngine(
                     }
                     cachedSnapshots.clear()
                     receivedInitialCollections.clear()
+                    clearDeltaCursorsForDepot(depotId)
+                    previousDepot?.let { clearDeltaCursorsForDepot(it) }
                 }
             } else if (role == DepotRole.STAFF) {
                 // Karyawan tidak boleh memiliki data pengeluaran maupun jadwal/riwayat perawatan pemilik di cache lokal.
@@ -849,6 +860,9 @@ class RealtimeSyncEngine(
                     db.perawatanLogDao().deleteAll()
                     db.perawatanDao().deleteAll()
                 }
+            }
+            if (!hasAnyLocalCoreData()) {
+                clearDeltaCursorsForDepot(depotId)
             }
             if (activeUid != sessionUid) return@launch
             prefs.edit().putString(KEY_LAST_DEPOT_ID, depotId).apply()
@@ -895,78 +909,136 @@ class RealtimeSyncEngine(
             }
         }
 
+        val bootstrapCollections = mutableSetOf<String>()
+        var initialBatchDispatched = false
+
         collections.forEach { colName ->
             val path = "depots/$depotId/$colName"
+            val cursor = getDeltaCursor(depotId, colName)
+            if (cursor == null) {
+                bootstrapCollections.add(colName)
+            }
+            val query = if (cursor != null) {
+                depotRef.collection(colName).whereGreaterThan("serverUpdatedAt", cursor)
+            } else {
+                depotRef.collection(colName)
+            }
             var isInitialSnapshotForCol = true
-            val registration = depotRef.collection(colName)
-                .addSnapshotListener { snapshot, error ->
-                    if (error != null) {
-                        handleFirestoreError(error, OperationType.LIST, path)
-                        val isOnline = checkIsOnline()
-                        _state.update {
-                            it.copy(
-                                status = if (!isOnline) SyncConnectionStatus.OFFLINE else SyncConnectionStatus.ERROR,
-                                isOnline = isOnline,
-                                errorMessage = friendlyError(error)
+            val registration = query.addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    handleFirestoreError(error, OperationType.LIST, path)
+                    val isOnline = checkIsOnline()
+                    _state.update {
+                        it.copy(
+                            status = if (!isOnline) SyncConnectionStatus.OFFLINE else SyncConnectionStatus.ERROR,
+                            isOnline = isOnline,
+                            errorMessage = friendlyError(error)
+                        )
+                    }
+                    scope.launch {
+                        var batchToApply: Map<String, List<DocumentSnapshot>>? = null
+                        var shouldFlushBatch = false
+                        applyMutex.withLock {
+                            if (isInitialSnapshotForCol) {
+                                isInitialSnapshotForCol = false
+                                receivedInitialCollections.add(colName)
+                            }
+                            if (!initialBatchDispatched && receivedInitialCollections.containsAll(collections)) {
+                                initialBatchDispatched = true
+                                shouldFlushBatch = true
+                                batchToApply = cachedSnapshots.toMap()
+                                cachedSnapshots.clear()
+                            }
+                        }
+                        if (shouldFlushBatch && !batchToApply.isNullOrEmpty()) {
+                            applySnapshotsInOrder(
+                                snapshotsByCollection = batchToApply,
+                                seedDefaultPerawatanIfEmpty = role == DepotRole.OWNER &&
+                                    SyncCollections.PERAWATAN_JADWAL in bootstrapCollections
                             )
                         }
-                        if (isOnline) {
-                            scheduleAutoRetry()
-                        }
-                        return@addSnapshotListener
                     }
-                    if (snapshot != null) {
-                        val isInitialForCollection = isInitialSnapshotForCol
-                        val readsCount = if (isInitialForCollection) {
-                            isInitialSnapshotForCol = false
-                            snapshot.documents.size.coerceAtLeast(1)
-                        } else {
-                            snapshot.documentChanges.size
-                        }
-                        recordReads(readsCount)
-                        scope.launch {
-                            autoRetryCount = 0
-                            if (isInitialForCollection) {
-                                applyMutex.withLock {
-                                    cachedSnapshots[colName] = snapshot.documents
-                                    receivedInitialCollections.add(colName)
-                                }
-                                applyAllSnapshotsInOrder()
-                            } else {
-                                applyChangedDocuments(colName, snapshot.documentChanges)
-                            }
+                    if (isOnline) {
+                        scheduleAutoRetry()
+                    }
+                    return@addSnapshotListener
+                }
+                if (snapshot != null) {
+                    val isFromCache = snapshot.metadata.isFromCache
+                    val isInitialForCollection = isInitialSnapshotForCol
+                    if (isInitialForCollection) {
+                        isInitialSnapshotForCol = false
+                    }
+                    val readsCount = when {
+                        isFromCache -> 0
+                        isInitialForCollection -> snapshot.documents.size
+                        else -> snapshot.documentChanges.size
+                    }
+                    recordReads(readsCount)
 
-                            if (receivedInitialCollections.containsAll(collections)) {
+                    scope.launch {
+                        autoRetryCount = 0
+                        var batchToApply: Map<String, List<DocumentSnapshot>>? = null
+                        var allInitialArrived = false
+
+                        if (isInitialForCollection) {
+                            applyMutex.withLock {
+                                cachedSnapshots[colName] = snapshot.documents
+                                receivedInitialCollections.add(colName)
+                                if (!initialBatchDispatched && receivedInitialCollections.containsAll(collections)) {
+                                    initialBatchDispatched = true
+                                    allInitialArrived = true
+                                    batchToApply = cachedSnapshots.toMap()
+                                    cachedSnapshots.clear()
+                                }
+                            }
+                            if (allInitialArrived) {
+                                val resolvedBatch = batchToApply.orEmpty()
+                                applySnapshotsInOrder(
+                                    snapshotsByCollection = resolvedBatch,
+                                    seedDefaultPerawatanIfEmpty = role == DepotRole.OWNER &&
+                                        SyncCollections.PERAWATAN_JADWAL in bootstrapCollections
+                                )
                                 if (role == DepotRole.OWNER && !hasSeededInitialOwnerPush) {
                                     hasSeededInitialOwnerPush = true
-                                    enqueueMissingLocalRecordsForOwner()
+                                    if (bootstrapCollections.isNotEmpty()) {
+                                        enqueueMissingLocalRecordsForOwner(resolvedBatch, bootstrapCollections)
+                                    }
                                     flushPendingQueueInternal()
                                 }
-                                applyMutex.withLock {
-                                    if (cachedSnapshots.isNotEmpty()) {
-                                        cachedSnapshots.clear()
-                                    }
-                                }
                             }
+                        } else {
+                            applyChangedDocuments(colName, snapshot.documentChanges)
+                        }
 
-                            _state.update {
-                                val onlineNow = checkIsOnline()
-                                it.copy(
-                                    status = if (!onlineNow) {
-                                        SyncConnectionStatus.OFFLINE
-                                    } else if (it.pendingCount > 0) {
-                                        SyncConnectionStatus.SYNCING
-                                    } else {
-                                        SyncConnectionStatus.LIVE
-                                    },
-                                    isOnline = onlineNow,
-                                    lastSyncedAt = System.currentTimeMillis(),
-                                    errorMessage = null
-                                )
-                            }
+                        if (!isFromCache) {
+                            advanceDeltaCursor(
+                                depotId = depotId,
+                                colName = colName,
+                                docs = snapshot.documents,
+                                isFromCache = false,
+                                markInitializedIfEmpty = (cursor == null)
+                            )
+                        }
+
+                        _state.update {
+                            val onlineNow = checkIsOnline()
+                            it.copy(
+                                status = if (!onlineNow) {
+                                    SyncConnectionStatus.OFFLINE
+                                } else if (it.pendingCount > 0) {
+                                    SyncConnectionStatus.SYNCING
+                                } else {
+                                    SyncConnectionStatus.LIVE
+                                },
+                                isOnline = onlineNow,
+                                lastSyncedAt = System.currentTimeMillis(),
+                                errorMessage = null
+                            )
                         }
                     }
                 }
+            }
             collectionListeners.add(registration)
         }
     }
@@ -999,7 +1071,10 @@ class RealtimeSyncEngine(
         }
     }
 
-    private suspend fun enqueueMissingLocalRecordsForOwner() {
+    private suspend fun enqueueMissingLocalRecordsForOwner(
+        sourceSnapshots: Map<String, List<DocumentSnapshot>>,
+        allowedCollections: Set<String>?
+    ) {
         // Jaring pengaman: jangan pernah mengunggah data lokal jika pemilik sesi
         // tidak sama dengan pemilik yang tercatat di perangkat ini.
         val recordedOwnerUid = prefs.getString(KEY_LAST_OWNER_UID, null)
@@ -1009,9 +1084,11 @@ class RealtimeSyncEngine(
             .map { "${it.collectionName}:${it.syncId}" }
             .toSet()
 
+        fun shouldProcess(col: String): Boolean = allowedCollections == null || col in allowedCollections
+
         suspend fun checkAndEnqueue(col: String, syncId: String, localUpdatedAt: Long) {
             if ("$col:$syncId" in pendingKeys) return
-            val cloudDoc = cachedSnapshots[col]?.firstOrNull { it.id == syncId }
+            val cloudDoc = sourceSnapshots[col]?.firstOrNull { it.id == syncId }
             val cloudUpdatedAt = (cloudDoc?.get("updatedAt") as? Number)?.toLong() ?: -1L
             val cloudDeleted = cloudDoc?.getBoolean("isDeleted") == true
             if (cloudDoc == null || (!cloudDeleted && localUpdatedAt > cloudUpdatedAt)) {
@@ -1026,77 +1103,103 @@ class RealtimeSyncEngine(
             }
         }
 
-        db.produkDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PRODUK, it.syncId, it.updatedAt) }
-        db.kurirDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.KURIR, it.syncId, it.updatedAt) }
-        db.pelangganDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PELANGGAN, it.syncId, it.updatedAt) }
-        db.transaksiDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.TRANSAKSI, it.syncId, it.updatedAt) }
-        db.pengeluaranDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PENGELUARAN, it.syncId, it.updatedAt) }
-        db.kasbonLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.KASBON_LOGS, it.syncId, it.updatedAt) }
-        db.perawatanDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_JADWAL, it.syncId, it.updatedAt) }
-        db.perawatanLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_LOG, it.syncId, it.updatedAt) }
+        if (shouldProcess(SyncCollections.PRODUK)) {
+            db.produkDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PRODUK, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.KURIR)) {
+            db.kurirDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.KURIR, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.PELANGGAN)) {
+            db.pelangganDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PELANGGAN, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.TRANSAKSI)) {
+            db.transaksiDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.TRANSAKSI, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.PENGELUARAN)) {
+            db.pengeluaranDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PENGELUARAN, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.KASBON_LOGS)) {
+            db.kasbonLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.KASBON_LOGS, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.PERAWATAN_JADWAL)) {
+            db.perawatanDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_JADWAL, it.syncId, it.updatedAt) }
+        }
+        if (shouldProcess(SyncCollections.PERAWATAN_LOG)) {
+            db.perawatanLogDao().getAllOnce().forEach { checkAndEnqueue(SyncCollections.PERAWATAN_LOG, it.syncId, it.updatedAt) }
+        }
     }
 
-    private suspend fun applyAllSnapshotsInOrder() {
+    private suspend fun applySnapshotsInOrder(
+        snapshotsByCollection: Map<String, List<DocumentSnapshot>>,
+        seedDefaultPerawatanIfEmpty: Boolean
+    ) {
+        val hasAnyDocuments = snapshotsByCollection.values.any { it.isNotEmpty() }
+        if (!hasAnyDocuments && !seedDefaultPerawatanIfEmpty) return
+
         applyMutex.withLock {
             val pendingMap = db.pendingSyncDao().getAllPending()
                 .associateBy { "${it.collectionName}:${it.syncId}" }
 
             db.withTransaction {
-                // 1. Produk
-                cachedSnapshots[SyncCollections.PRODUK]?.forEach { doc ->
-                    applyProdukDoc(doc, pendingMap["${SyncCollections.PRODUK}:${doc.id}"])
-                }
-
-                // 2. Kurir (also ensures depot/staff links stay clean if needed)
-                cachedSnapshots[SyncCollections.KURIR]?.forEach { doc ->
-                    applyKurirDoc(doc, pendingMap["${SyncCollections.KURIR}:${doc.id}"])
-                }
-
-                // 3. Pelanggan (depends on Kurir syncId -> local id)
-                val kurirSyncToId = db.kurirDao().getAllOnce().associate { it.syncId to it.id }
-                cachedSnapshots[SyncCollections.PELANGGAN]?.forEach { doc ->
-                    applyPelangganDoc(doc, kurirSyncToId, pendingMap["${SyncCollections.PELANGGAN}:${doc.id}"])
-                }
-
-                // 4. Transaksi (depends on Pelanggan, Kurir, Produk)
-                val pelangganSyncToId = db.pelangganDao().getAllOnce().associate { it.syncId to it.id }
-                val produkSyncToId = db.produkDao().getAllOnce().associate { it.syncId to it.id }
-                cachedSnapshots[SyncCollections.TRANSAKSI]?.forEach { doc ->
-                    applyTransaksiDoc(
-                        doc = doc,
-                        pelangganSyncToId = pelangganSyncToId,
-                        kurirSyncToId = kurirSyncToId,
-                        produkSyncToId = produkSyncToId,
-                        pending = pendingMap["${SyncCollections.TRANSAKSI}:${doc.id}"]
-                    )
-                }
-
-                // 5. Kasbon Logs
-                cachedSnapshots[SyncCollections.KASBON_LOGS]?.forEach { doc ->
-                    applyKasbonLogDoc(
-                        doc = doc,
-                        pelangganSyncToId = pelangganSyncToId,
-                        pending = pendingMap["${SyncCollections.KASBON_LOGS}:${doc.id}"]
-                    )
-                }
-
-                // 6. Pengeluaran & Perawatan RO (Owner only)
-                if (activeRole == DepotRole.OWNER) {
-                    cachedSnapshots[SyncCollections.PENGELUARAN]?.forEach { doc ->
-                        applyPengeluaranDoc(doc, pendingMap["${SyncCollections.PENGELUARAN}:${doc.id}"])
+                if (hasAnyDocuments) {
+                    // 1. Produk
+                    snapshotsByCollection[SyncCollections.PRODUK]?.forEach { doc ->
+                        applyProdukDoc(doc, pendingMap["${SyncCollections.PRODUK}:${doc.id}"])
                     }
-                    cachedSnapshots[SyncCollections.PERAWATAN_JADWAL]?.forEach { doc ->
-                        applyPerawatanJadwalDoc(doc, pendingMap["${SyncCollections.PERAWATAN_JADWAL}:${doc.id}"])
+
+                    // 2. Kurir (also ensures depot/staff links stay clean if needed)
+                    snapshotsByCollection[SyncCollections.KURIR]?.forEach { doc ->
+                        applyKurirDoc(doc, pendingMap["${SyncCollections.KURIR}:${doc.id}"])
                     }
-                    cachedSnapshots[SyncCollections.PERAWATAN_LOG]?.forEach { doc ->
-                        applyPerawatanLogDoc(doc, pendingMap["${SyncCollections.PERAWATAN_LOG}:${doc.id}"])
+
+                    // 3. Pelanggan (depends on Kurir syncId -> local id)
+                    val kurirSyncToId = db.kurirDao().getAllOnce().associate { it.syncId to it.id }
+                    snapshotsByCollection[SyncCollections.PELANGGAN]?.forEach { doc ->
+                        applyPelangganDoc(doc, kurirSyncToId, pendingMap["${SyncCollections.PELANGGAN}:${doc.id}"])
                     }
-                    if (receivedInitialCollections.contains(SyncCollections.PERAWATAN_JADWAL) &&
-                        cachedSnapshots[SyncCollections.PERAWATAN_JADWAL].isNullOrEmpty() &&
-                        db.perawatanDao().count() == 0
-                    ) {
-                        db.perawatanDao().insertAllIgnore(PerawatanScheduler.buildDefaultItems())
+
+                    // 4. Transaksi (depends on Pelanggan, Kurir, Produk)
+                    val pelangganSyncToId = db.pelangganDao().getAllOnce().associate { it.syncId to it.id }
+                    val produkSyncToId = db.produkDao().getAllOnce().associate { it.syncId to it.id }
+                    snapshotsByCollection[SyncCollections.TRANSAKSI]?.forEach { doc ->
+                        applyTransaksiDoc(
+                            doc = doc,
+                            pelangganSyncToId = pelangganSyncToId,
+                            kurirSyncToId = kurirSyncToId,
+                            produkSyncToId = produkSyncToId,
+                            pending = pendingMap["${SyncCollections.TRANSAKSI}:${doc.id}"]
+                        )
                     }
+
+                    // 5. Kasbon Logs
+                    snapshotsByCollection[SyncCollections.KASBON_LOGS]?.forEach { doc ->
+                        applyKasbonLogDoc(
+                            doc = doc,
+                            pelangganSyncToId = pelangganSyncToId,
+                            pending = pendingMap["${SyncCollections.KASBON_LOGS}:${doc.id}"]
+                        )
+                    }
+
+                    // 6. Pengeluaran & Perawatan RO (Owner only)
+                    if (activeRole == DepotRole.OWNER) {
+                        snapshotsByCollection[SyncCollections.PENGELUARAN]?.forEach { doc ->
+                            applyPengeluaranDoc(doc, pendingMap["${SyncCollections.PENGELUARAN}:${doc.id}"])
+                        }
+                        snapshotsByCollection[SyncCollections.PERAWATAN_JADWAL]?.forEach { doc ->
+                            applyPerawatanJadwalDoc(doc, pendingMap["${SyncCollections.PERAWATAN_JADWAL}:${doc.id}"])
+                        }
+                        snapshotsByCollection[SyncCollections.PERAWATAN_LOG]?.forEach { doc ->
+                            applyPerawatanLogDoc(doc, pendingMap["${SyncCollections.PERAWATAN_LOG}:${doc.id}"])
+                        }
+                    }
+                }
+
+                if (activeRole == DepotRole.OWNER &&
+                    seedDefaultPerawatanIfEmpty &&
+                    snapshotsByCollection[SyncCollections.PERAWATAN_JADWAL].isNullOrEmpty() &&
+                    db.perawatanDao().count() == 0
+                ) {
+                    db.perawatanDao().insertAllIgnore(PerawatanScheduler.buildDefaultItems())
                 }
             }
         }
@@ -2396,12 +2499,95 @@ class RealtimeSyncEngine(
         }
     }
 
+    internal fun getDeltaCursor(depotId: String, colName: String): Timestamp? {
+        if (depotId.isBlank() || colName.isBlank()) return null
+        val sec = prefs.getLong(deltaCursorSecKey(depotId, colName), -1L)
+        if (sec < 0L) return null
+        val ns = prefs.getInt(deltaCursorNsKey(depotId, colName), 0)
+        return Timestamp(sec, ns)
+    }
+
+    internal fun advanceDeltaCursor(
+        depotId: String,
+        colName: String,
+        docs: List<DocumentSnapshot>,
+        isFromCache: Boolean,
+        markInitializedIfEmpty: Boolean = false
+    ) {
+        if (isFromCache || depotId.isBlank() || colName.isBlank()) return
+        var maxTs = getDeltaCursor(depotId, colName)
+        var changed = false
+
+        for (doc in docs) {
+            if (doc.metadata.hasPendingWrites()) continue
+            val serverTs = doc.getTimestamp("serverUpdatedAt") ?: continue
+            if (maxTs == null || compareTimestamp(serverTs, maxTs) > 0) {
+                maxTs = serverTs
+                changed = true
+            }
+        }
+
+        if (!changed && markInitializedIfEmpty && maxTs == null) {
+            maxTs = Timestamp(0L, 1)
+            changed = true
+        }
+
+        if (changed && maxTs != null) {
+            prefs.edit()
+                .putLong(deltaCursorSecKey(depotId, colName), maxTs.seconds)
+                .putInt(deltaCursorNsKey(depotId, colName), maxTs.nanoseconds)
+                .apply()
+        }
+    }
+
+    internal fun clearDeltaCursorsForDepot(depotId: String) {
+        if (depotId.isBlank()) return
+        val editor = prefs.edit()
+        val secPrefix = "${KEY_DELTA_SEC_PREFIX}${depotId}_"
+        val nsPrefix = "${KEY_DELTA_NS_PREFIX}${depotId}_"
+        prefs.all.keys.forEach { key ->
+            if (key.startsWith(secPrefix) || key.startsWith(nsPrefix)) {
+                editor.remove(key)
+            }
+        }
+        editor.apply()
+    }
+
+    internal fun clearAllDeltaCursors() {
+        val editor = prefs.edit()
+        prefs.all.keys.forEach { key ->
+            if (key.startsWith(KEY_DELTA_SEC_PREFIX) || key.startsWith(KEY_DELTA_NS_PREFIX)) {
+                editor.remove(key)
+            }
+        }
+        editor.apply()
+    }
+
+    private suspend fun hasAnyLocalCoreData(): Boolean {
+        return db.produkDao().count() > 0 ||
+            db.pelangganDao().count() > 0 ||
+            db.transaksiDao().getAllOnce().isNotEmpty()
+    }
+
+    private fun deltaCursorSecKey(depotId: String, colName: String): String =
+        "${KEY_DELTA_SEC_PREFIX}${depotId}_$colName"
+
+    private fun deltaCursorNsKey(depotId: String, colName: String): String =
+        "${KEY_DELTA_NS_PREFIX}${depotId}_$colName"
+
+    private fun compareTimestamp(a: Timestamp, b: Timestamp): Int {
+        val secCmp = a.seconds.compareTo(b.seconds)
+        return if (secCmp != 0) secCmp else a.nanoseconds.compareTo(b.nanoseconds)
+    }
+
     companion object {
         private const val TAG = "RealtimeSyncEngine"
         private const val PREFS_NAME = "santoya_sync_prefs"
         private const val KEY_LAST_DEPOT_ID = "last_depot_id"
         private const val KEY_LAST_OWNER_UID = "last_owner_uid"
         private const val KEY_CONFIRMED_OWNER_PREFIX = "confirmed_owner_"
+        private const val KEY_DELTA_SEC_PREFIX = "delta_sec_"
+        private const val KEY_DELTA_NS_PREFIX = "delta_ns_"
         private val EMAIL_KEY_REGEX = Regex("^[a-zA-Z0-9_.+\\-@]+$")
     }
 }

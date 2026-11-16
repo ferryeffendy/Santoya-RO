@@ -904,7 +904,41 @@ class SantoyaRepository(
         if (changed) onLocalMutation?.invoke()
     }
 
-    suspend fun deleteTransaksi(transaksi: Transaksi) {
+    suspend fun deleteTransaksi(transaksi: Transaksi, deletedByName: String = "Pemilik") {
+        val now = System.currentTimeMillis()
+        var changed = false
+        db.withTransaction {
+            val latest = db.transaksiDao().getDetailById(transaksi.id)?.transaksi ?: transaksi
+            if (KaryawanScopeHelper.isDeletedTransaksi(latest)) return@withTransaction
+
+            if (latest.status.equals("Kasbon", ignoreCase = true)) {
+                val deduct = latest.remainingKasbonAmount()
+                if (deduct > 0.0) {
+                    val pelanggan = db.pelangganDao().getById(latest.id_pelanggan)
+                    if (pelanggan != null) {
+                        val newKasbon = (pelanggan.sisa_kasbon - deduct).coerceAtLeast(0.0)
+                        val updatedPelanggan = pelanggan.copy(sisa_kasbon = newKasbon, updatedAt = now)
+                        db.pelangganDao().update(updatedPelanggan)
+                        enqueueUpsert(SyncCollections.PELANGGAN, updatedPelanggan.syncId, now)
+                    }
+                }
+            }
+
+            val softDeletedTx = latest.copy(
+                status = KaryawanScopeHelper.STATUS_DIHAPUS,
+                isDeleted = true,
+                deletedBy = deletedByName.trim().ifBlank { "Pemilik" },
+                total_komisi = 0.0,
+                updatedAt = now
+            )
+            db.transaksiDao().update(softDeletedTx)
+            enqueueUpsert(SyncCollections.TRANSAKSI, softDeletedTx.syncId, now)
+            changed = true
+        }
+        if (changed) onLocalMutation?.invoke()
+    }
+
+    suspend fun permanentDeleteTransaksi(transaksi: Transaksi) {
         val now = System.currentTimeMillis()
         db.withTransaction {
             val latest = db.transaksiDao().getDetailById(transaksi.id)?.transaksi ?: transaksi

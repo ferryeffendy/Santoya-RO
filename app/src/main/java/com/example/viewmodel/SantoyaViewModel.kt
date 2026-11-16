@@ -798,7 +798,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         launchGuardedAction("Menghapus permanen...") {
-            repository.deleteTransaksi(transaksi)
+            repository.permanentDeleteTransaksi(transaksi)
             showSnackbar("Transaksi dihapus permanen")
         }
     }
