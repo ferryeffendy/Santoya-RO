@@ -2,6 +2,7 @@ package com.example.viewmodel
 
 import android.app.Application
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -25,8 +26,10 @@ import com.example.data.repository.AiAnalyticsRepository
 import com.example.data.repository.InsufficientAiDataException
 import com.example.data.repository.SantoyaRepository
 import com.example.util.DepotRole
+import com.example.util.ExportHelper
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
+import com.example.util.KasbonReconcileHelper
 import com.example.util.LastSessionInfo
 import com.example.util.OfflineLocalSummary
 import com.example.util.OfflineSessionManager
@@ -100,6 +103,7 @@ enum class KasbonSortOption {
 /**
  * State tampilan untuk tab Kalkulator Kesehatan Membran RO (khusus pemilik depot).
  */
+@Immutable
 data class RoMembraneUiState(
     val tdsBakuInput: String = "",
     val tdsJadiInput: String = "",
@@ -119,6 +123,7 @@ data class RoMembraneUiState(
 /**
  * State tampilan untuk sub-tab Kalkulator Takaran Pencucian Membran RO (CIP).
  */
+@Immutable
 data class CipCalculatorUiState(
     val selectedMode: CipCleaningMode = CipCleaningMode.CITRIC_ACID,
     val selectedHousing: CipHousingSize = CipHousingSize.HOUSING_4040,
@@ -143,6 +148,7 @@ enum class LaporanPeriode(val label: String) {
     SEMUA("Semua")
 }
 
+@Immutable
 data class TodaySummary(
     val galonTerjual: Int = 0,
     val pendapatanLunas: Double = 0.0,
@@ -158,13 +164,7 @@ data class ActiveReceiptDialog(
     val receiptBuilder: ((DepotProfile) -> String)? = null
 )
 
-data class KasbonDiscrepancy(
-    val pelangganId: Int,
-    val namaPelanggan: String,
-    val saldoTercatat: Double,
-    val totalNotaBelumLunas: Double,
-    val selisih: Double
-)
+typealias KasbonDiscrepancy = com.example.util.KasbonDiscrepancy
 
 /**
  * State tampilan untuk fitur AI Business Insights khusus Pemilik Depot.
@@ -194,25 +194,11 @@ sealed interface AiAnalyticsUiState {
 class SantoyaViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
-    private val transaksiDao = db.transaksiDao()
-    private val pelangganDao = db.pelangganDao()
     private val syncEngine = RealtimeSyncEngine(application, db)
     private val repository = SantoyaRepository(db, application) {
         syncEngine.scheduleFlush()
     }
     private val aiAnalyticsRepository by lazy { AiAnalyticsRepository(getApplication()) }
-
-    val transaksiPagingFlow: Flow<PagingData<Transaksi>> = Pager(
-        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
-    ) {
-        transaksiDao.getTransaksiPaging()
-    }.flow.cachedIn(viewModelScope)
-
-    val pelangganPagingFlow: Flow<PagingData<Pelanggan>> = Pager(
-        config = PagingConfig(pageSize = 20, enablePlaceholders = false)
-    ) {
-        pelangganDao.getPelangganPaging()
-    }.flow.cachedIn(viewModelScope)
 
     // --- Centralized Loading & Anti-Double-Tap Busy States ---
     private val _isInitialDataLoaded = MutableStateFlow(false)
@@ -282,6 +268,11 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
 
     val allTransaksi: StateFlow<List<TransaksiDetail>> = repository.allTransaksiWithDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val transaksiPagingFlow: Flow<PagingData<Transaksi>> = Pager(
+        config = PagingConfig(pageSize = 30, prefetchDistance = 10, enablePlaceholders = false),
+        pagingSourceFactory = { db.transaksiDao().getTransaksiPaged() }
+    ).flow.cachedIn(viewModelScope)
 
     val allKasbonLogs: StateFlow<List<KasbonLog>> = repository.allKasbonLogs
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -528,19 +519,30 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         getApplication<Application>().getSharedPreferences("santoya_crm_reminder_prefs", Context.MODE_PRIVATE)
     }
 
-    private val _crmContactedTimestamps = MutableStateFlow(loadCrmContactedTimestamps())
+    private val _crmContactedTimestamps = MutableStateFlow<Map<Int, Long>>(emptyMap())
     val crmContactedTimestamps: StateFlow<Map<Int, Long>> = _crmContactedTimestamps.asStateFlow()
 
     private val _roMembraneSubTab = MutableStateFlow(0)
     val roMembraneSubTab: StateFlow<Int> = _roMembraneSubTab.asStateFlow()
 
-    private val _roMembraneUiState = MutableStateFlow(loadSavedRoMembraneState())
+    private val _roMembraneUiState = MutableStateFlow(RoMembraneUiState())
     val roMembraneUiState: StateFlow<RoMembraneUiState> = _roMembraneUiState.asStateFlow()
 
-    private val _cipCalculatorUiState = MutableStateFlow(buildInitialCipState(_roMembraneUiState.value))
+    private val _cipCalculatorUiState = MutableStateFlow(CipCalculatorUiState())
     val cipCalculatorUiState: StateFlow<CipCalculatorUiState> = _cipCalculatorUiState.asStateFlow()
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val loadedCrm = loadCrmContactedTimestamps()
+            if (loadedCrm.isNotEmpty()) {
+                _crmContactedTimestamps.update { current ->
+                    if (current.isEmpty()) loadedCrm else loadedCrm + current
+                }
+            }
+            val loadedRo = loadSavedRoMembraneState()
+            _roMembraneUiState.value = loadedRo
+            _cipCalculatorUiState.value = buildInitialCipState(loadedRo)
+        }
         viewModelScope.launch(Dispatchers.Default) {
             combine(
                 repository.allPelanggan,
@@ -561,37 +563,9 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
         allTransaksi,
         allKasbonLogs
     ) { pelangganList, transaksiList, kasbonLogs ->
-        val activeTxByCust = transaksiList.asSequence()
-            .filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
-            .groupBy { it.transaksi.id_pelanggan }
-        val custIdsWithLogs = kasbonLogs.asSequence()
-            .filter { it.jumlah_bayar > 0.0 }
-            .map { it.id_pelanggan }
-            .toSet()
-
-        pelangganList.mapNotNull { p ->
-            val custTxs = activeTxByCust[p.id].orEmpty()
-            val unpaidSum = custTxs
-                .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-                .sumOf { it.transaksi.remainingKasbonAmount() }
-            val targetKasbon = p.sisa_kasbon.coerceAtLeast(0.0)
-            val hasSettledHistory = p.id in custIdsWithLogs || custTxs.any {
-                it.transaksi.status.equals("Lunas", ignoreCase = true) &&
-                    it.transaksi.tanggalBayar != null &&
-                    it.transaksi.tanggalBayar != it.transaksi.tanggal
-            }
-
-            if (unpaidSum > targetKasbon || (targetKasbon > unpaidSum && (hasSettledHistory || unpaidSum > 0.0))) {
-                KasbonDiscrepancy(
-                    pelangganId = p.id,
-                    namaPelanggan = p.nama,
-                    saldoTercatat = targetKasbon,
-                    totalNotaBelumLunas = unpaidSum,
-                    selisih = kotlin.math.abs(unpaidSum - targetKasbon)
-                )
-            } else null
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        KasbonReconcileHelper.detectDiscrepancies(pelangganList, transaksiList, kasbonLogs)
+    }.flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun reconcileKasbonDiscrepancies(onFinished: ((Int) -> Unit)? = null) {
         launchGuardedAction("Merapikan nota kasbon...") {
@@ -1056,10 +1030,20 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Mengalihkan akun dari mode Pemilik bayangan ke mode Karyawan, membersihkan klaim tautan bayangan,
-     * dan menghubungkan ulang ke depot Pemilik asli.
+     * dan menghubungkan ulang ke depot Pemilik asli. Mencegah kehilangan data jika masih ada antrean belum terkirim.
      */
-    fun switchToStaffWaitingMode() {
+    fun switchToStaffWaitingMode(forceDiscardPending: Boolean = false) {
         viewModelScope.launch {
+            val remaining = syncEngine.flushPendingBeforeSignOut(timeoutMs = 6_000L)
+            if (remaining > 0 && !forceDiscardPending) {
+                showSnackbar(
+                    getApplication<Application>().getString(
+                        com.example.R.string.switch_staff_pending_blocked_snackbar,
+                        remaining
+                    )
+                )
+                return@launch
+            }
             val connected = syncEngine.switchToStaffWaitingMode()
             if (connected) {
                 showSnackbar("Berhasil berpindah ke depot pemilik")
@@ -1070,10 +1054,78 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
+     * Mencoba mengirim seluruh antrean lokal (`pending_sync` + profil) sebelum keluar akun.
+     * Memanggil [onResult] dengan jumlah antrean yang masih tersisa (0 berarti aman untuk keluar).
+     */
+    fun flushPendingBeforeSignOut(onResult: (Int) -> Unit) {
+        viewModelScope.launch {
+            _isBusyAction.value = true
+            val remaining = try {
+                syncEngine.flushPendingBeforeSignOut(timeoutMs = 10_000L)
+            } finally {
+                _isBusyAction.value = false
+            }
+            onResult(remaining)
+        }
+    }
+
+    /**
+     * Mengekspor seluruh data lokal beserta antrean belum tersinkron ke berkas JSON darurat
+     * dan menyimpan salinan auto-backup internal sebelum pengguna keluar akun.
+     */
+    fun exportEmergencyBackupJson(context: Context) {
+        val pelangganList = allPelanggan.value
+        val transaksiList = allTransaksi.value
+        val produkList = allProduk.value
+        val kurirList = allKurir.value
+        val pengeluaranList = allPengeluaran.value
+        val kasbonLogList = allKasbonLogs.value
+        val perawatanList = allPerawatanEvaluations.value.map { it.item }
+        val perawatanLogList = allPerawatanLogs.value
+        val currentProfile = depotProfile.value
+
+        ExportHelper.createAutoBackupBeforeImport(
+            context = context,
+            pelangganList = pelangganList,
+            transaksiList = transaksiList,
+            produkList = produkList,
+            kurirList = kurirList,
+            pengeluaranList = pengeluaranList,
+            kasbonLogList = kasbonLogList,
+            perawatanList = perawatanList,
+            perawatanLogList = perawatanLogList,
+            depotProfile = currentProfile
+        )
+        val json = ExportHelper.generateNestedJson(
+            pelangganList = pelangganList,
+            transaksiList = transaksiList,
+            produkList = produkList,
+            kurirList = kurirList,
+            pengeluaranList = pengeluaranList,
+            kasbonLogList = kasbonLogList,
+            perawatanList = perawatanList,
+            perawatanLogList = perawatanLogList,
+            depotProfile = currentProfile
+        )
+        ExportHelper.shareExportFile(
+            context = context,
+            filename = "santoya_backup_darurat_${System.currentTimeMillis()}.json",
+            content = json,
+            mimeType = "application/json"
+        )
+        showSnackbar(context.getString(com.example.R.string.sign_out_auto_backup_saved_snackbar))
+    }
+
+    /**
      * Dipanggil sebelum Firebase.signOut(). Semua data depot di perangkat ini
      * dihapus agar akun berikutnya tidak melihat data pemilik sebelumnya.
+     * Sebelum menghapus, mencoba flush antrean terakhir dan mengamankan snapshot auto-backup bila masih ada antrean.
      */
     suspend fun clearLocalDataForLogout() {
+        try {
+            syncEngine.flushPendingBeforeSignOut(timeoutMs = 5_000L)
+        } catch (_: Exception) {
+        }
         _activeAuthUid.value = null
         _currentUserEmail.value = null
         _isAnalyzingAi.value = false
@@ -3137,6 +3189,7 @@ class SantoyaViewModel(application: Application) : AndroidViewModel(application)
     }
 }
 
+@Immutable
 data class PelangganUiModel(
     val pelanggan: Pelanggan,
     val estimatedIntervalDays: Int?,

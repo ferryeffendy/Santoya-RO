@@ -86,7 +86,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -174,9 +173,9 @@ fun TransaksiScreen(
     activeKaryawan: Kurir? = null,
     modifier: Modifier = Modifier
 ) {
-    val selectedTab by viewModel.transaksiTab.collectAsState()
-    val vmIsKaryawan by viewModel.isKaryawan.collectAsState()
-    val vmActiveKaryawan by viewModel.activeKaryawan.collectAsState()
+    val selectedTab by viewModel.transaksiTab.collectAsStateWithLifecycle()
+    val vmIsKaryawan by viewModel.isKaryawan.collectAsStateWithLifecycle()
+    val vmActiveKaryawan by viewModel.activeKaryawan.collectAsStateWithLifecycle()
     val effectiveIsKaryawan = isKaryawan ?: vmIsKaryawan
     val effectiveActiveKaryawan = activeKaryawan ?: vmActiveKaryawan
     val coroutineScope = rememberCoroutineScope()
@@ -311,17 +310,17 @@ fun CatatPenjualanTab(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val isImeVisible = rememberIsImeVisible()
-    val tanggal by viewModel.txTanggal.collectAsState()
-    val selectedPelangganId by viewModel.txPelangganId.collectAsState()
-    val selectedProdukId by viewModel.txProdukId.collectAsState()
-    val selectedKurirId by viewModel.txKurirId.collectAsState()
-    val jumlah by viewModel.txJumlah.collectAsState()
-    val hargaSatuan by viewModel.txHargaSatuan.collectAsState()
-    val metodeBayar by viewModel.txMetodeBayar.collectAsState()
-    val status by viewModel.txStatus.collectAsState()
-    val uangMuka by viewModel.txUangMuka.collectAsState()
+    val tanggal by viewModel.txTanggal.collectAsStateWithLifecycle()
+    val selectedPelangganId by viewModel.txPelangganId.collectAsStateWithLifecycle()
+    val selectedProdukId by viewModel.txProdukId.collectAsStateWithLifecycle()
+    val selectedKurirId by viewModel.txKurirId.collectAsStateWithLifecycle()
+    val jumlah by viewModel.txJumlah.collectAsStateWithLifecycle()
+    val hargaSatuan by viewModel.txHargaSatuan.collectAsStateWithLifecycle()
+    val metodeBayar by viewModel.txMetodeBayar.collectAsStateWithLifecycle()
+    val status by viewModel.txStatus.collectAsStateWithLifecycle()
+    val uangMuka by viewModel.txUangMuka.collectAsStateWithLifecycle()
     val txWaterType by viewModel.txWaterType.collectAsStateWithLifecycle()
-    val isBusyAction by viewModel.isBusyAction.collectAsState()
+    val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
     val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
     val formScrollState = rememberScrollState()
 
@@ -2247,7 +2246,8 @@ fun RiwayatTransaksiTab(
             } else if (!hasActiveFilter && (!isKaryawan || activeTransactions.isNotEmpty())) {
                 items(
                     count = items.itemCount,
-                    key = items.itemKey { it.id }
+                    key = items.itemKey { it.id },
+                    contentType = { "transaksi_history_card" }
                 ) { index ->
                     val tx = items[index] ?: return@items
                     if (isKaryawan && KaryawanScopeHelper.isDeletedTransaksi(tx)) return@items
@@ -2306,7 +2306,7 @@ fun RiwayatTransaksiTab(
                     )
                 }
             } else {
-                items(displayedHistory, key = { it.transaksi.id }) { detail ->
+                items(displayedHistory, key = { it.transaksi.id }, contentType = { "transaksi_history_card" }) { detail ->
                     TransaksiHistoryCard(
                         detail = detail,
                         searchQuery = searchQuery,
@@ -2378,13 +2378,13 @@ fun RiwayatTransaksiTab(
                         FilterChip(
                             selected = selectedMetodePelunasan == "Cash",
                             onClick = { selectedMetodePelunasan = "Cash" },
-                            label = { Text("Tunai") },
+                            label = { Text(stringResource(R.string.payment_method_tunai)) },
                             modifier = Modifier.weight(1f)
                         )
                         FilterChip(
                             selected = selectedMetodePelunasan == "Transfer",
                             onClick = { selectedMetodePelunasan = "Transfer" },
-                            label = { Text("Transfer") },
+                            label = { Text(stringResource(R.string.payment_method_transfer)) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -2910,7 +2910,10 @@ fun RiwayatTransaksiTab(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Perhatian: Transaksi ini sebelumnya memiliki DP ${FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())}. Memilih Kasbon Penuh akan membatalkan DP ini.",
+                        text = stringResource(
+                            R.string.tx_edit_cancel_uang_muka_warning,
+                            FormatUtils.formatRupiah(detail.transaksi.uangMuka.toDouble())
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.padding(8.dp)
@@ -2960,7 +2963,7 @@ fun RiwayatTransaksiTab(
                     value = editUangMuka,
                     onValueChange = { editUangMuka = it.filter { c -> c.isDigit() } },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    label = { Text("Uang Muka (Rp) *") },
+                    label = { Text(stringResource(R.string.tx_uang_muka_label)) },
                     isError = parsedEditDp <= 0L || parsedEditDp > previewTotalLong,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(

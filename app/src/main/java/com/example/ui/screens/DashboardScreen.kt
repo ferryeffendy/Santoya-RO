@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -25,8 +26,10 @@ import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,6 +67,7 @@ import com.example.ui.components.OwnerVerticalMenuList
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
 import com.example.ui.components.WaveHeader
 import com.example.ui.theme.SantoyaRadius
+import com.example.ui.theme.SantoyaSize
 import com.example.util.FormatUtils
 import com.example.util.GoogleSignInHelper
 import com.example.util.KaryawanScopeHelper
@@ -565,31 +569,114 @@ fun DashboardScreen(
     }
 
     if (showKaryawanSignOutDialog && onSignOut != null) {
+        val pendingCount = syncState.pendingCount
+        var isFlushingBeforeExit by remember { mutableStateOf(false) }
         AlertDialog(
-            onDismissRequest = { showKaryawanSignOutDialog = false },
+            onDismissRequest = {
+                if (!isFlushingBeforeExit) {
+                    showKaryawanSignOutDialog = false
+                }
+            },
             title = {
                 Text(
-                    text = stringResource(R.string.dashboard_staff_sign_out_title),
+                    text = if (pendingCount > 0) {
+                        stringResource(R.string.sign_out_pending_warning_title, pendingCount)
+                    } else {
+                        stringResource(R.string.dashboard_staff_sign_out_title)
+                    },
                     fontWeight = FontWeight.Bold
                 )
             },
-            text = { Text(stringResource(R.string.dashboard_staff_sign_out_message)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (pendingCount > 0) {
+                            stringResource(R.string.sign_out_pending_warning_msg, pendingCount)
+                        } else {
+                            stringResource(R.string.dashboard_staff_sign_out_message)
+                        }
+                    )
+                    if (pendingCount > 0) {
+                        OutlinedButton(
+                            onClick = { viewModel.exportEmergencyBackupJson(context) },
+                            enabled = !isFlushingBeforeExit,
+                            shape = RoundedCornerShape(SantoyaRadius.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_staff_sign_out_backup_json")
+                        ) {
+                            Text(
+                                text = stringResource(R.string.sign_out_btn_backup_json),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                isFlushingBeforeExit = true
+                                viewModel.flushPendingBeforeSignOut { remaining ->
+                                    isFlushingBeforeExit = false
+                                    if (remaining == 0) {
+                                        showKaryawanSignOutDialog = false
+                                        onSignOut()
+                                    } else {
+                                        viewModel.showSnackbar(
+                                            context.getString(R.string.sign_out_flush_failed_snackbar, remaining)
+                                        )
+                                    }
+                                }
+                            },
+                            enabled = !isFlushingBeforeExit,
+                            shape = RoundedCornerShape(SantoyaRadius.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_staff_sign_out_sync_first")
+                        ) {
+                            if (isFlushingBeforeExit) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.sign_out_flushing_pending_msg))
+                            } else {
+                                Text(
+                                    text = stringResource(R.string.sign_out_btn_sync_and_exit),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         showKaryawanSignOutDialog = false
                         onSignOut()
                     },
+                    enabled = !isFlushingBeforeExit,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     )
                 ) {
-                    Text(stringResource(R.string.action_sign_out))
+                    Text(
+                        text = if (pendingCount > 0) {
+                            stringResource(R.string.sign_out_btn_force_exit)
+                        } else {
+                            stringResource(R.string.action_sign_out)
+                        }
+                    )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showKaryawanSignOutDialog = false }) {
+                TextButton(
+                    onClick = { showKaryawanSignOutDialog = false },
+                    enabled = !isFlushingBeforeExit
+                ) {
                     Text(stringResource(R.string.action_cancel))
                 }
             }
@@ -599,9 +686,7 @@ fun DashboardScreen(
     if (showSyncInfoSheet) {
         val currentUser = Firebase.auth.currentUser
         val currentUserId = currentUser?.uid
-        val canSwitchToStaffWaiting = !isOfflineMode &&
-            !KaryawanScopeHelper.isPrimaryOwnerEmail(currentUser?.email) &&
-            (!isKaryawan || !KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
+        val canSwitchToStaffWaiting = !isOfflineMode && currentUser != null
         SantoyaSyncInfoBottomSheet(
             syncState = syncState,
             isOfflineLocalMode = isOfflineMode,

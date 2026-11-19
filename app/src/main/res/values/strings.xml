@@ -1209,4 +1209,31 @@
     <string name="sync_force_push_progress">Mengirim ulang seluruh data lokal ke Cloud…</string>
     <string name="sync_force_push_success_snackbar">Seluruh data lokal berhasil dikirim ulang (%1$d pelanggan, %2$d nota)</string>
     <string name="settings_sync_summary_recap_full">Tersinkron: %1$d Pelanggan • %2$d Nota • %3$d Produk • %4$d Karyawan • %5$d Pengeluaran</string>
+
+    <!-- Perlindungan Antrean Sinkronisasi Saat Keluar Akun / Pindah Peran (Fix H2) -->
+    <string name="sign_out_pending_warning_title">Masih Ada %1$d Data Belum Tersinkron!</string>
+    <string name="sign_out_pending_warning_msg">Jika Anda keluar sekarang saat koneksi belum selesai menyinkronkan data, %1$d perubahan lokal di HP ini akan dibersihkan dari antrean. Sinkronkan ke Cloud atau simpan file cadangan JSON terlebih dahulu.</string>
+    <string name="sign_out_btn_sync_and_exit">Sinkronkan &amp; Keluar</string>
+    <string name="sign_out_btn_backup_json">Simpan Cadangan JSON</string>
+    <string name="sign_out_btn_force_exit">Tetap Keluar (Cadangkan Otomatis)</string>
+    <string name="sign_out_flushing_pending_msg">Menyinkronkan antrean data sebelum keluar…</string>
+    <string name="sign_out_flush_failed_snackbar">Masih ada %1$d data belum terkirim ke Cloud. Periksa internet atau simpan Cadangan JSON terlebih dahulu.</string>
+    <string name="sign_out_auto_backup_saved_snackbar">Cadangan darurat JSON berhasil disimpan sebelum keluar akun.</string>
+    <string name="switch_staff_pending_blocked_snackbar">Masih ada %1$d antrean belum terkirim. Sinkronkan atau simpan Cadangan JSON di Pengaturan sebelum pindah ke Mode Karyawan.</string>
+
+    <!-- String UI Terpusat & Konsistensi Istilah Bahasa Indonesia -->
+    <string name="payment_method_tunai">Tunai</string>
+    <string name="payment_method_transfer">Transfer</string>
+    <string name="tx_uang_muka_label">Uang Muka (Rp) *</string>
+    <string name="tx_edit_cancel_uang_muka_warning">Perhatian: Transaksi ini sebelumnya memiliki Uang Muka %1$s. Memilih Kasbon Penuh akan membatalkan Uang Muka ini.</string>
+    <string name="pelanggan_kasbon_nominal_label">Nominal Bayar (Rp) *</string>
+    <string name="pelanggan_kasbon_uang_muka_summary">Uang Muka %1$s • Sisa %2$s</string>
+    <string name="pelanggan_kasbon_note_with_uang_muka">• %1$s (%2$d gln • Uang Muka %3$s)</string>
+    <string name="kurir_name_placeholder">Contoh: Fitri, Budi</string>
+    <string name="kurir_komisi_label">Komisi per Galon (Rp) *</string>
+    <string name="kurir_komisi_helper">Dihitung otomatis per galon yang diantar.</string>
+    <string name="kurir_google_section_title">Akun Google Karyawan (Opsional)</string>
+    <string name="kurir_google_email_label">Email Google Karyawan</string>
+    <string name="kurir_google_email_placeholder">contoh: fitri@gmail.com</string>
+    <string name="kurir_google_email_helper">Masukkan email Google kurir supaya datanya tersambung ke HP-nya.</string>
 </resources>

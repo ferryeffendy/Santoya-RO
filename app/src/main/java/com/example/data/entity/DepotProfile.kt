@@ -1,6 +1,7 @@
 package com.example.data.entity
 
 import androidx.annotation.Keep
+import androidx.compose.runtime.Immutable
 import com.google.firebase.firestore.IgnoreExtraProperties
 import java.text.NumberFormat
 import java.util.Locale
@@ -20,6 +21,7 @@ enum class DepotProfileField {
  * Model profil pemilik dan identitas usaha depot air minum untuk pemantauan pendaftar,
  * sinkronisasi identitas ke perangkat karyawan, serta kop dinamis pada struk, nota WhatsApp, dan PDF.
  */
+@Immutable
 @Keep
 @IgnoreExtraProperties
 data class DepotProfile(

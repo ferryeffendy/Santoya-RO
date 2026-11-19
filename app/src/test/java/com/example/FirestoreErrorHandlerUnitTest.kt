@@ -10,12 +10,12 @@ class FirestoreErrorHandlerUnitTest {
 
     @Test
     fun `redactEmailForLog masks local part when redact is true and preserves when false`() {
-        assertEquals("fe***@gmail.com", redactEmailForLog("ferryeffendy@gmail.com", redact = true))
+        assertEquals("pe***@santoya.id", redactEmailForLog("pemilik@santoya.id", redact = true))
         assertEquals("a***@x.id", redactEmailForLog("ab@x.id", redact = true))
         assertEquals("***", redactEmailForLog("invalid-email", redact = true))
         assertEquals(
-            "ferryeffendy@gmail.com",
-            redactEmailForLog("ferryeffendy@gmail.com", redact = false)
+            "pemilik@santoya.id",
+            redactEmailForLog("pemilik@santoya.id", redact = false)
         )
         assertNull(redactEmailForLog(null, redact = true))
     }

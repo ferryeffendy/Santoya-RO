@@ -1,6 +1,5 @@
 package com.example.data.dao
 
-import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -12,9 +11,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface PelangganDao {
-    @Query("SELECT * FROM pelanggan ORDER BY nama ASC")
-    fun getPelangganPaging(): PagingSource<Int, Pelanggan>
-
     @Query("SELECT * FROM pelanggan ORDER BY nama ASC")
     fun getAll(): Flow<List<Pelanggan>>
 

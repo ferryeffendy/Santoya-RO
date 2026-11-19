@@ -48,8 +48,8 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -96,8 +96,8 @@ fun KurirScreen(
     onBack: () -> Unit = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
     modifier: Modifier = Modifier
 ) {
-    val vmKurirList by viewModel.allKurir.collectAsState()
-    val vmTransaksiList by viewModel.allTransaksi.collectAsState()
+    val vmKurirList by viewModel.allKurir.collectAsStateWithLifecycle()
+    val vmTransaksiList by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val displayKurirList = if (kurirList.isNotEmpty()) kurirList else vmKurirList
     val rawTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else vmTransaksiList
     val displayTransaksiList = remember(rawTransaksiList) {
@@ -171,7 +171,7 @@ fun KurirScreen(
                     )
                 }
             } else {
-                items(displayKurirList, key = { it.id }) { kurir ->
+                items(displayKurirList, key = { it.id }, contentType = { "kurir_card" }) { kurir ->
                     val kurirTx = remember(displayTransaksiList, kurir.id) {
                         displayTransaksiList.filter { it.transaksi.id_kurir == kurir.id }
                     }
@@ -522,7 +522,7 @@ private fun KurirFormDialog(
                 errorMessage = null
             },
             label = { Text(stringResource(R.string.kurir_name_label)) },
-            placeholder = { Text("Contoh: Fitri, Budi") },
+            placeholder = { Text(stringResource(R.string.kurir_name_placeholder)) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
                 imeAction = ImeAction.Next
@@ -544,9 +544,9 @@ private fun KurirFormDialog(
                 komisiStr = it.filter { char -> char.isDigit() }
                 errorMessage = null
             },
-            label = { Text("Komisi per Galon (Rp) *") },
+            label = { Text(stringResource(R.string.kurir_komisi_label)) },
             supportingText = {
-                Text("Dihitung otomatis per galon yang diantar.")
+                Text(stringResource(R.string.kurir_komisi_helper))
             },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
@@ -567,9 +567,9 @@ private fun KurirFormDialog(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
 
         Text(
-            text = "Akun Google Karyawan (Opsional)",
+            text = stringResource(R.string.kurir_google_section_title),
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
         )
 
@@ -579,8 +579,8 @@ private fun KurirFormDialog(
                 emailInput = it.replace(" ", "").lowercase()
                 errorMessage = null
             },
-            label = { Text("Email Google Karyawan") },
-            placeholder = { Text("contoh: fitri@gmail.com") },
+            label = { Text(stringResource(R.string.kurir_google_email_label)) },
+            placeholder = { Text(stringResource(R.string.kurir_google_email_placeholder)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
@@ -590,7 +590,7 @@ private fun KurirFormDialog(
                 onDone = { focusManager.clearFocus() }
             ),
             supportingText = {
-                Text("Masukkan email Google kurir supaya datanya tersambung ke HP-nya.")
+                Text(stringResource(R.string.kurir_google_email_helper))
             },
             modifier = Modifier
                 .fillMaxWidth()

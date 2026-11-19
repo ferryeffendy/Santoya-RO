@@ -370,21 +370,19 @@ fun RoleConfirmationDialog(
 
                     Spacer(Modifier.height(16.dp))
 
-                    if (!com.example.util.KaryawanScopeHelper.isDesignatedStaffEmail(userEmail)) {
-                        TextButton(
-                            onClick = { showOwnerConfirmDialog = true },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = SantoyaSize.touchTarget)
-                                .testTag("btn_role_choose_owner")
-                        ) {
-                            Text(
-                                text = stringResource(R.string.role_confirm_owner_btn),
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                    TextButton(
+                        onClick = { showOwnerConfirmDialog = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = SantoyaSize.touchTarget)
+                            .testTag("btn_role_choose_owner")
+                    ) {
+                        Text(
+                            text = stringResource(R.string.role_confirm_owner_btn),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
 
                     TextButton(

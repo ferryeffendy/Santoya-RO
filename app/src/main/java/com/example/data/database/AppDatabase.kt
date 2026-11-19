@@ -44,7 +44,7 @@ import kotlinx.coroutines.launch
         PerawatanLog::class,
         TangkiRefill::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -326,6 +326,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pelanggan_id_kurir_langganan` ON `pelanggan` (`id_kurir_langganan`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pelanggan_isDeleted` ON `pelanggan` (`isDeleted`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_kasbon_log_id_pelanggan` ON `kasbon_log` (`id_pelanggan`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_kasbon_log_tanggal` ON `kasbon_log` (`tanggal`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pengeluaran_tanggal` ON `pengeluaran` (`tanggal`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaksi_status` ON `transaksi` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaksi_id_pelanggan_status_isDeleted` ON `transaksi` (`id_pelanggan`, `status`, `isDeleted`)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -347,7 +359,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_13_14,
                         MIGRATION_14_15,
                         MIGRATION_15_16,
-                        MIGRATION_16_17
+                        MIGRATION_16_17,
+                        MIGRATION_17_18
                     )
                     .addCallback(DatabaseCallback())
                     .build()

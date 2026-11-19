@@ -33,7 +33,11 @@ class Migration15to16Test {
             AppDatabase::class.java,
             testDbName
         )
-            .addMigrations(AppDatabase.MIGRATION_15_16, AppDatabase.MIGRATION_16_17)
+            .addMigrations(
+                AppDatabase.MIGRATION_15_16,
+                AppDatabase.MIGRATION_16_17,
+                AppDatabase.MIGRATION_17_18
+            )
             .allowMainThreadQueries()
             .build()
         helper.closeWhenFinished(database)

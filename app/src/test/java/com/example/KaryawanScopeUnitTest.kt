@@ -127,23 +127,24 @@ class KaryawanScopeUnitTest {
         assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "rudi@gmail.com", "pemilik@gmail.com", couriers))
         assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "pemilik@gmail.com", "pemilik@gmail.com", couriers))
 
-        // Ketiga email karyawan utama selalu dikenali sebagai karyawan bahkan sebelum daftar kurir lokal dimuat
-        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("mumus8800@gmail.com"))
-        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("RADIJAYA168@GMAIL.COM "))
-        assertTrue(KaryawanScopeHelper.isDesignatedStaffEmail("fitriazizaheffendy@gmail.com"))
-        assertFalse(KaryawanScopeHelper.isDesignatedStaffEmail("ferryeffendy@gmail.com"))
-        assertTrue(KaryawanScopeHelper.isPrimaryOwnerEmail("FerryEffendy@gmail.com "))
-        assertFalse(KaryawanScopeHelper.isPrimaryOwnerEmail("radijaya168@gmail.com"))
+        // Kurir yang sudah dihapus (isDeleted = true) tidak boleh dikenali sebagai karyawan aktif
+        val deletedKurir = activeFitri.copy(id = 4, email = "deleted@gmail.com", isDeleted = true, akses_aktif = true)
+        val couriersWithDeleted = couriers + deletedKurir
+        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "deleted@gmail.com", "pemilik@gmail.com", couriersWithDeleted))
+        assertNull(KaryawanScopeHelper.resolveActiveKaryawan("deleted@gmail.com", couriersWithDeleted))
 
-        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "radijaya168@gmail.com", "radijaya168@gmail.com", emptyList()))
-        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "mumus8800@gmail.com", "ferryeffendy@gmail.com", emptyList()))
-        assertTrue(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "fitriazizaheffendy@gmail.com", "ferryeffendy@gmail.com", emptyList()))
-        assertFalse(KaryawanScopeHelper.isKaryawanRole(DepotRole.OWNER, "ferryeffendy@gmail.com", "ferryeffendy@gmail.com", couriers))
+        // Sanitasi email kurir impor menolak email pemilik aktif secara dinamis
+        assertEquals(
+            "",
+            com.example.util.ExportHelper.sanitizeImportedCourierEmail("pemilik@gmail.com", ownerEmail = "PEMILIK@gmail.com")
+        )
+        assertEquals(
+            "kurir1@gmail.com",
+            com.example.util.ExportHelper.sanitizeImportedCourierEmail("Kurir1@gmail.com ", ownerEmail = "pemilik@gmail.com")
+        )
 
-        assertEquals("Mumus8800", KaryawanScopeHelper.defaultStaffDisplayName("mumus8800@gmail.com"))
-        assertEquals("Radijaya168", KaryawanScopeHelper.defaultStaffDisplayName("radijaya168@gmail.com"))
-        assertEquals("Fitriazizaheffendy", KaryawanScopeHelper.defaultStaffDisplayName("fitriazizaheffendy@gmail.com"))
-        assertEquals("kurir_staff_mumus8800", KaryawanScopeHelper.defaultStaffSyncId("mumus8800@gmail.com"))
+        assertEquals("Kurirbaru", KaryawanScopeHelper.defaultStaffDisplayName("kurirbaru@gmail.com"))
+        assertEquals("kurir_staff_kurirbaru", KaryawanScopeHelper.defaultStaffSyncId("kurirbaru@gmail.com"))
     }
 
     @Test

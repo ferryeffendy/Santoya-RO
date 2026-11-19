@@ -203,43 +203,38 @@ class OfflineSyncQueueUnitTest {
     }
 
     @Test
-    fun ensureDesignatedStaffKurirsForOwner_seedsThreeStaffEmailsWithoutOverwritingCustomOwnerEdits() = runBlocking {
+    fun clearLocalData_createsEmergencyAutoBackupBeforeWipingWhenPendingQueueIsNotEmpty() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val engine = com.example.util.RealtimeSyncEngine(context, db)
 
-        // Pre-populate one customized courier for mumus8800@gmail.com
-        val customMumus = com.example.data.entity.Kurir(
-            nama = "Kang Mumus",
-            komisi_per_galon = 1_500.0,
-            email = "mumus8800@gmail.com",
-            akses_aktif = true,
-            syncId = "custom_mumus_sync",
-            updatedAt = 50_000L
+        val pelanggan = Pelanggan(
+            nama = "Pelanggan Offline Penting",
+            alamat = "Jl. Melati No. 8",
+            no_hp = "081234567890",
+            syncId = "pel_offline_1",
+            updatedAt = 10_000L
         )
-        db.kurirDao().insert(customMumus)
+        db.pelangganDao().insert(pelanggan)
+        db.pendingSyncDao().enqueue(
+            com.example.data.entity.PendingSyncEntity(
+                collectionName = com.example.util.SyncCollections.PELANGGAN,
+                syncId = "pel_offline_1",
+                operation = com.example.util.SyncOperations.UPSERT,
+                updatedAt = 10_000L
+            )
+        )
+        assertEquals(1, db.pendingSyncDao().getQueueSize())
 
-        engine.ensureDesignatedStaffKurirsForOwner("ferryeffendy@gmail.com")
+        engine.clearLocalData()
 
-        val allKurirs = db.kurirDao().getAllOnce().filter { !it.isDeleted }
-        assertEquals(3, allKurirs.size)
+        // Local tables are cleared for the next account session
+        assertEquals(0, db.pendingSyncDao().getQueueSize())
+        assertEquals(0, db.pelangganDao().getAllOnce().size)
 
-        val mumusAfter = allKurirs.first { it.email == "mumus8800@gmail.com" }
-        assertEquals("Kang Mumus", mumusAfter.nama)
-        assertEquals(1_500.0, mumusAfter.komisi_per_galon, 0.01)
-
-        val radiAfter = allKurirs.first { it.email == "radijaya168@gmail.com" }
-        assertEquals("Radijaya168", radiAfter.nama)
-        assertEquals(1_000.0, radiAfter.komisi_per_galon, 0.01)
-        assertTrue(radiAfter.akses_aktif)
-
-        val fitriAfter = allKurirs.first { it.email == "fitriazizaheffendy@gmail.com" }
-        assertEquals("Fitriazizaheffendy", fitriAfter.nama)
-        assertEquals(1_000.0, fitriAfter.komisi_per_galon, 0.01)
-        assertTrue(fitriAfter.akses_aktif)
-
-        // Running again is idempotent (still 3 rows)
-        engine.ensureDesignatedStaffKurirsForOwner("ferryeffendy@gmail.com")
-        assertEquals(3, db.kurirDao().getAllOnce().count { !it.isDeleted })
+        // Emergency auto-backup JSON was preserved automatically before wipe
+        assertTrue(com.example.util.ExportHelper.hasAutoBackup(context))
+        val backupJson = com.example.util.ExportHelper.readAutoBackupJson(context).orEmpty()
+        assertTrue(backupJson.contains("Pelanggan Offline Penting"))
     }
 
     @Test

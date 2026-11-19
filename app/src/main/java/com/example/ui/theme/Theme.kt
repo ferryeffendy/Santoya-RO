@@ -1,12 +1,10 @@
 package com.example.ui.theme
 
 import android.os.Build
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -17,14 +15,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.PointerInputModifierNode
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntSize
+import kotlinx.coroutines.launch
 
 @Immutable
 data class SantoyaExtendedColors(
@@ -176,34 +183,102 @@ private val LightColorScheme = lightColorScheme(
 )
 
 /**
- * Lightweight tactile scale micro-interaction for POS buttons and cards.
+ * Efek skala taktil ringan tanpa rekomposisi untuk tombol dan kartu POS menggunakan [ModifierNodeElement].
  */
 fun Modifier.pressClickEffect(
     pressedScale: Float = 0.96f,
     enabled: Boolean = true,
     onClick: () -> Unit
-): Modifier = composed {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed && enabled) pressedScale else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessHigh
-        ),
-        label = "press_scale"
+): Modifier = this
+    .then(PressScaleElement(pressedScale = pressedScale, enabled = enabled))
+    .clickable(enabled = enabled, onClick = onClick)
+
+private data class PressScaleElement(
+    val pressedScale: Float,
+    val enabled: Boolean
+) : ModifierNodeElement<PressScaleNode>() {
+    override fun create(): PressScaleNode = PressScaleNode(pressedScale, enabled)
+
+    override fun update(node: PressScaleNode) {
+        node.updateParams(pressedScale, enabled)
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "pressScale"
+        properties["pressedScale"] = pressedScale
+        properties["enabled"] = enabled
+    }
+}
+
+private class PressScaleNode(
+    private var pressedScale: Float,
+    private var enabled: Boolean
+) : Modifier.Node(), PointerInputModifierNode, LayoutModifierNode {
+
+    private val scaleAnim = Animatable(1f)
+    private val scaleSpec = spring<Float>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessHigh
     )
-    this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
+    private var isPressed: Boolean = false
+
+    fun updateParams(newPressedScale: Float, newEnabled: Boolean) {
+        pressedScale = newPressedScale
+        enabled = newEnabled
+        if (!newEnabled) {
+            setPressed(false)
         }
-        .clickable(
-            interactionSource = interactionSource,
-            indication = androidx.compose.foundation.LocalIndication.current,
-            enabled = enabled,
-            onClick = onClick
-        )
+    }
+
+    private fun setPressed(pressed: Boolean) {
+        val effective = pressed && enabled
+        if (isPressed == effective) return
+        isPressed = effective
+        if (!isAttached) return
+        val target = if (effective) pressedScale else 1f
+        coroutineScope.launch {
+            scaleAnim.animateTo(targetValue = target, animationSpec = scaleSpec)
+        }
+    }
+
+    override fun onDetach() {
+        isPressed = false
+    }
+
+    override fun onPointerEvent(
+        pointerEvent: PointerEvent,
+        pass: PointerEventPass,
+        bounds: IntSize
+    ) {
+        if (pass != PointerEventPass.Main) return
+        when (pointerEvent.type) {
+            PointerEventType.Press -> setPressed(true)
+            PointerEventType.Release, PointerEventType.Exit -> setPressed(false)
+            PointerEventType.Move -> {
+                if (pointerEvent.changes.none { it.pressed }) {
+                    setPressed(false)
+                }
+            }
+        }
+    }
+
+    override fun onCancelPointerInput() {
+        setPressed(false)
+    }
+
+    override fun MeasureScope.measure(
+        measurable: Measurable,
+        constraints: Constraints
+    ): MeasureResult {
+        val placeable = measurable.measure(constraints)
+        return layout(placeable.width, placeable.height) {
+            placeable.placeWithLayer(0, 0) {
+                val s = scaleAnim.value
+                scaleX = s
+                scaleY = s
+            }
+        }
+    }
 }
 
 @Composable

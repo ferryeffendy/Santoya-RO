@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
 import androidx.room.withTransaction
+import com.example.data.database.AppDatabase
 import com.example.data.entity.DepotProfile
 import com.example.data.entity.KasbonLog
 import com.example.data.entity.Kurir
@@ -46,12 +47,14 @@ object ExportHelper {
     }
 
     /**
-     * Menormalisasi email kurir dari berkas impor JSON dan menolak email pemilik utama depot
+     * Menormalisasi email kurir dari berkas impor JSON dan menolak email pemilik depot aktif
      * agar tidak terjadi kebingungan hak akses (role confusion).
      */
-    internal fun sanitizeImportedCourierEmail(raw: String?): String {
+    internal fun sanitizeImportedCourierEmail(raw: String?, ownerEmail: String? = null): String {
         val normalized = KaryawanScopeHelper.normalizeEmail(raw)
-        if (normalized.isBlank() || KaryawanScopeHelper.isPrimaryOwnerEmail(normalized)) {
+        if (normalized.isBlank()) return ""
+        val normalizedOwner = KaryawanScopeHelper.normalizeEmail(ownerEmail)
+        if (normalizedOwner.isNotBlank() && normalized == normalizedOwner) {
             return ""
         }
         return normalized
@@ -898,7 +901,8 @@ object ExportHelper {
         pengeluaranList: List<Pengeluaran>,
         kasbonLogList: List<KasbonLog> = emptyList(),
         perawatanList: List<PerawatanItem> = emptyList(),
-        perawatanLogList: List<PerawatanLog> = emptyList()
+        perawatanLogList: List<PerawatanLog> = emptyList(),
+        depotProfile: DepotProfile? = null
     ) {
         val json = generateNestedJson(
             pelangganList = pelangganList,
@@ -908,11 +912,69 @@ object ExportHelper {
             pengeluaranList = pengeluaranList,
             kasbonLogList = kasbonLogList,
             perawatanList = perawatanList,
-            perawatanLogList = perawatanLogList
+            perawatanLogList = perawatanLogList,
+            depotProfile = depotProfile
         )
         context.openFileOutput(AUTO_BACKUP_FILE_NAME, Context.MODE_PRIVATE).use { fos ->
             fos.write(json.toByteArray(Charsets.UTF_8))
             fos.flush()
+        }
+    }
+
+    /**
+     * Membuat snapshot cadangan otomatis (`AUTO_BACKUP_FILE_NAME`) langsung dari isi database Room saat ini
+     * sebelum pembersihan data lokal (logout atau pindah depot) ketika masih ada data lokal/antrean tertunda.
+     */
+    suspend fun createAutoBackupFromDatabase(
+        context: Context,
+        db: AppDatabase,
+        depotProfile: DepotProfile? = null
+    ): Boolean {
+        return try {
+            val pelangganList = db.pelangganDao().getAllOnce()
+            val produkList = db.produkDao().getAllOnce()
+            val kurirList = db.kurirDao().getAllOnce()
+            val rawTransaksi = db.transaksiDao().getAllOnce()
+            val pengeluaranList = db.pengeluaranDao().getAllOnce()
+            val kasbonLogList = db.kasbonLogDao().getAllOnce()
+            val perawatanList = db.perawatanDao().getAllOnce()
+            val perawatanLogList = db.perawatanLogDao().getAllOnce()
+
+            if (pelangganList.isEmpty() && rawTransaksi.isEmpty() && pengeluaranList.isEmpty()) {
+                return false
+            }
+
+            val pelangganById = pelangganList.associateBy { it.id }
+            val produkById = produkList.associateBy { it.id }
+            val kurirById = kurirList.associateBy { it.id }
+
+            val fallbackPelanggan = Pelanggan(id = 0, nama = "Pelanggan", alamat = "", no_hp = "")
+            val fallbackProduk = Produk(id = 1, nama_produk = "Galon Air RO 19L", harga = 6000.0)
+
+            val transaksiDetails = rawTransaksi.map { tx ->
+                TransaksiDetail(
+                    transaksi = tx,
+                    pelanggan = pelangganById[tx.id_pelanggan] ?: fallbackPelanggan,
+                    kurir = tx.id_kurir?.let { kurirById[it] },
+                    produk = tx.id_produk?.let { produkById[it] } ?: fallbackProduk
+                )
+            }
+
+            createAutoBackupBeforeImport(
+                context = context,
+                pelangganList = pelangganList,
+                transaksiList = transaksiDetails,
+                produkList = produkList,
+                kurirList = kurirList,
+                pengeluaranList = pengeluaranList,
+                kasbonLogList = kasbonLogList,
+                perawatanList = perawatanList,
+                perawatanLogList = perawatanLogList,
+                depotProfile = depotProfile
+            )
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 

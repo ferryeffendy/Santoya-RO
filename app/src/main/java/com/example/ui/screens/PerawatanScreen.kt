@@ -340,7 +340,7 @@ fun PerawatanScreen(
                                     }
                                 }
                                 else -> {
-                                    items(filteredEvaluations, key = { it.item.syncId }) { eval ->
+                                    items(filteredEvaluations, key = { it.item.syncId }, contentType = { "perawatan_schedule_card" }) { eval ->
                                         PerawatanScheduleCard(
                                             evaluation = eval,
                                             metrics = componentMetricsMap[eval.item.syncId],
@@ -440,7 +440,7 @@ fun PerawatanScreen(
                                     }
                                 }
                                 else -> {
-                                    items(filteredLogs, key = { it.syncId }) { log ->
+                                    items(filteredLogs, key = { it.syncId }, contentType = { "perawatan_history_card" }) { log ->
                                         PerawatanHistoryCard(
                                             log = log,
                                             searchQuery = riwayatQuery,

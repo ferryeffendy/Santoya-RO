@@ -8,7 +8,10 @@ import java.util.UUID
 
 @Entity(
     tableName = "pengeluaran",
-    indices = [Index(value = ["syncId"], unique = true)]
+    indices = [
+        Index(value = ["syncId"], unique = true),
+        Index("tanggal")
+    ]
 )
 data class Pengeluaran(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

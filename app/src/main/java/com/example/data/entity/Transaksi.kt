@@ -13,6 +13,8 @@ import java.util.UUID
         Index("id_kurir"),
         Index("id_produk"),
         Index("tanggal"),
+        Index("status"),
+        Index(value = ["id_pelanggan", "status", "isDeleted"]),
         Index(value = ["syncId"], unique = true)
     ]
 )

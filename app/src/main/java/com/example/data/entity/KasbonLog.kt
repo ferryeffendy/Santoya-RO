@@ -8,7 +8,11 @@ import java.util.UUID
 
 @Entity(
     tableName = "kasbon_log",
-    indices = [Index(value = ["syncId"], unique = true)]
+    indices = [
+        Index(value = ["syncId"], unique = true),
+        Index("id_pelanggan"),
+        Index("tanggal")
+    ]
 )
 data class KasbonLog(
     @PrimaryKey(autoGenerate = true)

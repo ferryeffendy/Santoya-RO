@@ -26,16 +26,7 @@ data class RestoredTransaksiPayment(
 object KaryawanScopeHelper {
 
     const val STATUS_DIHAPUS = "Dihapus"
-    const val PRIMARY_OWNER_EMAIL = "ferryeffendy@gmail.com"
     const val DEFAULT_STAFF_COMMISSION_PER_GALON = 1000.0
-
-    val DESIGNATED_STAFF_EMAILS: List<String> = listOf(
-        "mumus8800@gmail.com",
-        "radijaya168@gmail.com",
-        "fitriazizaheffendy@gmail.com"
-    )
-
-    private val DESIGNATED_STAFF_EMAIL_SET: Set<String> = DESIGNATED_STAFF_EMAILS.toSet()
 
     private const val TX_DEL_PREFIX = "DEL:"
     private const val PELANGGAN_DEL_PREFIX = "[DIHAPUS:"
@@ -61,21 +52,6 @@ object KaryawanScopeHelper {
     }
 
     /**
-     * Memeriksa apakah email merupakan akun pemilik utama Santoya RO (`ferryeffendy@gmail.com`).
-     */
-    fun isPrimaryOwnerEmail(raw: String?): Boolean {
-        return normalizeEmail(raw) == PRIMARY_OWNER_EMAIL
-    }
-
-    /**
-     * Memeriksa apakah email termasuk dalam daftar karyawan resmi depot yang wajib ditautkan sebagai karyawan.
-     */
-    fun isDesignatedStaffEmail(raw: String?): Boolean {
-        val normalized = normalizeEmail(raw)
-        return normalized.isNotBlank() && normalized in DESIGNATED_STAFF_EMAIL_SET
-    }
-
-    /**
      * Menghasilkan nama tampilan sementara dari bagian lokal alamat email karyawan (mis. `Mumus8800`).
      */
     fun defaultStaffDisplayName(email: String): String {
@@ -87,7 +63,7 @@ object KaryawanScopeHelper {
     }
 
     /**
-     * Menghasilkan `syncId` deterministik untuk entri kurir bawaan berdasarkan alamat email karyawan.
+     * Menghasilkan `syncId` deterministik untuk entri kurir berdasarkan alamat email karyawan.
      */
     fun defaultStaffSyncId(email: String): String {
         val localPart = email.trim().lowercase().substringBefore("@")
@@ -101,9 +77,9 @@ object KaryawanScopeHelper {
         val normalizedUser = normalizeEmail(userEmail)
         if (normalizedUser.isBlank()) return null
         return kurirList.firstOrNull {
-            it.akses_aktif && normalizeEmail(it.email) == normalizedUser
+            !it.isDeleted && it.akses_aktif && normalizeEmail(it.email) == normalizedUser
         } ?: kurirList.firstOrNull {
-            normalizeEmail(it.email) == normalizedUser
+            !it.isDeleted && normalizeEmail(it.email) == normalizedUser
         }
     }
 
@@ -116,7 +92,6 @@ object KaryawanScopeHelper {
         if (syncRole == DepotRole.STAFF) return true
         val normalizedUser = normalizeEmail(userEmail)
         if (normalizedUser.isBlank()) return false
-        if (isDesignatedStaffEmail(normalizedUser)) return true
 
         // Pemilik depot selalu owner, walaupun emailnya juga terdaftar sebagai kurir.
         val normalizedOwner = normalizeEmail(ownerEmail)
@@ -125,7 +100,7 @@ object KaryawanScopeHelper {
         }
 
         return kurirList.any {
-            it.akses_aktif && normalizeEmail(it.email) == normalizedUser
+            !it.isDeleted && it.akses_aktif && normalizeEmail(it.email) == normalizedUser
         }
     }
 

@@ -530,7 +530,12 @@ fun PelunasanKasbonDialog(
                         ) {
                             Text(
                                 text = if (dpPaid > 0L) {
-                                    "• ${FormatUtils.formatDateUi(t.transaksi.tanggal)} (${t.transaksi.jumlah} gln • DP ${FormatUtils.formatRupiah(dpPaid.toDouble())})"
+                                    stringResource(
+                                        R.string.pelanggan_kasbon_note_with_uang_muka,
+                                        FormatUtils.formatDateUi(t.transaksi.tanggal),
+                                        t.transaksi.jumlah,
+                                        FormatUtils.formatRupiah(dpPaid.toDouble())
+                                    )
                                 } else {
                                     "• ${FormatUtils.formatDateUi(t.transaksi.tanggal)} (${t.transaksi.jumlah} gln)"
                                 },
@@ -593,7 +598,7 @@ fun PelunasanKasbonDialog(
                 nominalStr = it.filter { c -> c.isDigit() }
                 errorMessage = null
             },
-            label = { Text("Nominal Bayar (Rp) *") },
+            label = { Text(stringResource(R.string.pelanggan_kasbon_nominal_label)) },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Done

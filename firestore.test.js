@@ -860,5 +860,88 @@ test("ai_insights/{insightId} enforces strict owner-only isolation, schema bound
   await assertSucceeds(oDb.collection("ai_insights").doc(insightDocId).delete());
 });
 
+test("malicious other owner cannot hijack an active staff_link belonging to an active depot, but can link after revocation", async () => {
+  await seedDepotWithStaff();
+  const outDb = outsiderDb();
+  const outsiderDepotId = `depot_${OUTSIDER_UID}`;
+
+  // Outsider creates their own valid depot and adds STAFF_EMAIL to memberEmails
+  await assertSucceeds(
+    outDb.collection("depots").doc(outsiderDepotId).set({
+      depotId: outsiderDepotId,
+      ownerUid: OUTSIDER_UID,
+      ownerEmail: OUTSIDER_EMAIL,
+      name: "Depot Lain",
+      memberEmails: [STAFF_EMAIL],
+      createdAt: ts(),
+      updatedAt: ts(),
+    })
+  );
+
+  // Attempt to hijack active staff_link while STAFF_EMAIL is still active in DEPOT_ID MUST FAIL
+  await assertFails(
+    outDb.collection("staff_links").doc(STAFF_EMAIL).set({
+      depotId: outsiderDepotId,
+      ownerUid: OUTSIDER_UID,
+      ownerEmail: OUTSIDER_EMAIL,
+      staffEmail: STAFF_EMAIL,
+      active: true,
+      createdAt: ts(),
+      updatedAt: ts(),
+    })
+  );
+
+  // Once real owner revokes STAFF_EMAIL from DEPOT_ID, another legitimate depot can claim the email
+  await assertSucceeds(
+    ownerDb().collection("depots").doc(DEPOT_ID).update({
+      memberEmails: [],
+      updatedAt: ts(),
+    })
+  );
+  await assertSucceeds(
+    outDb.collection("staff_links").doc(STAFF_EMAIL).set({
+      depotId: outsiderDepotId,
+      ownerUid: OUTSIDER_UID,
+      ownerEmail: OUTSIDER_EMAIL,
+      staffEmail: STAFF_EMAIL,
+      active: true,
+      createdAt: ts(),
+      updatedAt: ts(),
+    })
+  );
+});
+
+test("depot currentTankStockLiters rejects extreme out-of-range corruption while allowing valid updates", async () => {
+  await seedDepotWithStaff();
+  const oDb = ownerDb();
+  const sDb = staffDb(true);
+
+  await assertSucceeds(
+    oDb.collection("depots").doc(DEPOT_ID).update({
+      currentTankStockLiters: 5000,
+      updatedAt: ts(),
+    })
+  );
+  await assertSucceeds(
+    sDb.collection("depots").doc(DEPOT_ID).update({
+      currentTankStockLiters: 4981,
+      updatedAt: ts(),
+    })
+  );
+  await assertFails(
+    sDb.collection("depots").doc(DEPOT_ID).update({
+      currentTankStockLiters: -500000,
+      updatedAt: ts(),
+    })
+  );
+  await assertFails(
+    oDb.collection("depots").doc(DEPOT_ID).update({
+      currentTankStockLiters: 999999999,
+      updatedAt: ts(),
+    })
+  );
+});
+
+
 
 

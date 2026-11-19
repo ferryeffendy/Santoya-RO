@@ -187,7 +187,8 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
                 AppDatabase.MIGRATION_15_16,
-                AppDatabase.MIGRATION_16_17
+                AppDatabase.MIGRATION_16_17,
+                AppDatabase.MIGRATION_17_18
             )
             .allowMainThreadQueries()
             .build()
@@ -232,7 +233,8 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
                 AppDatabase.MIGRATION_15_16,
-                AppDatabase.MIGRATION_16_17
+                AppDatabase.MIGRATION_16_17,
+                AppDatabase.MIGRATION_17_18
             )
             .allowMainThreadQueries()
             .build()
@@ -312,7 +314,8 @@ class AppDatabaseMigrationTest {
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
                 AppDatabase.MIGRATION_15_16,
-                AppDatabase.MIGRATION_16_17
+                AppDatabase.MIGRATION_16_17,
+                AppDatabase.MIGRATION_17_18
             )
             .allowMainThreadQueries()
             .build()
@@ -336,6 +339,23 @@ class AppDatabaseMigrationTest {
         assertEquals("Fitri", txDel.deletedBy)
         assertFalse(txAct.isDeleted)
         assertNull(txAct.deletedBy)
+
+        // Verify v17 -> v18 performance indexes were created
+        val indexNames = mutableSetOf<String>()
+        db.openHelper.readableDatabase.query(
+            "SELECT name FROM sqlite_master WHERE type = 'index'"
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                indexNames.add(cursor.getString(0))
+            }
+        }
+        assertTrue(indexNames.contains("index_pelanggan_id_kurir_langganan"))
+        assertTrue(indexNames.contains("index_pelanggan_isDeleted"))
+        assertTrue(indexNames.contains("index_kasbon_log_id_pelanggan"))
+        assertTrue(indexNames.contains("index_kasbon_log_tanggal"))
+        assertTrue(indexNames.contains("index_pengeluaran_tanggal"))
+        assertTrue(indexNames.contains("index_transaksi_status"))
+        assertTrue(indexNames.contains("index_transaksi_id_pelanggan_status_isDeleted"))
     }
 
     @Test

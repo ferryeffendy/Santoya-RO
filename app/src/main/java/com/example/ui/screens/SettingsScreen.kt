@@ -1208,13 +1208,102 @@ fun SettingsScreen(
     }
 
     if (showSignOutDialog) {
+        val pendingCount = syncState.pendingCount
+        var isFlushingBeforeExit by remember { mutableStateOf(false) }
         AlertDialog(
-            onDismissRequest = { showSignOutDialog = false },
+            onDismissRequest = {
+                if (!isFlushingBeforeExit) {
+                    showSignOutDialog = false
+                }
+            },
             title = {
-                Text(stringResource(R.string.settings_sign_out_title), fontWeight = FontWeight.Bold)
+                Text(
+                    text = if (pendingCount > 0) {
+                        stringResource(R.string.sign_out_pending_warning_title, pendingCount)
+                    } else {
+                        stringResource(R.string.settings_sign_out_title)
+                    },
+                    fontWeight = FontWeight.Bold
+                )
             },
             text = {
-                Text(stringResource(R.string.settings_sign_out_msg))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = if (pendingCount > 0) {
+                            stringResource(R.string.sign_out_pending_warning_msg, pendingCount)
+                        } else {
+                            stringResource(R.string.settings_sign_out_msg)
+                        }
+                    )
+                    if (pendingCount > 0) {
+                        if (syncState.pendingByCollection.isNotEmpty()) {
+                            SyncQueueBreakdownChips(pendingByCollection = syncState.pendingByCollection)
+                        }
+                        OutlinedButton(
+                            onClick = { viewModel.exportEmergencyBackupJson(context) },
+                            enabled = !isFlushingBeforeExit,
+                            shape = RoundedCornerShape(SantoyaRadius.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_sign_out_backup_json")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Description,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.sign_out_btn_backup_json),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Button(
+                            onClick = {
+                                isFlushingBeforeExit = true
+                                viewModel.flushPendingBeforeSignOut { remaining ->
+                                    isFlushingBeforeExit = false
+                                    if (remaining == 0) {
+                                        showSignOutDialog = false
+                                        onSignOut()
+                                    } else {
+                                        viewModel.showSnackbar(
+                                            context.getString(R.string.sign_out_flush_failed_snackbar, remaining)
+                                        )
+                                    }
+                                }
+                            },
+                            enabled = !isFlushingBeforeExit,
+                            shape = RoundedCornerShape(SantoyaRadius.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_sign_out_sync_first")
+                        ) {
+                            if (isFlushingBeforeExit) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(stringResource(R.string.sign_out_flushing_pending_msg))
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Outlined.CloudUpload,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.sign_out_btn_sync_and_exit),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
                 Button(
@@ -1222,18 +1311,26 @@ fun SettingsScreen(
                         showSignOutDialog = false
                         onSignOut()
                     },
+                    enabled = !isFlushingBeforeExit,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                         contentColor = MaterialTheme.colorScheme.onError
                     ),
                     modifier = Modifier.testTag("btn_confirm_sign_out")
                 ) {
-                    Text(stringResource(R.string.action_sign_out))
+                    Text(
+                        text = if (pendingCount > 0) {
+                            stringResource(R.string.sign_out_btn_force_exit)
+                        } else {
+                            stringResource(R.string.action_sign_out)
+                        }
+                    )
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { showSignOutDialog = false },
+                    enabled = !isFlushingBeforeExit,
                     modifier = Modifier.testTag("btn_cancel_sign_out")
                 ) {
                     Text(stringResource(R.string.action_cancel))

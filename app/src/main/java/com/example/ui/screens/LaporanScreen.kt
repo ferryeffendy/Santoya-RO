@@ -1733,7 +1733,7 @@ fun LaporanScreen(
                     }
                 } else {
                     val displayedTx = if (showAllDetails) searchedTx else searchedTx.take(15)
-                    items(displayedTx, key = { it.transaksi.id }) { item ->
+                    items(displayedTx, key = { it.transaksi.id }, contentType = { "laporan_tx_card" }) { item ->
                         val trx = item.transaksi
                         val isLunas = trx.status.equals("Lunas", ignoreCase = true)
                         val isBayarSebagian = !isLunas && trx.uangMuka > 0L
@@ -1882,7 +1882,7 @@ fun LaporanScreen(
                     }
                 } else {
                     val displayedLogs = if (showAllDetails) summary.filteredKasbonLogs else summary.filteredKasbonLogs.take(15)
-                    items(displayedLogs, key = { "log_${it.log.id}_${it.log.syncId}" }) { logDetail ->
+                    items(displayedLogs, key = { "log_${it.log.id}_${it.log.syncId}" }, contentType = { "laporan_kasbon_log_card" }) { logDetail ->
                         LaporanKasbonLogItemCard(
                             item = logDetail,
                             profitColor = profitColor
@@ -1924,7 +1924,7 @@ fun LaporanScreen(
                     }
                 } else {
                     val displayedExp = if (showAllDetails) summary.filteredExp else summary.filteredExp.take(15)
-                    items(displayedExp, key = { it.id }) { pengeluaran ->
+                    items(displayedExp, key = { it.id }, contentType = { "laporan_expense_card" }) { pengeluaran ->
                         val catColor = resolvePengeluaranCategoryColor(
                             kategori = pengeluaran.kategori,
                             namaItem = pengeluaran.nama_item

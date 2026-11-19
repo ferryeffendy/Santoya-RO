@@ -75,8 +75,11 @@ import androidx.credentials.CredentialManager
 import com.example.R
 import com.example.ui.theme.HeroOnSurface
 import com.example.ui.theme.PlusJakartaSansFontFamily
+import com.example.ui.theme.GoogleBrandBlue
+import com.example.ui.theme.GoogleBrandGreen
+import com.example.ui.theme.GoogleBrandRed
+import com.example.ui.theme.GoogleBrandYellow
 import com.example.ui.theme.SantoyaRadius
-import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.GoogleSignInHelper
 import com.example.util.LastSessionInfo
@@ -280,7 +283,6 @@ fun AuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                            .pressClickEffect(enabled = !isLoading) {}
                             .testTag("google_sign_in_button")
                     ) {
                         if (isLoading) {
@@ -379,7 +381,6 @@ fun AuthScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 56.dp)
-                            .pressClickEffect(enabled = !isLoading) {}
                             .testTag(if (hasLocalOfflineData) "offline_resume_button" else "offline_login_button")
                     ) {
                         Row(
@@ -523,7 +524,7 @@ private fun GoogleMonogramIcon(modifier: Modifier = Modifier) {
         val style = Stroke(width = strokeWidth, cap = StrokeCap.Butt)
 
         drawArc(
-            color = Color(0xFFEA4335),
+            color = GoogleBrandRed,
             startAngle = -145f,
             sweepAngle = 105f,
             useCenter = false,
@@ -532,7 +533,7 @@ private fun GoogleMonogramIcon(modifier: Modifier = Modifier) {
             style = style
         )
         drawArc(
-            color = Color(0xFFFBBC05),
+            color = GoogleBrandYellow,
             startAngle = 135f,
             sweepAngle = 80f,
             useCenter = false,
@@ -541,7 +542,7 @@ private fun GoogleMonogramIcon(modifier: Modifier = Modifier) {
             style = style
         )
         drawArc(
-            color = Color(0xFF34A853),
+            color = GoogleBrandGreen,
             startAngle = 45f,
             sweepAngle = 90f,
             useCenter = false,
@@ -550,7 +551,7 @@ private fun GoogleMonogramIcon(modifier: Modifier = Modifier) {
             style = style
         )
         drawArc(
-            color = Color(0xFF4285F4),
+            color = GoogleBrandBlue,
             startAngle = -15f,
             sweepAngle = 60f,
             useCenter = false,
@@ -559,7 +560,7 @@ private fun GoogleMonogramIcon(modifier: Modifier = Modifier) {
             style = style
         )
         drawLine(
-            color = Color(0xFF4285F4),
+            color = GoogleBrandBlue,
             start = Offset(size.width * 0.52f, size.height * 0.5f),
             end = Offset(size.width * 0.92f, size.height * 0.5f),
             strokeWidth = strokeWidth * 0.9f,

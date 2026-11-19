@@ -113,7 +113,7 @@ service cloud.firestore {
              (!('subscriptionTier' in data) || (data.subscriptionTier is string && data.subscriptionTier in ['FREE', 'PRO'])) &&
              (!('depotType' in data) || (data.depotType is string && data.depotType in ['RO', 'MINERAL', 'BOTH'])) &&
              (!('tankCapacityLiters' in data) || (data.tankCapacityLiters is number && data.tankCapacityLiters >= 100)) &&
-             (!('currentTankStockLiters' in data) || (data.currentTankStockLiters is number)) &&
+             (!('currentTankStockLiters' in data) || (data.currentTankStockLiters is number && data.currentTankStockLiters >= -100000 && data.currentTankStockLiters <= 10000000)) &&
              data.memberEmails is list && data.memberEmails.size() <= 30 &&
              (data.memberEmails.size() == 0 || (data.memberEmails[0] is string && data.memberEmails[0].size() <= 160));
     }
@@ -386,7 +386,12 @@ service cloud.firestore {
                          (
                            isDepotOwner(incoming().depotId) &&
                            incoming().active == true &&
-                           emailKey in depotData(incoming().depotId).memberEmails
+                           emailKey in depotData(incoming().depotId).memberEmails &&
+                           (
+                             existing().active == false ||
+                             !exists(/databases/$(database)/documents/depots/$(existing().depotId)) ||
+                             !(emailKey in depotData(existing().depotId).memberEmails)
+                           )
                          )
                        );
 

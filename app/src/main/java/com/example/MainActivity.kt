@@ -346,9 +346,7 @@ class MainActivity : ComponentActivity() {
 
                         if (showSyncInfoSheet) {
                             val activeUser = currentUser
-                            val canSwitchToStaffWaiting = !isOfflineMode &&
-                                !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(activeUser?.email) &&
-                                (!isKaryawan || !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
+                            val canSwitchToStaffWaiting = !isOfflineMode && activeUser != null
                             SantoyaSyncInfoBottomSheet(
                                 syncState = syncState,
                                 onDismiss = { showSyncInfoSheet = false },

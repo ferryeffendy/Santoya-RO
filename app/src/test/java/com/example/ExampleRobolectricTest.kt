@@ -43,10 +43,10 @@ class ExampleRobolectricTest {
     assertEquals(null, com.example.util.ExportHelper.sanitizeSyncId("id with spaces"))
     assertEquals(null, com.example.util.ExportHelper.sanitizeSyncId("a".repeat(129)))
 
-    // 2. Pencegahan injeksi email pemilik utama sebagai kurir saat impor JSON
-    assertEquals("", com.example.util.ExportHelper.sanitizeImportedCourierEmail("ferryeffendy@gmail.com"))
+    // 2. Pencegahan injeksi email pemilik depot aktif sebagai kurir saat impor JSON
+    assertEquals("", com.example.util.ExportHelper.sanitizeImportedCourierEmail("pemilik@depot.id", ownerEmail = "pemilik@depot.id"))
     assertEquals("", com.example.util.ExportHelper.sanitizeImportedCourierEmail("bukan-email-valid"))
-    assertEquals("mumus8800@gmail.com", com.example.util.ExportHelper.sanitizeImportedCourierEmail("  Mumus8800@gmail.com "))
+    assertEquals("kurir01@depot.id", com.example.util.ExportHelper.sanitizeImportedCourierEmail("  Kurir01@depot.id ", ownerEmail = "pemilik@depot.id"))
 
     // 3. Proteksi CSV Formula / Spreadsheet Injection
     assertEquals("'=SUM(A1:A10)", com.example.util.LaporanFinanceCalculator.escapeCsvField("=SUM(A1:A10)"))

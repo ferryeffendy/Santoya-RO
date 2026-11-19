@@ -826,7 +826,7 @@ private fun SemuaPelangganTab(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filtered, key = { it.pelanggan.id }) { item ->
+                    items(filtered, key = { it.pelanggan.id }, contentType = { "pelanggan_card" }) { item ->
                         val isSoftDeleted = KaryawanScopeHelper.isSoftDeletedPelanggan(item.pelanggan)
                         val deletedBy = KaryawanScopeHelper.extractDeletedByPelanggan(item.pelanggan)
                         val isContacted = CrmFollowUpHelper.isContactedInCurrentCycle(
@@ -1031,7 +1031,7 @@ private fun JadwalPelangganTab(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(displayedModels, key = { it.pelanggan.id }) { item ->
+                        items(displayedModels, key = { it.pelanggan.id }, contentType = { "crm_followup_card" }) { item ->
                             val cust = item.pelanggan
                             val prediction = item.crmPrediction
                             val lastContactedMillis = contactedTimestamps[cust.id]
@@ -1511,7 +1511,7 @@ private fun KasbonPelangganTab(
                         }
                     }
 
-                    items(sortedKasbon, key = { it.id }) { cust ->
+                    items(sortedKasbon, key = { it.id }, contentType = { "kasbon_customer_card" }) { cust ->
                         val unpaid = unpaidByCustomer[cust.id] ?: emptyList()
                         val isExpanded = expandedCustomerIds.contains(cust.id)
                         val displayedUnpaid = if (isExpanded) unpaid else unpaid.take(3)
@@ -1907,7 +1907,7 @@ private fun TopRankingTab(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredRanking, key = { it.pelanggan.id }) { entry ->
+                    items(filteredRanking, key = { it.pelanggan.id }, contentType = { "ranking_customer_card" }) { entry ->
                         val rank = entry.rank
                         val cust = entry.pelanggan
                         val galonCount = entry.totalGalon
@@ -2192,7 +2192,7 @@ private fun PasifPelangganTab(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredPasif, key = { it.pelanggan.id }) { entry ->
+                    items(filteredPasif, key = { it.pelanggan.id }, contentType = { "pasif_customer_card" }) { entry ->
                         val cust = entry.pelanggan
                         val days = entry.daysPassive
                         val lastOrderMillis = entry.lastOrderMillis

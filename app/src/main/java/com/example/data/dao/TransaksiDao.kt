@@ -14,12 +14,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TransaksiDao {
-    @Query("SELECT * FROM transaksi ORDER BY tanggal DESC")
-    fun getTransaksiPaging(): PagingSource<Int, Transaksi>
-
     @Transaction
     @Query("SELECT * FROM transaksi ORDER BY tanggal DESC")
     fun getAllWithDetail(): Flow<List<TransaksiDetail>>
+
+    @Query("SELECT * FROM transaksi ORDER BY tanggal DESC")
+    fun getTransaksiPaged(): PagingSource<Int, Transaksi>
 
     @Transaction
     @Query("SELECT * FROM transaksi WHERE tanggal >= :startTime AND tanggal <= :endTime ORDER BY tanggal DESC")

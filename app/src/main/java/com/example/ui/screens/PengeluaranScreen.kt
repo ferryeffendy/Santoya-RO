@@ -65,8 +65,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -134,7 +134,7 @@ fun PengeluaranScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val vmList by viewModel.allPengeluaran.collectAsState()
+    val vmList by viewModel.allPengeluaran.collectAsStateWithLifecycle()
     val displayList = if (pengeluaranList.isNotEmpty()) pengeluaranList else vmList
 
     var searchQuery by remember { mutableStateOf("") }
@@ -556,7 +556,7 @@ fun PengeluaranScreen(
                             )
                         }
                     } else {
-                        items(filteredList, key = { it.id }) { item ->
+                        items(filteredList, key = { it.id }, contentType = { "pengeluaran_item" }) { item ->
                             val kategoriColor = resolvePengeluaranCategoryColor(
                                 kategori = item.kategori,
                                 namaItem = item.nama_item

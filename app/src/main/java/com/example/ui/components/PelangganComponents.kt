@@ -1694,7 +1694,11 @@ fun PelangganDetailBottomSheet(
                                             )
                                             if (isKasbon && tx.uangMuka > 0L) {
                                                 Text(
-                                                    text = "DP ${FormatUtils.formatRupiah(tx.uangMuka.toDouble())} • Sisa ${FormatUtils.formatRupiah(tx.remainingKasbonAmount())}",
+                                                    text = stringResource(
+                                                        R.string.pelanggan_kasbon_uang_muka_summary,
+                                                        FormatUtils.formatRupiah(tx.uangMuka.toDouble()),
+                                                        FormatUtils.formatRupiah(tx.remainingKasbonAmount())
+                                                    ),
                                                     style = MaterialTheme.typography.labelSmall,
                                                     color = santoyaColors.warning,
                                                     fontWeight = FontWeight.SemiBold

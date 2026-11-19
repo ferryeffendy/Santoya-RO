@@ -49,8 +49,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -93,7 +93,7 @@ fun ProdukScreen(
     onBack: () -> Unit = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
     modifier: Modifier = Modifier
 ) {
-    val vmList by viewModel.allProduk.collectAsState()
+    val vmList by viewModel.allProduk.collectAsStateWithLifecycle()
     val displayList = if (produkList.isNotEmpty()) produkList else vmList
 
     var showAddDialog by remember { mutableStateOf(false) }
@@ -163,7 +163,7 @@ fun ProdukScreen(
                     )
                 }
             } else {
-                items(displayList, key = { it.id }) { produk ->
+                items(displayList, key = { it.id }, contentType = { "produk_card" }) { produk ->
                     Card(
                         shape = RoundedCornerShape(SantoyaRadius.lg),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
