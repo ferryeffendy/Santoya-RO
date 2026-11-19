@@ -57,8 +57,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -66,6 +68,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.TransaksiDetail
 import com.example.ui.components.HydroCourierWaveIcon
@@ -363,8 +366,8 @@ fun KurirScreen(
 
     if (showAddDialog) {
         KurirFormDialog(
-            title = "Tambah Karyawan",
-            confirmLabel = "Simpan",
+            title = stringResource(R.string.kurir_form_add_title),
+            confirmLabel = stringResource(R.string.action_save),
             initialKurir = null,
             existingKurirList = displayKurirList,
             onDismiss = { showAddDialog = false },
@@ -382,8 +385,8 @@ fun KurirScreen(
 
     editingKurir?.let { target ->
         KurirFormDialog(
-            title = "Edit Karyawan",
-            confirmLabel = "Perbarui",
+            title = stringResource(R.string.kurir_form_edit_title),
+            confirmLabel = stringResource(R.string.action_update),
             initialKurir = target,
             existingKurirList = displayKurirList,
             onDismiss = { editingKurir = null },
@@ -408,7 +411,7 @@ fun KurirScreen(
             onDismissRequest = { kurirToDelete = null },
             title = {
                 Text(
-                    text = "Hapus Karyawan?",
+                    text = stringResource(R.string.kurir_delete_title),
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -416,7 +419,7 @@ fun KurirScreen(
             },
             text = {
                 Text(
-                    text = "Hapus \"${kurir.nama}\" dari daftar? Riwayat transaksi lama tetap aman.",
+                    text = stringResource(R.string.kurir_delete_msg, kurir.nama),
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
@@ -434,12 +437,12 @@ fun KurirScreen(
                     ),
                     shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Hapus")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { kurirToDelete = null }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -475,6 +478,7 @@ private fun KurirFormDialog(
     val komisiFocusRequester = remember { FocusRequester() }
     val emailFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
 
     val validateAndSubmit = {
         val trimmedNama = nama.trim()
@@ -487,18 +491,18 @@ private fun KurirFormDialog(
             KaryawanScopeHelper.normalizeEmail(existing.email) == cleanEmail
         }
         when {
-            trimmedNama.isBlank() -> errorMessage = "Nama karyawan wajib diisi"
-            komisi == null || komisi < 0.0 -> errorMessage = "Nominal komisi tidak valid"
+            trimmedNama.isBlank() -> errorMessage = context.getString(R.string.kurir_err_name)
+            komisi == null || komisi < 0.0 -> errorMessage = context.getString(R.string.kurir_err_commission)
             cleanEmail.isNotBlank() && !KaryawanScopeHelper.isValidEmail(cleanEmail) ->
-                errorMessage = "Masukkan alamat email Google lengkap (contoh: nama@gmail.com)"
-            isDuplicate -> errorMessage = "Email '$cleanEmail' sudah dipakai karyawan lain"
+                errorMessage = context.getString(R.string.kurir_err_email)
+            isDuplicate -> errorMessage = context.getString(R.string.kurir_err_duplicate_email, cleanEmail)
             else -> onSubmit(trimmedNama, komisi, cleanEmail, aksesAktif)
         }
     }
 
     SantoyaFormBottomSheet(
         title = title,
-        subtitle = "Tarif komisi & akses Google karyawan",
+        subtitle = stringResource(R.string.kurir_form_subtitle),
         headerAccent = MaterialTheme.colorScheme.secondary,
         headerIconContent = {
             HydroCourierWaveIcon(
@@ -517,7 +521,7 @@ private fun KurirFormDialog(
                 nama = it
                 errorMessage = null
             },
-            label = { Text("Nama Karyawan *") },
+            label = { Text(stringResource(R.string.kurir_name_label)) },
             placeholder = { Text("Contoh: Fitri, Budi") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,

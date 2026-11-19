@@ -97,7 +97,11 @@ import com.example.ui.theme.SantoyaSpacing
 import com.example.ui.theme.santoyaColors
 import com.example.util.FormatUtils
 import com.example.util.RealtimeSyncState
+import com.example.util.SyncCollections
 import com.example.util.SyncConnectionStatus
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.LinearProgressIndicator
 import com.google.firebase.Firebase
 import com.google.firebase.auth.auth
 import kotlinx.coroutines.delay
@@ -110,9 +114,11 @@ import kotlinx.coroutines.launch
 fun RealtimeSyncStatusPill(
     syncState: RealtimeSyncState,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
     onClick: (() -> Unit)? = null
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
+    val isCompact = compact || LocalDensity.current.fontScale >= 1.15f
     val infiniteTransition = rememberInfiniteTransition(label = "sync_rotation")
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -124,38 +130,46 @@ fun RealtimeSyncStatusPill(
         label = "sync_icon_spin"
     )
 
+    val liveLabel = stringResource(R.string.sync_status_live)
+    val syncingCountLabel = stringResource(R.string.sync_status_syncing_count, syncState.pendingCount)
+    val syncingLabel = stringResource(R.string.sync_status_syncing)
+    val offlineCountLabel = stringResource(R.string.sync_status_offline_count, syncState.pendingCount)
+    val offlineLabel = stringResource(R.string.sync_status_offline)
+    val restrictedLabel = stringResource(R.string.sync_status_restricted)
+    val errorLabel = stringResource(R.string.sync_status_error)
+
     val (icon, label, tint, bgColor, borderColor) = when (syncState.status) {
         SyncConnectionStatus.LIVE -> Tuple5(
             Icons.Outlined.CloudDone,
-            "Terhubung",
+            liveLabel,
             santoyaColors.success,
             santoyaColors.successContainer.copy(alpha = 0.55f),
             santoyaColors.success.copy(alpha = 0.35f)
         )
         SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
             Icons.Outlined.CloudSync,
-            if (syncState.pendingCount > 0) "Sinkron (${syncState.pendingCount})" else "Sinkron...",
+            if (syncState.pendingCount > 0) syncingCountLabel else syncingLabel,
             MaterialTheme.colorScheme.primary,
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
             MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
         )
         SyncConnectionStatus.OFFLINE -> Tuple5(
             Icons.Outlined.CloudOff,
-            if (syncState.pendingCount > 0) "Offline (${syncState.pendingCount})" else "Mode Offline",
+            if (syncState.pendingCount > 0) offlineCountLabel else offlineLabel,
             santoyaColors.warning,
             santoyaColors.warningContainer.copy(alpha = 0.6f),
             santoyaColors.warning.copy(alpha = 0.45f)
         )
         SyncConnectionStatus.REVOKED, SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION -> Tuple5(
             Icons.Outlined.Block,
-            "Dibatasi",
+            restrictedLabel,
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
             MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
         )
         SyncConnectionStatus.ERROR -> Tuple5(
             Icons.Outlined.CloudOff,
-            "Cek Koneksi",
+            errorLabel,
             MaterialTheme.colorScheme.error,
             MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
             MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
@@ -181,26 +195,173 @@ fun RealtimeSyncStatusPill(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            modifier = Modifier.padding(
+                horizontal = if (isCompact) 8.dp else 10.dp,
+                vertical = if (isCompact) 5.dp else 6.dp
+            )
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = tint,
                 modifier = Modifier
-                    .size(15.dp)
+                    .size(if (isCompact) 13.dp else 15.dp)
                     .graphicsLayer {
                         if (isRotating) rotationZ = rotation
                     }
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(if (isCompact) 4.dp else 6.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = tint,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+/**
+ * Mengembalikan nama tampilan Bahasa Indonesia untuk setiap kunci koleksi sinkronisasi Cloud.
+ */
+@Composable
+fun syncCollectionLabel(collectionKey: String): String {
+    return when (collectionKey) {
+        SyncCollections.PELANGGAN -> stringResource(R.string.sync_col_pelanggan)
+        SyncCollections.TRANSAKSI -> stringResource(R.string.sync_col_transaksi)
+        SyncCollections.KASBON_LOGS -> stringResource(R.string.sync_col_kasbon_logs)
+        SyncCollections.PRODUK -> stringResource(R.string.sync_col_produk)
+        SyncCollections.KURIR -> stringResource(R.string.sync_col_kurir)
+        SyncCollections.PENGELUARAN -> stringResource(R.string.sync_col_pengeluaran)
+        SyncCollections.PERAWATAN_JADWAL -> stringResource(R.string.sync_col_perawatan_jadwal)
+        SyncCollections.PERAWATAN_LOG -> stringResource(R.string.sync_col_perawatan_log)
+        SyncCollections.TANGKI_REFILL -> stringResource(R.string.sync_col_tangki_refill)
+        SyncCollections.PROFIL -> stringResource(R.string.sync_col_profil)
+        else -> collectionKey
+    }
+}
+
+/**
+ * Menampilkan deretan chip rincian antrean sinkronisasi per jenis data (mis. Transaksi, Pelanggan, Produk).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SyncQueueBreakdownChips(
+    pendingByCollection: Map<String, Int>,
+    modifier: Modifier = Modifier
+) {
+    val santoyaColors = MaterialTheme.santoyaColors
+    val orderedEntries = remember(pendingByCollection) {
+        val list = mutableListOf<Pair<String, Int>>()
+        for (key in SyncCollections.ORDERED_DISPLAY_KEYS) {
+            val count = pendingByCollection[key] ?: 0
+            if (count > 0) {
+                list.add(key to count)
+            }
+        }
+        for ((k, v) in pendingByCollection) {
+            if (v > 0 && k !in SyncCollections.ORDERED_DISPLAY_KEYS) {
+                list.add(k to v)
+            }
+        }
+        list
+    }
+
+    if (orderedEntries.isEmpty()) return
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        orderedEntries.forEach { (colKey, count) ->
+            val label = syncCollectionLabel(colKey)
+            Surface(
+                shape = RoundedCornerShape(SantoyaRadius.sm),
+                color = santoyaColors.warningContainer.copy(alpha = 0.65f),
+                border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.4f))
+            ) {
+                Text(
+                    text = stringResource(R.string.sync_col_chip_format, count, label),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                    fontWeight = FontWeight.SemiBold,
+                    color = santoyaColors.warning,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Menampilkan kartu progres tahapan sinkronisasi aktif beserta persentase dan bilah kemajuan.
+ */
+@Composable
+fun SyncActiveStageProgressBox(
+    stageLabel: String,
+    progressFraction: Float?,
+    modifier: Modifier = Modifier
+) {
+    val clampedProgress = progressFraction?.coerceIn(0.04f, 1.0f)
+    Surface(
+        shape = RoundedCornerShape(SantoyaRadius.sm),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stageLabel,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (clampedProgress != null) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(
+                            R.string.sync_progress_percent_format,
+                            (clampedProgress * 100f).toInt().coerceIn(1, 100)
+                        ),
+                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            if (clampedProgress != null) {
+                LinearProgressIndicator(
+                    progress = { clampedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(SantoyaRadius.pill)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surface
+                )
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .clip(RoundedCornerShape(SantoyaRadius.pill)),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surface
+                )
+            }
         }
     }
 }
@@ -214,62 +375,95 @@ fun SantoyaSyncInfoBottomSheet(
     syncState: RealtimeSyncState,
     onDismiss: () -> Unit,
     onSyncNow: () -> Unit,
+    onForcePushAll: (() -> Unit)? = null,
     onNavigateToSettings: (() -> Unit)? = null,
-    onSwitchToStaffWaiting: (() -> Unit)? = null
+    onSwitchToStaffWaiting: (() -> Unit)? = null,
+    isOfflineLocalMode: Boolean = false,
+    onConnectGoogleAccount: (() -> Unit)? = null
 ) {
     val santoyaColors = MaterialTheme.santoyaColors
-    val isSyncing = syncState.status == SyncConnectionStatus.SYNCING ||
-        syncState.status == SyncConnectionStatus.CONNECTING
+    val isSyncing = !isOfflineLocalMode && (
+        syncState.status == SyncConnectionStatus.SYNCING ||
+            syncState.status == SyncConnectionStatus.CONNECTING
+        )
 
-    val (statusTitle, statusDesc, statusColor, statusBg, statusIcon) = when (syncState.status) {
-        SyncConnectionStatus.LIVE -> Tuple5(
-            "Terhubung Real-Time",
-            "Database terhubung ke Firebase Firestore. Semua data dan perubahan otomatis tersinkron.",
-            santoyaColors.success,
-            santoyaColors.successContainer.copy(alpha = 0.5f),
-            Icons.Outlined.CloudDone
-        )
-        SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
-            "Sedang Menyinkronkan...",
-            "Mengirim dan menerima pembaruan data antara HP dan Cloud Firestore.",
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-            Icons.Outlined.CloudSync
-        )
-        SyncConnectionStatus.OFFLINE -> Tuple5(
-            "Mode Offline",
-            "Tidak ada koneksi internet. Data transaksi tetap tersimpan aman di HP dan akan otomatis dikirim saat online.",
+    val (statusTitle, statusDesc, statusColor, statusBg, statusIcon) = if (isOfflineLocalMode) {
+        Tuple5(
+            stringResource(R.string.offline_sync_sheet_title),
+            stringResource(R.string.offline_sync_sheet_desc),
             santoyaColors.warning,
-            santoyaColors.warningContainer.copy(alpha = 0.5f),
+            santoyaColors.warningContainer.copy(alpha = 0.55f),
             Icons.Outlined.CloudOff
         )
-        SyncConnectionStatus.REVOKED, SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION -> Tuple5(
-            "Akses Dibatasi",
-            "Akun ini belum memiliki izin akses depot atau dinonaktifkan oleh Pemilik.",
-            MaterialTheme.colorScheme.error,
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
-            Icons.Outlined.Block
-        )
-        SyncConnectionStatus.ERROR -> Tuple5(
-            "Gagal Terhubung",
-            syncState.errorMessage ?: "Periksa koneksi data seluler atau WiFi perangkat Anda.",
-            MaterialTheme.colorScheme.error,
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
-            Icons.Outlined.CloudOff
-        )
+    } else {
+        when (syncState.status) {
+            SyncConnectionStatus.LIVE -> Tuple5(
+                stringResource(R.string.sync_sheet_status_live_title),
+                stringResource(R.string.sync_sheet_status_live_desc),
+                santoyaColors.success,
+                santoyaColors.successContainer.copy(alpha = 0.5f),
+                Icons.Outlined.CloudDone
+            )
+            SyncConnectionStatus.SYNCING, SyncConnectionStatus.CONNECTING -> Tuple5(
+                stringResource(R.string.sync_sheet_status_syncing_title),
+                syncState.syncStageLabel?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.sync_sheet_status_syncing_desc),
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                Icons.Outlined.CloudSync
+            )
+            SyncConnectionStatus.OFFLINE -> Tuple5(
+                stringResource(R.string.sync_sheet_status_offline_title),
+                stringResource(R.string.sync_sheet_status_offline_desc),
+                santoyaColors.warning,
+                santoyaColors.warningContainer.copy(alpha = 0.5f),
+                Icons.Outlined.CloudOff
+            )
+            SyncConnectionStatus.REVOKED, SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION -> Tuple5(
+                stringResource(R.string.sync_sheet_status_restricted_title),
+                stringResource(R.string.sync_sheet_status_restricted_desc),
+                MaterialTheme.colorScheme.error,
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                Icons.Outlined.Block
+            )
+            SyncConnectionStatus.ERROR -> Tuple5(
+                stringResource(R.string.sync_sheet_status_error_title),
+                syncState.errorMessage?.takeIf { it.isNotBlank() }
+                    ?: stringResource(R.string.sync_sheet_status_error_default),
+                MaterialTheme.colorScheme.error,
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f),
+                Icons.Outlined.CloudOff
+            )
+        }
+    }
+
+    val primaryActionLabel = when {
+        isOfflineLocalMode && onConnectGoogleAccount != null ->
+            stringResource(R.string.offline_connect_google_btn)
+        isSyncing ->
+            stringResource(R.string.sync_sheet_btn_syncing)
+        else ->
+            stringResource(R.string.sync_sheet_btn_sync_now)
     }
 
     SantoyaFormBottomSheet(
-        title = "Status Sinkronisasi Cloud",
-        subtitle = "Google Firebase Firestore",
+        title = stringResource(R.string.sync_sheet_title),
+        subtitle = stringResource(R.string.sync_sheet_subtitle),
         headerIcon = statusIcon,
         headerAccent = statusColor,
-        confirmLabel = if (isSyncing) "Menyinkronkan..." else "Sinkronkan Sekarang",
-        confirmEnabled = !isSyncing,
+        confirmLabel = primaryActionLabel,
+        confirmEnabled = if (isOfflineLocalMode) onConnectGoogleAccount != null else !isSyncing,
         confirmContainerColor = MaterialTheme.colorScheme.primary,
-        dismissLabel = "Tutup",
+        dismissLabel = stringResource(R.string.action_close),
         onDismiss = onDismiss,
-        onConfirm = onSyncNow
+        onConfirm = {
+            if (isOfflineLocalMode && onConnectGoogleAccount != null) {
+                onDismiss()
+                onConnectGoogleAccount()
+            } else {
+                onSyncNow()
+            }
+        }
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -312,6 +506,14 @@ fun SantoyaSyncInfoBottomSheet(
             }
         }
 
+        val activeStage = syncState.syncStageLabel
+        if (!isOfflineLocalMode && activeStage != null) {
+            SyncActiveStageProgressBox(
+                stageLabel = activeStage,
+                progressFraction = syncState.syncProgressFraction
+            )
+        }
+
         HydroBentoCard(
             accentColor = MaterialTheme.colorScheme.primary,
             cornerRadius = SantoyaRadius.lg,
@@ -331,16 +533,57 @@ fun SantoyaSyncInfoBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Antrean Data Offline",
+                        text = stringResource(R.string.sync_sheet_queue_label),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = if (syncState.pendingCount > 0) "${syncState.pendingCount} data tertunda" else "Semua data aman (0)",
+                        text = when {
+                            isOfflineLocalMode && syncState.pendingCount > 0 ->
+                                stringResource(R.string.offline_sync_sheet_merge_ready, syncState.pendingCount)
+                            syncState.pendingCount > 0 ->
+                                stringResource(R.string.sync_sheet_queue_pending, syncState.pendingCount)
+                            else ->
+                                stringResource(R.string.sync_sheet_queue_clear)
+                        },
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = if (syncState.pendingCount > 0) santoyaColors.warning else santoyaColors.success
                     )
+                }
+
+                if (syncState.pendingByCollection.isNotEmpty()) {
+                    SyncQueueBreakdownChips(pendingByCollection = syncState.pendingByCollection)
+                }
+
+                if (!isOfflineLocalMode && syncState.expectedListenerCount > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.sync_channel_health_format,
+                                syncState.activeListenerCount,
+                                syncState.expectedListenerCount
+                            ),
+                            style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        val isHealthy = syncState.activeListenerCount >= syncState.expectedListenerCount
+                        Text(
+                            text = stringResource(
+                                if (isHealthy) R.string.sync_channel_health_healthy
+                                else R.string.sync_channel_health_degraded
+                            ),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isHealthy) santoyaColors.success else santoyaColors.warning
+                        )
+                    }
                 }
 
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -351,19 +594,20 @@ fun SantoyaSyncInfoBottomSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Terakhir Sinkron",
+                        text = stringResource(R.string.sync_sheet_last_label),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = syncState.lastSyncedAt?.let { FormatUtils.formatDateTime(it) } ?: "Belum pernah",
+                        text = syncState.lastSyncedAt?.let { FormatUtils.formatDateTime(it) }
+                            ?: stringResource(R.string.sync_sheet_last_never),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                if (syncState.ownerEmail.isNotBlank()) {
+                if (!isOfflineLocalMode && syncState.ownerEmail.isNotBlank()) {
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     Row(
@@ -372,7 +616,7 @@ fun SantoyaSyncInfoBottomSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Email Depot",
+                            text = stringResource(R.string.sync_sheet_owner_label),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -386,6 +630,44 @@ fun SantoyaSyncInfoBottomSheet(
                         )
                     }
                 }
+
+                if (!isOfflineLocalMode && syncState.isAutoRetryScheduled && syncState.autoRetryAttempt > 0) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                    Text(
+                        text = stringResource(
+                            R.string.sync_auto_retry_scheduled_note,
+                            syncState.autoRetryAttempt,
+                            syncState.maxAutoRetryAttempts
+                        ),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                        fontWeight = FontWeight.Medium,
+                        color = santoyaColors.warning
+                    )
+                }
+            }
+        }
+
+        if (!isOfflineLocalMode && onForcePushAll != null) {
+            OutlinedButton(
+                onClick = onForcePushAll,
+                enabled = !isSyncing,
+                shape = RoundedCornerShape(SantoyaRadius.md),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .testTag("btn_sheet_force_push_all")
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CloudSync,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.sync_btn_force_push_all),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
@@ -404,14 +686,14 @@ fun SantoyaSyncInfoBottomSheet(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Buka Pengaturan Lengkap",
+                    text = stringResource(R.string.sync_sheet_open_settings),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
-        if (onSwitchToStaffWaiting != null) {
+        if (!isOfflineLocalMode && onSwitchToStaffWaiting != null) {
             OutlinedButton(
                 onClick = onSwitchToStaffWaiting,
                 shape = RoundedCornerShape(SantoyaRadius.md),
@@ -463,13 +745,21 @@ fun LocalStorageStatusPill(
         ) {
             Icon(
                 imageVector = if (isConnected) Icons.Outlined.CloudDone else Icons.Outlined.CheckCircle,
-                contentDescription = if (isConnected) "Sinkronisasi Cloud Aktif" else "Lokal HP",
+                contentDescription = if (isConnected) {
+                    stringResource(R.string.storage_pill_online_cd)
+                } else {
+                    stringResource(R.string.storage_pill_local_cd)
+                },
                 tint = if (isConnected) MaterialTheme.colorScheme.primary else santoyaColors.success,
                 modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isConnected) "Terhubung" else "Lokal HP",
+                text = if (isConnected) {
+                    stringResource(R.string.storage_pill_online)
+                } else {
+                    stringResource(R.string.storage_pill_local)
+                },
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isConnected) MaterialTheme.colorScheme.onPrimaryContainer else santoyaColors.onSuccessContainer
@@ -928,7 +1218,7 @@ fun SantoyaAdaptiveCurrencyText(
 @Composable
 fun SantoyaLoadingSkeleton(
     itemCount: Int = 4,
-    message: String = "Memuat & menyinkronkan data...",
+    message: String = stringResource(R.string.loading_skeleton_default),
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "skeleton_pulse")
@@ -1203,10 +1493,14 @@ fun SantoyaFilterPill(
             shape = shape,
             color = containerColor,
             border = BorderStroke(1.dp, borderColor),
-            modifier = Modifier.heightIn(min = 34.dp)
+            modifier = Modifier
+                .then(if (centerContent) Modifier.fillMaxWidth() else Modifier)
+                .heightIn(min = 36.dp)
         ) {
             Row(
-                modifier = Modifier.padding(contentPadding),
+                modifier = Modifier
+                    .then(if (centerContent) Modifier.fillMaxWidth() else Modifier)
+                    .padding(contentPadding),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = if (centerContent) Arrangement.Center else Arrangement.Start
             ) {
@@ -1276,33 +1570,33 @@ fun SantoyaAdaptiveTabPillRow(
             ) {
                 val availableWidth = maxWidth
                 val horizontalPadding = when {
-                    availableWidth < 340.dp -> 6.dp
-                    availableWidth < 400.dp -> 10.dp
-                    else -> 12.dp
+                    availableWidth < 340.dp -> 8.dp
+                    availableWidth < 400.dp -> 12.dp
+                    else -> 16.dp
                 }
                 val itemGap = when {
                     items.size <= 2 -> 8.dp
-                    availableWidth < 340.dp -> 3.dp
-                    availableWidth < 400.dp -> 5.dp
+                    availableWidth < 340.dp -> 4.dp
+                    availableWidth < 400.dp -> 6.dp
                     else -> 8.dp
                 }
                 val innerHorizontalPadding = when {
                     items.size <= 2 -> 12.dp
-                    availableWidth < 340.dp -> 3.dp
-                    availableWidth < 400.dp -> 5.dp
+                    availableWidth < 340.dp -> 4.dp
+                    availableWidth < 400.dp -> 6.dp
                     else -> 8.dp
                 }
                 val baseLabelFontSize = when {
                     items.size <= 2 && availableWidth >= 360.dp -> 13.sp
                     items.size <= 2 -> 12.sp
-                    availableWidth < 330.dp -> 9.5.sp
-                    availableWidth < 365.dp -> 10.5.sp
+                    availableWidth < 330.dp -> 10.sp
+                    availableWidth < 365.dp -> 11.sp
                     availableWidth < 400.dp -> 11.5.sp
                     else -> 12.5.sp
                 }
                 val baseBadgeFontSize = when {
                     items.size <= 2 -> 10.5.sp
-                    availableWidth < 330.dp -> 8.sp
+                    availableWidth < 330.dp -> 8.5.sp
                     availableWidth < 365.dp -> 9.sp
                     availableWidth < 400.dp -> 9.5.sp
                     else -> 10.5.sp
@@ -1323,9 +1617,9 @@ fun SantoyaAdaptiveTabPillRow(
                                 1f
                             } else {
                                 val badgeWeight = item.badgeCount?.toString()?.length?.let { len ->
-                                    (len * 0.16f) + 0.28f
+                                    (len * 0.16f) + 0.30f
                                 } ?: 0f
-                                ((item.label.length * 0.145f) + 0.20f + badgeWeight).coerceAtLeast(0.88f)
+                                ((item.label.length * 0.135f) + 0.34f + badgeWeight).coerceAtLeast(0.95f)
                             }
                         }
 

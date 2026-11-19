@@ -178,7 +178,7 @@ fun KasbonPelunasanDialog(
                 )
                 if (kembalian > 0.0) {
                     Text(
-                        text = "Kembalian: ${FormatUtils.formatRupiah(kembalian)}",
+                        text = stringResource(R.string.kasbon_kembalian_value, FormatUtils.formatRupiah(kembalian)),
                         style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary

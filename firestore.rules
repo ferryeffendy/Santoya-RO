@@ -77,13 +77,43 @@ service cloud.firestore {
              data.serverUpdatedAt <= request.time;
     }
 
+    function isValidUserProfile(data, uid) {
+      return data.keys().hasAll(['uid', 'email', 'googleDisplayName', 'ownerName', 'depotName', 'phoneNumber', 'address', 'receiptFooter', 'role', 'subscriptionTier', 'registeredAt', 'lastActiveAt', 'appVersion']) &&
+             data.keys().hasOnly(['uid', 'email', 'googleDisplayName', 'ownerName', 'depotName', 'phoneNumber', 'address', 'receiptFooter', 'role', 'subscriptionTier', 'registeredAt', 'lastActiveAt', 'appVersion', 'depotType', 'tankCapacityLiters', 'currentTankStockLiters']) &&
+             data.uid is string && data.uid == uid && isValidId(uid) &&
+             data.email is string && data.email.size() <= 160 &&
+             data.googleDisplayName is string && data.googleDisplayName.size() <= 120 &&
+             data.ownerName is string && data.ownerName.size() <= 120 &&
+             data.depotName is string && data.depotName.size() <= 100 &&
+             data.phoneNumber is string && data.phoneNumber.size() <= 40 &&
+             data.address is string && data.address.size() <= 300 &&
+             data.receiptFooter is string && data.receiptFooter.size() <= 200 &&
+             data.role is string && data.role in ['OWNER', 'STAFF'] &&
+             data.subscriptionTier is string && data.subscriptionTier in ['FREE', 'PRO'] &&
+             data.registeredAt is timestamp && data.registeredAt <= request.time &&
+             data.lastActiveAt is timestamp && data.lastActiveAt <= request.time &&
+             data.appVersion is string && data.appVersion.size() <= 40 &&
+             (!('depotType' in data) || (data.depotType is string && data.depotType in ['RO', 'MINERAL', 'BOTH'])) &&
+             (!('tankCapacityLiters' in data) || (data.tankCapacityLiters is number && data.tankCapacityLiters >= 100)) &&
+             (!('currentTankStockLiters' in data) || (data.currentTankStockLiters is number && data.currentTankStockLiters >= 0));
+    }
+
     function isValidDepot(data) {
       return data.keys().hasAll(['depotId', 'ownerUid', 'ownerEmail', 'name', 'memberEmails', 'createdAt', 'updatedAt']) &&
-             data.keys().hasOnly(['depotId', 'ownerUid', 'ownerEmail', 'name', 'memberEmails', 'createdAt', 'updatedAt']) &&
+             data.keys().hasOnly(['depotId', 'ownerUid', 'ownerEmail', 'name', 'depotName', 'ownerName', 'phoneNumber', 'address', 'receiptFooter', 'subscriptionTier', 'memberEmails', 'createdAt', 'updatedAt', 'depotType', 'tankCapacityLiters', 'currentTankStockLiters']) &&
              isValidId(data.depotId) &&
              data.ownerUid is string && data.ownerUid.size() >= 1 && data.ownerUid.size() <= 128 &&
              data.ownerEmail is string && data.ownerEmail.size() <= 160 &&
              data.name is string && data.name.size() >= 1 && data.name.size() <= 100 &&
+             (!('depotName' in data) || (data.depotName is string && data.depotName.size() <= 100)) &&
+             (!('ownerName' in data) || (data.ownerName is string && data.ownerName.size() <= 120)) &&
+             (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 40)) &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 300)) &&
+             (!('receiptFooter' in data) || (data.receiptFooter is string && data.receiptFooter.size() <= 200)) &&
+             (!('subscriptionTier' in data) || (data.subscriptionTier is string && data.subscriptionTier in ['FREE', 'PRO'])) &&
+             (!('depotType' in data) || (data.depotType is string && data.depotType in ['RO', 'MINERAL', 'BOTH'])) &&
+             (!('tankCapacityLiters' in data) || (data.tankCapacityLiters is number && data.tankCapacityLiters >= 100)) &&
+             (!('currentTankStockLiters' in data) || (data.currentTankStockLiters is number)) &&
              data.memberEmails is list && data.memberEmails.size() <= 30 &&
              (data.memberEmails.size() == 0 || (data.memberEmails[0] is string && data.memberEmails[0].size() <= 160));
     }
@@ -134,7 +164,7 @@ service cloud.firestore {
 
     function isValidTransaksi(data, docId) {
       return data.keys().hasAll(['syncId', 'tanggal', 'pelangganSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
-             data.keys().hasOnly(['syncId', 'tanggal', 'pelangganSyncId', 'kurirSyncId', 'produkSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'tanggalBayar', 'updatedAt', 'isDeleted', 'deletedBy', '_hardDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'tanggal', 'pelangganSyncId', 'kurirSyncId', 'produkSyncId', 'jumlah', 'harga_satuan', 'total_harga', 'total_komisi', 'metode_bayar', 'status', 'uangMuka', 'sisaKasbon', 'tanggalBayar', 'waterType', 'updatedAt', 'isDeleted', 'deletedBy', '_hardDeleted', 'serverUpdatedAt']) &&
              hasValidSyncMeta(data, docId) &&
              data.tanggal is number && data.tanggal >= 0 &&
              data.pelangganSyncId is string && data.pelangganSyncId.size() >= 1 && data.pelangganSyncId.size() <= 128 &&
@@ -145,12 +175,79 @@ service cloud.firestore {
              data.total_harga is number && data.total_harga >= 0 &&
              data.total_komisi is number && data.total_komisi >= 0 &&
              data.metode_bayar is string && data.metode_bayar.size() <= 40 &&
-             data.status is string && data.status.size() <= 40 &&
+             data.status is string && data.status in ['Lunas', 'Kasbon', 'Dihapus'] &&
              data.uangMuka is number && data.uangMuka >= 0 &&
              data.sisaKasbon is number && data.sisaKasbon >= 0 &&
              (!('tanggalBayar' in data) || data.tanggalBayar == null || (data.tanggalBayar is number && data.tanggalBayar >= 0)) &&
+             (!('waterType' in data) || (data.waterType is string && data.waterType in ['RO', 'MINERAL'])) &&
              (!('deletedBy' in data) || data.deletedBy == null || (data.deletedBy is string && data.deletedBy.size() <= 120)) &&
              (!('_hardDeleted' in data) || data._hardDeleted == null || data._hardDeleted is bool);
+    }
+
+    function isValidTangkiRefill(data, docId) {
+      return data.keys().hasAll(['syncId', 'tanggal', 'volumeLiter', 'totalHarga', 'namaPemasok', 'catatan', 'updatedAt', 'isDeleted', 'serverUpdatedAt']) &&
+             data.keys().hasOnly(['syncId', 'tanggal', 'volumeLiter', 'totalHarga', 'namaPemasok', 'catatan', 'linkedExpenseId', 'pengeluaranSyncId', 'updatedAt', 'isDeleted', 'deletedBy', 'serverUpdatedAt']) &&
+             hasValidSyncMeta(data, docId) &&
+             data.tanggal is number && data.tanggal >= 0 &&
+             data.volumeLiter is number && data.volumeLiter > 0 &&
+             data.totalHarga is number && data.totalHarga >= 0 &&
+             data.namaPemasok is string && data.namaPemasok.size() <= 120 &&
+             data.catatan is string && data.catatan.size() <= 300 &&
+             (!('linkedExpenseId' in data) || data.linkedExpenseId == null || data.linkedExpenseId is number) &&
+             (!('pengeluaranSyncId' in data) || data.pengeluaranSyncId == null || (data.pengeluaranSyncId is string && data.pengeluaranSyncId.size() <= 128)) &&
+             (!('deletedBy' in data) || data.deletedBy == null || (data.deletedBy is string && data.deletedBy.size() <= 120));
+    }
+
+    // Fungsi validasi matematika untuk transaksi
+    // Mencegah manipulasi total_harga, kasbon, dan komisi
+    function isValidTransaksiMath(data) {
+      // 1. Total harga harus sama dengan jumlah * harga_satuan (toleransi 0.01)
+      let calculatedTotal = data.jumlah * data.harga_satuan;
+      let totalValid = data.total_harga >= (calculatedTotal - 0.01) &&
+                       data.total_harga <= (calculatedTotal + 0.01);
+
+      // 2. Uang muka tidak boleh negatif dan tidak boleh melebihi total
+      let uangMukaValid = data.uangMuka >= 0 && data.uangMuka <= data.total_harga;
+
+      // 3. Sisa kasbon harus konsisten dengan uang muka
+      // Jika status = "Kasbon", sisaKasbon harus = total_harga - uangMuka
+      // Jika status = "Lunas", sisaKasbon harus = 0
+      let expectedSisa = data.total_harga - data.uangMuka;
+      let sisaKasbonValid = data.status == 'Kasbon'
+        ? (data.sisaKasbon >= (expectedSisa - 0.01) &&
+           data.sisaKasbon <= (expectedSisa + 0.01))
+        : (data.status == 'Lunas' ? data.sisaKasbon == 0 : true);
+
+      // 4. Total komisi tidak boleh negatif
+      let komisiValid = data.total_komisi >= 0;
+
+      // 5. Jumlah harus minimal 1
+      let jumlahValid = data.jumlah >= 1;
+
+      // 6. Harga satuan tidak boleh negatif
+      let hargaValid = data.harga_satuan >= 0;
+
+      return totalValid && uangMukaValid && sisaKasbonValid &&
+             komisiValid && jumlahValid && hargaValid;
+    }
+
+    // Fungsi validasi untuk kasbon_log
+    function isValidKasbonLogMath(data) {
+      // 1. Jumlah bayar tidak boleh negatif
+      let jumlahBayarValid = data.jumlah_bayar >= 0;
+
+      // 2. Sisa kasbon sebelum harus >= 0
+      let sisaSebelumValid = data.sisa_kasbon_sebelum >= 0;
+
+      // 3. Sisa kasbon sesudah harus = sisa_kasbon_sebelum - jumlah_bayar (toleransi 0.01)
+      let expectedSisa = data.sisa_kasbon_sebelum - data.jumlah_bayar;
+      let sisaSesudahValid = data.sisa_kasbon_sesudah >= (expectedSisa - 0.01) &&
+                             data.sisa_kasbon_sesudah <= (expectedSisa + 0.01);
+
+      // 4. Sisa kasbon sesudah tidak boleh negatif
+      let tidakNegatif = data.sisa_kasbon_sesudah >= 0;
+
+      return jumlahBayarValid && sisaSebelumValid && sisaSesudahValid && tidakNegatif;
     }
 
     function isValidPengeluaran(data, docId) {
@@ -169,9 +266,9 @@ service cloud.firestore {
              hasValidSyncMeta(data, docId) &&
              data.pelangganSyncId is string && data.pelangganSyncId.size() >= 1 && data.pelangganSyncId.size() <= 128 &&
              data.tanggal is number && data.tanggal >= 0 &&
-             data.jumlah_bayar is number &&
-             data.sisa_kasbon_sebelum is number &&
-             data.sisa_kasbon_sesudah is number &&
+             data.jumlah_bayar is number && data.jumlah_bayar >= 0 &&
+             data.sisa_kasbon_sebelum is number && data.sisa_kasbon_sebelum >= 0 &&
+             data.sisa_kasbon_sesudah is number && data.sisa_kasbon_sesudah >= 0 &&
              data.metode_bayar is string && data.metode_bayar.size() <= 40 &&
              data.catatan is string && data.catatan.size() <= 300;
     }
@@ -196,6 +293,64 @@ service cloud.firestore {
              data.biaya is number && data.biaya >= 0 &&
              data.catatan is string && data.catatan.size() <= 500 &&
              (!('pengeluaranSyncId' in data) || data.pengeluaranSyncId == null || (data.pengeluaranSyncId is string && data.pengeluaranSyncId.size() <= 128));
+    }
+
+    function isValidAiInsight(data, docId) {
+      return data.keys().hasAll(['ownerId', 'depotId', 'insights', 'stockAdvice', 'totalOmzet', 'totalGalon', 'activeCustomers', 'modelName', 'timestamp']) &&
+             data.keys().hasOnly([
+               'ownerId', 'depotId', 'periodDays', 'insights', 'stockAdvice',
+               'healthStatus', 'priorityActionTitle', 'priorityActionTarget',
+               'totalOmzet', 'totalKasMasuk', 'totalKomisiKurir', 'totalPengeluaran',
+               'labaBersih', 'marginLabaPersen', 'totalGalon', 'activeCustomers',
+               'totalPiutang', 'overduePiutangOver30d',
+               'omzetGrowthPercent', 'galonGrowthPercent', 'labaGrowthPercent',
+               'modelName', 'timestamp'
+             ]) &&
+             docId == ('latest_' + request.auth.uid) &&
+             data.ownerId is string && data.ownerId == request.auth.uid &&
+             data.depotId is string && data.depotId == ('depot_' + request.auth.uid) &&
+             (!('periodDays' in data) || (data.periodDays is number && data.periodDays in [7, 30, 90])) &&
+             data.insights is list &&
+             data.insights.size() >= 1 && data.insights.size() <= 5 &&
+             data.insights[0] is string && data.insights[0].size() >= 1 && data.insights[0].size() <= 500 &&
+             (data.insights.size() < 2 || (data.insights[1] is string && data.insights[1].size() >= 1 && data.insights[1].size() <= 500)) &&
+             (data.insights.size() < 3 || (data.insights[2] is string && data.insights[2].size() >= 1 && data.insights[2].size() <= 500)) &&
+             (data.insights.size() < 4 || (data.insights[3] is string && data.insights[3].size() >= 1 && data.insights[3].size() <= 500)) &&
+             (data.insights.size() < 5 || (data.insights[4] is string && data.insights[4].size() >= 1 && data.insights[4].size() <= 500)) &&
+             data.stockAdvice is string && data.stockAdvice.size() >= 1 && data.stockAdvice.size() <= 1000 &&
+             (!('healthStatus' in data) || (data.healthStatus is string && data.healthStatus in ['SEHAT', 'WASPADA', 'KRITIS'])) &&
+             (!('priorityActionTitle' in data) || (data.priorityActionTitle is string && data.priorityActionTitle.size() <= 80)) &&
+             (!('priorityActionTarget' in data) || (data.priorityActionTarget is string && data.priorityActionTarget in ['KASBON', 'CRM', 'STOK', 'PERAWATAN', 'LAPORAN'])) &&
+             data.totalOmzet is number && data.totalOmzet >= 0 &&
+             (!('totalKasMasuk' in data) || (data.totalKasMasuk is number && data.totalKasMasuk >= 0)) &&
+             (!('totalKomisiKurir' in data) || (data.totalKomisiKurir is number && data.totalKomisiKurir >= 0)) &&
+             (!('totalPengeluaran' in data) || (data.totalPengeluaran is number && data.totalPengeluaran >= 0)) &&
+             (!('labaBersih' in data) || data.labaBersih is number) &&
+             (!('marginLabaPersen' in data) || (data.marginLabaPersen is number && data.marginLabaPersen >= -1000 && data.marginLabaPersen <= 1000)) &&
+             data.totalGalon is number && data.totalGalon >= 0 &&
+             data.activeCustomers is number && data.activeCustomers >= 0 &&
+             (!('totalPiutang' in data) || (data.totalPiutang is number && data.totalPiutang >= 0)) &&
+             (!('overduePiutangOver30d' in data) || (data.overduePiutangOver30d is number && data.overduePiutangOver30d >= 0)) &&
+             (!('omzetGrowthPercent' in data) || (data.omzetGrowthPercent is number && data.omzetGrowthPercent >= -10000 && data.omzetGrowthPercent <= 10000)) &&
+             (!('galonGrowthPercent' in data) || (data.galonGrowthPercent is number && data.galonGrowthPercent >= -10000 && data.galonGrowthPercent <= 10000)) &&
+             (!('labaGrowthPercent' in data) || (data.labaGrowthPercent is number && data.labaGrowthPercent >= -10000 && data.labaGrowthPercent <= 10000)) &&
+             data.modelName is string && data.modelName.size() >= 1 && data.modelName.size() <= 64 &&
+             data.timestamp is timestamp && data.timestamp <= request.time;
+    }
+
+    match /users/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create: if isSignedIn() &&
+                       request.auth.uid == uid &&
+                       isValidUserProfile(incoming(), uid) &&
+                       incoming().subscriptionTier == 'FREE';
+      allow update: if isSignedIn() &&
+                       request.auth.uid == uid &&
+                       isValidUserProfile(incoming(), uid) &&
+                       (!('registeredAt' in existing()) || incoming().registeredAt == existing().registeredAt) &&
+                       (!('subscriptionTier' in existing()) || incoming().subscriptionTier == existing().subscriptionTier);
+      allow delete: if false;
     }
 
     match /staff_links/{emailKey} {
@@ -262,9 +417,18 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                        isValidId(depotId) &&
                        isValidDepot(incoming()) &&
-                       existing().ownerUid == request.auth.uid &&
-                       incoming().ownerUid == existing().ownerUid &&
-                       incoming().depotId == existing().depotId &&
+                       (
+                         (
+                           existing().ownerUid == request.auth.uid &&
+                           incoming().ownerUid == existing().ownerUid &&
+                           incoming().depotId == existing().depotId
+                         ) ||
+                         (
+                           isDepotMember(depotId) &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['currentTankStockLiters', 'updatedAt']) &&
+                           incoming().currentTankStockLiters is number
+                         )
+                       ) &&
                        incoming().updatedAt is timestamp && incoming().updatedAt <= request.time;
 
       allow delete: if isSignedIn() &&
@@ -295,14 +459,26 @@ service cloud.firestore {
       match /transaksi/{docId} {
         allow get: if isValidId(docId) && isDepotMember(depotId);
         allow list: if isDepotMember(depotId);
-        allow create, update: if isValidId(docId) && isValidTransaksi(incoming(), docId) && isDepotMember(depotId);
+
+        // PERBAIKAN: Tambahkan isValidTransaksiMath() untuk validasi matematika
+        allow create, update: if isValidId(docId) &&
+                              isValidTransaksi(incoming(), docId) &&
+                              isValidTransaksiMath(incoming()) &&
+                              isDepotMember(depotId);
+
         allow delete: if isValidId(docId) && isDepotOwner(depotId);
       }
 
       match /kasbon_logs/{docId} {
         allow get: if isValidId(docId) && isDepotMember(depotId);
         allow list: if isDepotMember(depotId);
-        allow create, update: if isValidId(docId) && isValidKasbonLog(incoming(), docId) && isDepotMember(depotId);
+
+        // PERBAIKAN: Tambahkan isValidKasbonLogMath() untuk validasi matematika
+        allow create, update: if isValidId(docId) &&
+                              isValidKasbonLog(incoming(), docId) &&
+                              isValidKasbonLogMath(incoming()) &&
+                              isDepotMember(depotId);
+
         allow delete: if isValidId(docId) && isDepotOwner(depotId);
       }
 
@@ -326,6 +502,31 @@ service cloud.firestore {
         allow create, update: if isValidId(docId) && isValidPerawatanLog(incoming(), docId) && isDepotOwner(depotId);
         allow delete: if isValidId(docId) && isDepotOwner(depotId);
       }
+
+      match /tangki_refill/{docId} {
+        allow get: if isValidId(docId) && isDepotMember(depotId);
+        allow list: if isDepotMember(depotId);
+        allow create, update: if isValidId(docId) && isValidTangkiRefill(incoming(), docId) && isDepotOwner(depotId);
+        allow delete: if isValidId(docId) && isDepotOwner(depotId);
+      }
+    }
+
+    match /ai_insights/{insightId} {
+      allow get: if isSignedIn() &&
+                    isValidId(insightId) &&
+                    (
+                      insightId == ('latest_' + request.auth.uid) ||
+                      (resource != null && existing().ownerId == request.auth.uid)
+                    );
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && isValidAiInsight(incoming(), insightId);
+      allow update: if isSignedIn() &&
+                       isValidAiInsight(incoming(), insightId) &&
+                       existing().ownerId == request.auth.uid &&
+                       incoming().ownerId == existing().ownerId;
+      allow delete: if isSignedIn() &&
+                       isValidId(insightId) &&
+                       existing().ownerId == request.auth.uid;
     }
   }
 }

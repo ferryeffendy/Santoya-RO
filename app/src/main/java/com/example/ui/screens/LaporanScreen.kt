@@ -2,8 +2,6 @@ package com.example.ui.screens
 
 import android.app.DatePickerDialog
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,20 +25,17 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.TrendingDown
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.EmojiEvents
-import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.TableView
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,12 +62,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -83,8 +75,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
+import com.example.data.entity.DepotProfile
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
+import com.example.ui.components.DepotQuickFillDialog
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroCourierWaveIcon
 import com.example.ui.components.HydroDropletSparkIcon
@@ -93,13 +87,23 @@ import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
 import com.example.ui.components.HydroReceiptNoteIcon
 import com.example.ui.components.HydroReportChartIcon
+import com.example.ui.components.LaporanBentoFinancialCard
+import com.example.ui.components.LaporanCashflowLegendDot
+import com.example.ui.components.LaporanEmptyPeriodListCard
+import com.example.ui.components.LaporanFinancialBreakdownRow
+import com.example.ui.components.LaporanKasbonLogItemCard
+import com.example.ui.components.LaporanMonthlyComparisonBadge
+import com.example.ui.components.LaporanAgingCard
+import com.example.ui.components.LaporanSalesRankingItemCard
+import com.example.ui.components.LaporanTrendChartCard
 import com.example.ui.components.PengeluaranCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
-import com.example.ui.components.resolvePengeluaranCategoryColor
 import com.example.ui.components.SantoyaEmptyState
 import com.example.ui.components.SantoyaEmptyType
 import com.example.ui.components.SantoyaFilterPill
 import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.components.SantoyaSearchBar
+import com.example.ui.components.resolvePengeluaranCategoryColor
 import com.example.ui.theme.AccentAmber
 import com.example.ui.theme.AccentCyan
 import com.example.ui.theme.AccentEmerald
@@ -118,34 +122,25 @@ import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
 import com.example.util.KaryawanScopeHelper
+import com.example.util.LaporanFinanceCalculator
 import com.example.util.PdfExporter
-import com.example.util.RankingEntryUi
 import com.example.util.RankingMetricsHelper
-import com.example.util.RankingRawEntry
 import com.example.util.RankingSortMode
+import com.example.util.SantoyaReceiptHelper
+import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
+import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.Calendar
-import java.util.Locale
 import kotlin.math.roundToInt
 
-data class PenjualanDesaItem(
-    val desa: String,
-    val total_galon: Int,
-    val total_transaksi: Int,
-    val total_pendapatan: Double
-)
-
-data class PenjualanKurirItem(
-    val nama_kurir: String,
-    val total_galon: Int,
-    val total_transaksi: Int,
-    val total_pendapatan: Double
-)
-
+/**
+ * Layar Laporan Keuangan pemilik depot Santoya RO yang menyajikan analisis arus kas riil,
+ * rekonsiliasi metode bayar, tren harian/bulanan, umur piutang, peringkat penjualan, serta ekspor PDF/CSV.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LaporanScreen(
@@ -159,7 +154,11 @@ fun LaporanScreen(
     val allTransactionsFromVm by viewModel.allTransaksi.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
     val allKasbonLogs by viewModel.allKasbonLogs.collectAsStateWithLifecycle()
+    val allPelanggan by viewModel.allPelanggan.collectAsStateWithLifecycle()
+    val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
+    val isKaryawan by viewModel.isKaryawan.collectAsStateWithLifecycle()
     val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
+    var showQuickFillForPdf by remember { mutableStateOf(false) }
 
     val rawTransaksiList = if (transaksiList.isNotEmpty()) transaksiList else allTransactionsFromVm
     val effectiveTransaksiList = remember(rawTransaksiList) {
@@ -175,194 +174,125 @@ fun LaporanScreen(
     var isSummaryMode by remember { mutableStateOf(false) }
     var detailTabIndex by remember { mutableIntStateOf(0) }
     var rankingTabIndex by remember { mutableIntStateOf(0) }
-
-    val todayEnd = FormatUtils.getEndOfDay()
-    val (startTime, endTime) = if (isCustomDateRange) {
-        Pair(customStartMillis, customEndMillis)
-    } else {
-        when (selectedPeriode) {
-            LaporanPeriode.HARI_INI -> Pair(FormatUtils.getStartOfDay(), todayEnd)
-            LaporanPeriode.MINGGU_INI -> Pair(FormatUtils.getStartOfWeek(), todayEnd)
-            LaporanPeriode.BULAN_INI -> Pair(FormatUtils.getStartOfMonth(), todayEnd)
-            LaporanPeriode.TAHUN_INI -> Pair(FormatUtils.getStartOfYear(), todayEnd)
-            LaporanPeriode.SEMUA -> Pair(0L, todayEnd + 86400000L)
-        }
-    }
-
-    // --- Core Financial Calculations (Preserved 100% + Memoized for 60fps performance) ---
-    val filteredTx = remember(effectiveTransaksiList, startTime, endTime) {
-        effectiveTransaksiList
-            .filter { it.transaksi.tanggal in startTime..endTime }
-            .sortedWith(compareByDescending<TransaksiDetail> { it.transaksi.tanggal }.thenByDescending { it.transaksi.id })
-    }
-    val filteredExp = remember(effectivePengeluaranList, startTime, endTime) {
-        effectivePengeluaranList
-            .filter { it.tanggal in startTime..endTime }
-            .sortedWith(compareByDescending<Pengeluaran> { it.tanggal }.thenByDescending { it.id })
-    }
-
-    val totalOmzetPenjualan = remember(filteredTx) {
-        filteredTx.sumOf { it.transaksi.total_harga }
-    }
-    val penjualanTunaiLangsung = remember(filteredTx) {
-        filteredTx.sumOf {
-            when {
-                it.transaksi.status.equals("Lunas", ignoreCase = true) &&
-                    (it.transaksi.tanggalBayar == null || it.transaksi.tanggalBayar == it.transaksi.tanggal) -> {
-                    it.transaksi.total_harga
-                }
-                it.transaksi.uangMuka > 0L -> {
-                    it.transaksi.uangMuka.toDouble()
-                }
-                else -> 0.0
-            }
-        }
-    }
-    val piutangKasbonPeriode = remember(filteredTx) {
-        filteredTx
-            .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-            .sumOf { it.transaksi.remainingKasbonAmount() }
-    }
-    val pelunasanKasbonPeriode = remember(allKasbonLogs, startTime, endTime) {
-        allKasbonLogs
-            .filter { it.tanggal in startTime..endTime && it.jumlah_bayar > 0 }
-            .sumOf { it.jumlah_bayar }
-    }
-    val totalKasMasuk = penjualanTunaiLangsung + pelunasanKasbonPeriode
-    val pendapatanLunas = totalKasMasuk
-    val totalKomisiKurir = remember(filteredTx) {
-        filteredTx.sumOf { it.transaksi.total_komisi }
-    }
-    val totalPengeluaran = remember(filteredExp) {
-        filteredExp.sumOf { it.nominal }
-    }
-    val totalBebanKeluar = totalKomisiKurir + totalPengeluaran
-    val labaBersih = totalKasMasuk - totalKomisiKurir - totalPengeluaran
-    val isProfit = labaBersih >= 0
-    val marginLabaPersen = if (totalKasMasuk > 0.0) {
-        (labaBersih / totalKasMasuk) * 100.0
-    } else {
-        0.0
-    }
-    val hasPeriodActivity = filteredTx.isNotEmpty() || filteredExp.isNotEmpty()
-
-    // --- Perbandingan Omzet Bulanan (Bulan Ini vs Bulan Lalu menggunakan java.time.YearMonth + DAO Query) ---
-    val (thisMonthRange, lastMonthRange) = remember {
-        val zoneId = ZoneId.systemDefault()
-        val currentYm = YearMonth.now(zoneId)
-        val previousYm = currentYm.minusMonths(1)
-        val currStart = currentYm.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val currEnd = currentYm.atEndOfMonth().atTime(23, 59, 59, 999_000_000).atZone(zoneId).toInstant().toEpochMilli()
-        val prevStart = previousYm.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-        val prevEnd = previousYm.atEndOfMonth().atTime(23, 59, 59, 999_000_000).atZone(zoneId).toInstant().toEpochMilli()
-        Pair(Pair(currStart, currEnd), Pair(prevStart, prevEnd))
-    }
-    val daoPendapatanBulanIni by remember(thisMonthRange) {
-        viewModel.getTotalPendapatanByDateRange(thisMonthRange.first, thisMonthRange.second)
-    }.collectAsStateWithLifecycle(initialValue = 0.0)
-    val daoPendapatanBulanLalu by remember(lastMonthRange) {
-        viewModel.getTotalPendapatanByDateRange(lastMonthRange.first, lastMonthRange.second)
-    }.collectAsStateWithLifecycle(initialValue = 0.0)
-
-    val bulanIniRev = daoPendapatanBulanIni ?: 0.0
-    val bulanLaluRev = daoPendapatanBulanLalu ?: 0.0
-    val effectiveBulanIniRevenue = if (bulanIniRev > 0.0) bulanIniRev else pendapatanLunas
-    val showMonthlyComparison = !isCustomDateRange && selectedPeriode == LaporanPeriode.BULAN_INI
-
     var showAllRanking by remember { mutableStateOf(false) }
     var rankingSortMode by remember { mutableStateOf(RankingSortMode.GALON) }
     var showAllDetails by remember { mutableStateOf(false) }
+    var txSearchQuery by remember { mutableStateOf("") }
 
-    // Smart Grouping for Penjualan per Desa / Wilayah (normalizes house numbers like "Jl. Raya Sukamaju No. 12" -> "Sukamaju")
-    val penjualanDesaList = remember(filteredTx) {
-        filteredTx.groupBy { tx ->
-            extractNormalizedDesaName(tx.pelanggan?.alamat)
-        }.map { (desa, list) ->
-            PenjualanDesaItem(
-                desa = desa,
-                total_galon = list.sumOf { it.transaksi.jumlah },
-                total_transaksi = list.size,
-                total_pendapatan = list.sumOf { it.transaksi.total_harga }
-            )
-        }.sortedByDescending { it.total_galon }
-    }
+    // Kunci tanggal berbasis hari berjalan agar rentang otomatis segar saat pergantian hari/bulan
+    val zoneId = ZoneId.systemDefault()
+    val currentLocalDate = LocalDate.now(zoneId)
+    val nowMillis = System.currentTimeMillis()
+    val todayEnd = remember(currentLocalDate) { FormatUtils.getEndOfDay(nowMillis) }
 
-    // Grouping for Penjualan per Kurir
-    val penjualanKurirList = remember(filteredTx) {
-        filteredTx.groupBy { it.kurir?.nama ?: "Ambil Sendiri" }
-            .map { (kurir, list) ->
-                PenjualanKurirItem(
-                    nama_kurir = kurir,
-                    total_galon = list.sumOf { it.transaksi.jumlah },
-                    total_transaksi = list.size,
-                    total_pendapatan = list.sumOf { it.transaksi.total_harga }
-                )
-            }.sortedByDescending { it.total_galon }
-    }
-
-    val rankedDesaEntries = remember(penjualanDesaList, rankingSortMode) {
-        RankingMetricsHelper.buildRankedEntries(
-            entries = penjualanDesaList.map {
-                RankingRawEntry(
-                    title = it.desa,
-                    totalGalon = it.total_galon,
-                    totalTransaksi = it.total_transaksi,
-                    totalPendapatan = it.total_pendapatan
-                )
-            },
-            sortMode = rankingSortMode
-        )
-    }
-
-    val rankedKurirEntries = remember(penjualanKurirList, rankingSortMode) {
-        RankingMetricsHelper.buildRankedEntries(
-            entries = penjualanKurirList.map {
-                RankingRawEntry(
-                    title = it.nama_kurir,
-                    totalGalon = it.total_galon,
-                    totalTransaksi = it.total_transaksi,
-                    totalPendapatan = it.total_pendapatan
-                )
-            },
-            sortMode = rankingSortMode
-        )
-    }
-
-    // Run-Rate Proyeksi Bulan Ini
-    val daysInMonth = FormatUtils.getDaysInCurrentMonth()
-    val currentDay = FormatUtils.getCurrentDayOfMonth().coerceAtLeast(1)
-    val remainingDays = (daysInMonth - currentDay).coerceAtLeast(0)
-
-    val monthStart = FormatUtils.getStartOfMonth()
-    val monthStats = remember(effectiveTransaksiList, effectivePengeluaranList, monthStart, currentDay, remainingDays) {
-        val mTx = effectiveTransaksiList.filter { it.transaksi.tanggal >= monthStart }
-        val mExp = effectivePengeluaranList.filter { it.tanggal >= monthStart }
-        val mGalon = mTx.sumOf { it.transaksi.jumlah }
-        val mLunas = mTx.sumOf {
-            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
-                it.transaksi.total_harga
-            } else {
-                it.transaksi.uangMuka.toDouble()
+    val (startTime, endTime) = remember(
+        isCustomDateRange,
+        customStartMillis,
+        customEndMillis,
+        selectedPeriode,
+        currentLocalDate
+    ) {
+        if (isCustomDateRange) {
+            Pair(customStartMillis, customEndMillis)
+        } else {
+            when (selectedPeriode) {
+                LaporanPeriode.HARI_INI -> Pair(FormatUtils.getStartOfDay(nowMillis), todayEnd)
+                LaporanPeriode.MINGGU_INI -> Pair(FormatUtils.getStartOfWeek(), todayEnd)
+                LaporanPeriode.BULAN_INI -> Pair(FormatUtils.getStartOfMonth(nowMillis), todayEnd)
+                LaporanPeriode.TAHUN_INI -> Pair(FormatUtils.getStartOfYear(), todayEnd)
+                LaporanPeriode.SEMUA -> Pair(0L, todayEnd + 86_400_000L)
             }
         }
-        val mKomisi = mTx.sumOf { it.transaksi.total_komisi }
-        val mPengeluaran = mExp.sumOf { it.nominal }
-        val mNetProfit = mLunas - mKomisi - mPengeluaran
-
-        val avgGalon = if (currentDay > 0) mGalon.toDouble() / currentDay else 0.0
-        val projGalon = (mGalon + (avgGalon * remainingDays)).toInt()
-        val avgProfit = if (currentDay > 0) mNetProfit / currentDay else 0.0
-        val projProfit = mNetProfit + (avgProfit * remainingDays)
-        QuadrupleMonthStats(mGalon, projGalon, mNetProfit, projProfit)
     }
-    val monthGalon = monthStats.monthGalon
-    val projectedGalon = monthStats.projectedGalon
-    val monthNetProfit = monthStats.monthNetProfit
-    val projectedProfit = monthStats.projectedProfit
 
+    val summary = remember(
+        effectiveTransaksiList,
+        effectivePengeluaranList,
+        allKasbonLogs,
+        allPelanggan,
+        startTime,
+        endTime
+    ) {
+        LaporanFinanceCalculator.summarizePeriod(
+            allTransaksi = effectiveTransaksiList,
+            allPengeluaran = effectivePengeluaranList,
+            allKasbonLogs = allKasbonLogs,
+            allPelanggan = allPelanggan,
+            startTime = startTime,
+            endTime = endTime,
+            zoneId = zoneId
+        )
+    }
+
+    val monthlyComparison = remember(
+        effectiveTransaksiList,
+        effectivePengeluaranList,
+        allKasbonLogs,
+        allPelanggan,
+        currentLocalDate
+    ) {
+        LaporanFinanceCalculator.calculateMonthlyComparison(
+            allTransaksi = effectiveTransaksiList,
+            allPengeluaran = effectivePengeluaranList,
+            allKasbonLogs = allKasbonLogs,
+            allPelanggan = allPelanggan,
+            nowMillis = nowMillis,
+            zoneId = zoneId
+        )
+    }
+
+    val monthlyProjection = remember(
+        effectiveTransaksiList,
+        effectivePengeluaranList,
+        allKasbonLogs,
+        allPelanggan,
+        currentLocalDate
+    ) {
+        LaporanFinanceCalculator.calculateMonthlyProjection(
+            allTransaksi = effectiveTransaksiList,
+            allPengeluaran = effectivePengeluaranList,
+            allKasbonLogs = allKasbonLogs,
+            allPelanggan = allPelanggan,
+            nowMillis = nowMillis,
+            zoneId = zoneId
+        )
+    }
+
+    val kasbonAgingSummary = remember(
+        effectiveTransaksiList,
+        allPelanggan,
+        currentLocalDate
+    ) {
+        LaporanFinanceCalculator.calculateKasbonAging(
+            allTransaksi = effectiveTransaksiList,
+            allPelanggan = allPelanggan,
+            nowMillis = nowMillis,
+            zoneId = zoneId
+        )
+    }
+
+    val rankedDesaEntries = remember(summary.desaEntries, rankingSortMode) {
+        RankingMetricsHelper.buildRankedEntries(summary.desaEntries, rankingSortMode)
+    }
+    val rankedKurirEntries = remember(summary.kurirEntries, rankingSortMode) {
+        RankingMetricsHelper.buildRankedEntries(summary.kurirEntries, rankingSortMode)
+    }
+
+    val currentYm = YearMonth.from(currentLocalDate)
+    val daysInMonth = currentYm.lengthOfMonth().coerceAtLeast(1)
+    val currentDay = currentLocalDate.dayOfMonth.coerceIn(1, daysInMonth)
+    val showMonthlyComparison = !isCustomDateRange && selectedPeriode == LaporanPeriode.BULAN_INI
+
+    val isProfit = summary.labaBersih >= 0.0
     val santoyaColors = MaterialTheme.santoyaColors
     val profitColor = santoyaColors.success
     val lossColor = santoyaColors.danger
+
+    val periodRangeLabel = if (!isCustomDateRange && selectedPeriode == LaporanPeriode.SEMUA) {
+        stringResource(R.string.laporan_all_time)
+    } else {
+        "${FormatUtils.formatDateUi(startTime)} – ${FormatUtils.formatDateUi(endTime)}"
+    }
 
     fun openCustomDateRangePicker() {
         val startCal = Calendar.getInstance().apply { timeInMillis = customStartMillis }
@@ -392,7 +322,7 @@ fun LaporanScreen(
                     endCal.get(Calendar.MONTH),
                     endCal.get(Calendar.DAY_OF_MONTH)
                 ).apply {
-                    setTitle("Pilih Tanggal Akhir")
+                    setTitle(context.getString(R.string.date_picker_end_title))
                     show()
                 }
             },
@@ -400,9 +330,33 @@ fun LaporanScreen(
             startCal.get(Calendar.MONTH),
             startCal.get(Calendar.DAY_OF_MONTH)
         ).apply {
-            setTitle("Pilih Tanggal Mulai")
+            setTitle(context.getString(R.string.date_picker_start_title))
             show()
         }
+    }
+
+    fun launchPdfExport(activeProfile: DepotProfile) {
+        val html = ExportHelper.generateLaporanHtml(
+            summary = summary,
+            allTransaksi = effectiveTransaksiList,
+            allKasbonLogs = allKasbonLogs,
+            periodeLabel = periodRangeLabel,
+            isSummaryMode = isSummaryMode,
+            kasbonAgingSummary = kasbonAgingSummary,
+            rankedDesaEntries = rankedDesaEntries,
+            depotProfile = activeProfile,
+            isProUser = activeProfile.isProUser()
+        )
+        val safePrefix = activeProfile.effectiveDepotName()
+            .replace(Regex("[^a-zA-Z0-9]+"), "_")
+            .trim('_')
+            .ifBlank { "Depot" }
+        val pdfJobName = ExportHelper.buildExportFileName(
+            prefix = "Laporan_$safePrefix",
+            periodeLabel = periodRangeLabel,
+            extension = "pdf"
+        ).removeSuffix(".pdf")
+        PdfExporter.printHtmlAsPdf(context, html, pdfJobName)
     }
 
     LazyColumn(
@@ -413,198 +367,511 @@ fun LaporanScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-            // 1. Prominent Period Filter Bar (Date Picker & Proportional 5-Tab Selector)
-            item {
-                HydroBentoCard(
-                    accentColor = MaterialTheme.colorScheme.primary,
-                    cornerRadius = SantoyaRadius.xl,
-                    tintAlpha = 0.07f,
-                    showWaterRipple = true,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
+        // 1. Bar Filter Periode Laporan
+        item {
+            HydroBentoCard(
+                accentColor = MaterialTheme.colorScheme.primary,
+                cornerRadius = SantoyaRadius.xl,
+                tintAlpha = 0.07f,
+                showWaterRipple = true,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            HydroGradientBadge(
+                                gradientColors = listOf(MaterialTheme.colorScheme.primary, AccentCyan),
+                                size = 36.dp,
+                                cornerRadius = 11.dp,
+                                elevation = 3.dp
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarToday,
+                                    contentDescription = null,
+                                    tint = santoyaColors.onHero,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = stringResource(R.string.laporan_period_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Surface(
+                            onClick = { openCustomDateRangePicker() },
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                            color = if (isCustomDateRange) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
+                            },
+                            modifier = Modifier
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_laporan_calendar")
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DateRange,
+                                    contentDescription = stringResource(R.string.laporan_calendar_cd),
+                                    tint = if (isCustomDateRange) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.laporan_calendar_label),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isCustomDateRange) {
+                                        MaterialTheme.colorScheme.onPrimary
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = periodRangeLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(SantoyaRadius.xs),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                HydroGalonIcon(
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Text(
+                                    text = "${FormatUtils.formatNumber(summary.totalGalon)} ${stringResource(R.string.unit_galon)}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
+
+                    if (depotProfile.isBothType() || (summary.totalGalonRo > 0 && summary.totalGalonMineral > 0)) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("row_laporan_water_type_breakdown"),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(SantoyaRadius.xs),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                                 modifier = Modifier.weight(1f)
                             ) {
-                                HydroGradientBadge(
-                                    gradientColors = listOf(MaterialTheme.colorScheme.primary, AccentCyan),
-                                    size = 36.dp,
-                                    cornerRadius = 11.dp,
-                                    elevation = 3.dp
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.CalendarToday,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.santoyaColors.onHero,
-                                        modifier = Modifier.size(17.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = stringResource(R.string.laporan_period_title),
-                                    style = MaterialTheme.typography.titleSmall,
+                                    text = stringResource(
+                                        R.string.laporan_galon_ro_label,
+                                        FormatUtils.formatNumber(summary.totalGalonRo)
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
                             Surface(
-                                onClick = { openCustomDateRangePicker() },
+                                shape = RoundedCornerShape(SantoyaRadius.xs),
+                                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        R.string.laporan_galon_mineral_label,
+                                        FormatUtils.formatNumber(summary.totalGalonMineral)
+                                    ),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val chipLabels = mapOf(
+                            LaporanPeriode.HARI_INI to stringResource(R.string.laporan_period_daily),
+                            LaporanPeriode.MINGGU_INI to stringResource(R.string.laporan_period_weekly),
+                            LaporanPeriode.BULAN_INI to stringResource(R.string.laporan_period_monthly),
+                            LaporanPeriode.TAHUN_INI to stringResource(R.string.laporan_period_yearly),
+                            LaporanPeriode.SEMUA to stringResource(R.string.laporan_period_all)
+                        )
+                        LaporanPeriode.entries.forEach { filter ->
+                            val isSelected = !isCustomDateRange && selectedPeriode == filter
+                            Surface(
+                                onClick = {
+                                    isCustomDateRange = false
+                                    viewModel.setLaporanPeriode(filter)
+                                    showAllDetails = false
+                                },
                                 shape = RoundedCornerShape(SantoyaRadius.sm),
-                                color = if (isCustomDateRange) {
+                                color = if (isSelected) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
+                                    MaterialTheme.colorScheme.surface
                                 },
-                                modifier = Modifier.heightIn(min = SantoyaSize.touchTarget)
+                                border = if (isSelected) {
+                                    null
+                                } else {
+                                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("chip_periode_${filter.name.lowercase()}")
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = SantoyaSize.touchTarget)
+                                        .padding(horizontal = 2.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.DateRange,
-                                        contentDescription = stringResource(R.string.laporan_calendar_cd),
-                                        tint = if (isCustomDateRange) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.primary
-                                        },
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = stringResource(R.string.laporan_calendar_label),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (isCustomDateRange) {
+                                        text = chipLabels[filter] ?: filter.label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) {
                                             MaterialTheme.colorScheme.onPrimary
                                         } else {
-                                            MaterialTheme.colorScheme.primary
+                                            MaterialTheme.colorScheme.onSurfaceVariant
                                         },
                                         maxLines = 1,
-                                        softWrap = false
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        // 2. Loading Skeleton ATAU Empty State ATAU Ringkasan Finansial
+        if (!isInitialDataLoaded && rawTransaksiList.isEmpty() && effectivePengeluaranList.isEmpty() && allKasbonLogs.isEmpty()) {
+            item {
+                SantoyaLoadingSkeleton(
+                    itemCount = 4,
+                    message = stringResource(R.string.laporan_loading)
+                )
+            }
+        } else if (!summary.hasPeriodActivity) {
+            item {
+                SantoyaEmptyState(
+                    emptyType = SantoyaEmptyType.LAPORAN,
+                    title = stringResource(R.string.laporan_empty_title),
+                    subtitle = stringResource(R.string.laporan_empty_subtitle),
+                    primaryActionLabel = stringResource(R.string.laporan_empty_cta),
+                    primaryActionIcon = Icons.Outlined.Add,
+                    onPrimaryAction = {
+                        viewModel.setTransaksiTab(0)
+                        viewModel.navigateTo(SantoyaScreen.TRANSAKSI)
+                    }
+                )
+            }
+        } else {
+            // 2A. Hero Card: Laba Bersih & Visualisasi Komposisi Arus Kas
+            item {
+                val heroContainerColor = if (isProfit) HeroGradientStart else HeroDeficitStart
+                val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else HeroDeficitPanel
+                val heroBorderColor = if (isProfit) SantoyaNavyBorder else HeroGlowRoseSoft.copy(alpha = 0.45f)
+                val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
+                val onHero = santoyaColors.onHero
+                val formattedMargin = FormatUtils.formatPercent(summary.marginLabaPersen)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(SantoyaRadius.xl),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(containerColor = heroContainerColor),
+                    border = BorderStroke(1.dp, heroBorderColor)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(heroContainerColor)
+                            .drawBehind {
+                                val w = size.width
+                                val h = size.height
+                                val curve1 = Path().apply {
+                                    moveTo(w * 0.72f, 0f)
+                                    cubicTo(w * 0.76f, h * 0.28f, w * 0.88f, h * 0.36f, w, h * 0.38f)
+                                }
+                                drawPath(
+                                    path = curve1,
+                                    color = onHero.copy(alpha = 0.24f),
+                                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                                val curve2 = Path().apply {
+                                    moveTo(w * 0.82f, 0f)
+                                    quadraticTo(w * 0.86f, h * 0.22f, w, h * 0.26f)
+                                }
+                                drawPath(
+                                    path = curve2,
+                                    color = heroAccent.copy(alpha = 0.36f),
+                                    style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
+                                )
+                            }
+                            .padding(20.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            HydroGradientBadge(
+                                gradientColors = if (isProfit) {
+                                    listOf(AccentEmerald, AccentCyan)
+                                } else {
+                                    listOf(AccentRose, AccentAmber)
+                                },
+                                size = 40.dp,
+                                cornerRadius = 13.dp,
+                                elevation = 3.dp
+                            ) {
+                                HydroReportChartIcon(
+                                    tint = onHero,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isProfit) {
+                                        stringResource(R.string.laporan_profit_label)
+                                    } else {
+                                        stringResource(R.string.laporan_loss_label)
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = heroAccent,
+                                    letterSpacing = 0.6.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = stringResource(R.string.laporan_profit_desc),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = onHero.copy(alpha = 0.82f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        SantoyaAdaptiveCurrencyText(
+                            amount = summary.labaBersih,
+                            style = MaterialTheme.typography.displaySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = onHero,
+                            minFontSize = 18.sp,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                text = if (!isCustomDateRange && startTime == 0L) {
-                                    "Semua waktu"
-                                } else {
-                                    "${FormatUtils.formatDateUi(startTime)} – ${FormatUtils.formatDateUi(endTime)}"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Surface(
-                                shape = RoundedCornerShape(SantoyaRadius.xs),
-                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                shape = RoundedCornerShape(50),
+                                color = heroSubPanelColor,
+                                border = BorderStroke(1.dp, heroAccent.copy(alpha = 0.55f))
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                ) {
-                                    HydroGalonIcon(
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Text(
-                                        text = "${filteredTx.sumOf { it.transaksi.jumlah }} Galon",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
+                                Text(
+                                    text = stringResource(R.string.laporan_margin_label, formattedMargin),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = heroAccent,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = heroSubPanelColor,
+                                border = BorderStroke(1.dp, heroBorderColor)
+                            ) {
+                                Text(
+                                    text = if (isProfit) {
+                                        stringResource(R.string.laporan_surplus)
+                                    } else {
+                                        stringResource(R.string.laporan_deficit)
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = onHero,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        val positiveProfit = summary.labaBersih.coerceAtLeast(0.0)
+                        val totalFlowBase = (positiveProfit + summary.totalPengeluaran + summary.totalKomisiKurir).coerceAtLeast(1.0)
+                        val profitShare = (positiveProfit / totalFlowBase).toFloat().coerceIn(0f, 1f)
+                        val opShare = (summary.totalPengeluaran / totalFlowBase).toFloat().coerceIn(0f, 1f)
+                        val komisiShare = (summary.totalKomisiKurir / totalFlowBase).toFloat().coerceIn(0f, 1f)
+
+                        val profitPct = (profitShare * 100).roundToInt()
+                        val opPct = (opShare * 100).roundToInt()
+                        val komisiPct = (komisiShare * 100).roundToInt()
+
+                        Surface(
+                            shape = RoundedCornerShape(SantoyaRadius.lg),
+                            color = heroSubPanelColor,
+                            border = BorderStroke(1.dp, heroBorderColor),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            val chipLabels = mapOf(
-                                LaporanPeriode.HARI_INI to stringResource(R.string.laporan_period_daily),
-                                LaporanPeriode.MINGGU_INI to stringResource(R.string.laporan_period_weekly),
-                                LaporanPeriode.BULAN_INI to stringResource(R.string.laporan_period_monthly),
-                                LaporanPeriode.TAHUN_INI to stringResource(R.string.laporan_period_yearly),
-                                LaporanPeriode.SEMUA to stringResource(R.string.laporan_period_all)
-                            )
-                            LaporanPeriode.values().forEach { filter ->
-                                val isSelected = !isCustomDateRange && selectedPeriode == filter
-                                Surface(
-                                    onClick = {
-                                        isCustomDateRange = false
-                                        viewModel.setLaporanPeriode(filter)
-                                        showAllDetails = false
-                                    },
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = if (isSelected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.surface
-                                    },
-                                    border = if (isSelected) {
-                                        null
-                                    } else {
-                                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-                                    },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .heightIn(min = SantoyaSize.touchTarget)
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        contentAlignment = Alignment.Center,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .heightIn(min = SantoyaSize.touchTarget)
-                                            .padding(horizontal = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = chipLabels[filter] ?: filter.label,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isSelected) {
-                                                MaterialTheme.colorScheme.onPrimary
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                            maxLines = 1,
-                                            softWrap = false,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center
+                                    Text(
+                                        text = stringResource(R.string.laporan_cashflow_title),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = onHero.copy(alpha = 0.85f)
+                                    )
+                                    Text(
+                                        text = stringResource(
+                                            R.string.laporan_summary_counts,
+                                            summary.filteredTx.size,
+                                            summary.filteredKasbonLogs.size,
+                                            summary.filteredExp.size
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = heroAccent,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp)
+                                        .clip(CircleShape)
+                                        .background(onHero.copy(alpha = 0.15f))
+                                ) {
+                                    if (profitShare > 0.01f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(profitShare.coerceAtLeast(0.03f))
+                                                .height(8.dp)
+                                                .background(HeroGlowEmeraldSoft)
                                         )
                                     }
+                                    if (opShare > 0.01f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(opShare.coerceAtLeast(0.03f))
+                                                .height(8.dp)
+                                                .background(HeroGlowRoseSoft)
+                                        )
+                                    }
+                                    if (komisiShare > 0.01f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(komisiShare.coerceAtLeast(0.03f))
+                                                .height(8.dp)
+                                                .background(HeroGlowAmberSoft)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    LaporanCashflowLegendDot(
+                                        color = HeroGlowEmeraldSoft,
+                                        label = "Laba ($profitPct%)"
+                                    )
+                                    LaporanCashflowLegendDot(
+                                        color = HeroGlowRoseSoft,
+                                        label = "Operasional ($opPct%)"
+                                    )
+                                    LaporanCashflowLegendDot(
+                                        color = HeroGlowAmberSoft,
+                                        label = "Komisi ($komisiPct%)"
+                                    )
                                 }
                             }
                         }
@@ -612,443 +879,196 @@ fun LaporanScreen(
                 }
             }
 
-            // 2. Loading Skeleton OR Main Profit & Loss Summary Card OR Empty State
-            if (!isInitialDataLoaded && rawTransaksiList.isEmpty() && effectivePengeluaranList.isEmpty()) {
-                item {
-                    SantoyaLoadingSkeleton(
-                        itemCount = 4,
-                        message = stringResource(R.string.laporan_loading)
-                    )
+            // 2B. Bento Grid Breakdown + Rincian Beban & Kasbon
+            item {
+                val pendapatanSubtitle = when {
+                    summary.totalOmzetPenjualan <= 0.0 && summary.pelunasanKasbonPeriode > 0.0 ->
+                        "${summary.filteredKasbonLogs.size} Pelunasan kasbon lama"
+                    summary.dpCount > 0 ->
+                        "${summary.lunasCount} Lunas • ${summary.dpCount} Sebagian (${(summary.collectionRatio * 100).roundToInt()}%)"
+                    else ->
+                        "${summary.lunasCount} Lunas (${(summary.collectionRatio * 100).roundToInt()}% tertagih)"
                 }
-            } else if (!hasPeriodActivity) {
-                item {
-                    SantoyaEmptyState(
-                        emptyType = SantoyaEmptyType.LAPORAN,
-                        title = stringResource(R.string.laporan_empty_title),
-                        subtitle = stringResource(R.string.laporan_empty_subtitle),
-                        primaryActionLabel = stringResource(R.string.laporan_empty_cta),
-                        primaryActionIcon = Icons.Outlined.Add,
-                        onPrimaryAction = {
-                            viewModel.setTransaksiTab(0)
-                            viewModel.navigateTo(SantoyaScreen.TRANSAKSI)
-                        }
-                    )
-                }
-            } else {
-                // 2A. Hero Card: Laba Bersih & Cashflow Ratio Visualizer (Solid Fresh Hydro Blue Style)
-                item {
-                    val heroContainerColor = if (isProfit) HeroGradientStart else HeroDeficitStart
-                    val heroSubPanelColor = if (isProfit) SantoyaNavyPanel else HeroDeficitPanel
-                    val heroBorderColor = if (isProfit) SantoyaNavyBorder else HeroGlowRoseSoft.copy(alpha = 0.45f)
-                    val heroAccent = if (isProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft
-                    val onHero = MaterialTheme.santoyaColors.onHero
-                    val formattedMargin = FormatUtils.formatPercent(marginLabaPersen)
 
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(SantoyaRadius.xl),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                        colors = CardDefaults.cardColors(containerColor = heroContainerColor),
-                        border = BorderStroke(1.dp, heroBorderColor)
+                val expenseBadgeOverride = when {
+                    summary.totalKasMasuk <= 0.0 && summary.totalBebanKeluar > 0.0 -> ">100%"
+                    summary.totalKasMasuk <= 0.0 -> "0%"
+                    else -> "${summary.expenseRatioActualPercent.roundToInt()}%"
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Max),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column(
+                        LaporanBentoFinancialCard(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .background(heroContainerColor)
-                                .drawBehind {
-                                    // Minimalist organic water droplet & leaf vein line art in top-right corner
-                                    val w = size.width
-                                    val h = size.height
-                                    val curve1 = Path().apply {
-                                        moveTo(w * 0.72f, 0f)
-                                        cubicTo(w * 0.76f, h * 0.28f, w * 0.88f, h * 0.36f, w, h * 0.38f)
-                                    }
-                                    drawPath(
-                                        path = curve1,
-                                        color = onHero.copy(alpha = 0.24f),
-                                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
-                                    )
-                                    val curve2 = Path().apply {
-                                        moveTo(w * 0.82f, 0f)
-                                        quadraticTo(w * 0.86f, h * 0.22f, w, h * 0.26f)
-                                    }
-                                    drawPath(
-                                        path = curve2,
-                                        color = heroAccent.copy(alpha = 0.36f),
-                                        style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
+                                .weight(1.14f)
+                                .fillMaxHeight(),
+                            gradientColors = listOf(profitColor, AccentEmerald),
+                            label = stringResource(R.string.laporan_total_revenue),
+                            amount = FormatUtils.formatRupiah(summary.totalKasMasuk),
+                            subtitle = pendapatanSubtitle,
+                            accentColor = profitColor,
+                            progress = summary.collectionRatio,
+                            comparisonBadge = if (showMonthlyComparison) {
+                                {
+                                    LaporanMonthlyComparisonBadge(
+                                        bulanIni = monthlyComparison.bulanIniKasMasuk,
+                                        bulanLalu = monthlyComparison.bulanLaluKasMasuk,
+                                        upColor = profitColor,
+                                        downColor = lossColor
                                     )
                                 }
-                                .padding(20.dp)
-                        ) {
-                            // Top Header Row: Label (Weighted so it never collides on small screens)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    HydroGradientBadge(
-                                        gradientColors = if (isProfit) {
-                                            listOf(AccentEmerald, AccentCyan)
-                                        } else {
-                                            listOf(AccentRose, AccentAmber)
-                                        },
-                                        size = 40.dp,
-                                        cornerRadius = 13.dp,
-                                        elevation = 3.dp
-                                    ) {
-                                        HydroReportChartIcon(
-                                            tint = onHero,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = if (isProfit) "LABA BERSIH" else "RUGI BERSIH",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = heroAccent,
-                                            letterSpacing = 0.6.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        Text(
-                                            text = "Uang masuk dikurangi biaya & komisi",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = onHero.copy(alpha = 0.82f),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Hero Number: Laba Bersih with Adaptive Font Size so tens/hundreds of millions never clip
-                            SantoyaAdaptiveCurrencyText(
-                                amount = labaBersih,
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = onHero,
-                                minFontSize = 18.sp,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Dedicated Pill Row directly beneath Laba Bersih
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = heroSubPanelColor,
-                                    border = BorderStroke(1.dp, heroAccent.copy(alpha = 0.55f))
-                                ) {
-                                    Text(
-                                        text = "Margin Laba: $formattedMargin",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = heroAccent,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = heroSubPanelColor,
-                                    border = BorderStroke(1.dp, heroBorderColor)
-                                ) {
-                                    Text(
-                                        text = if (isProfit) "Surplus" else "Defisit",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = onHero,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Solid Sub-Panel Multi-Segment Cashflow Bar
-                            val positiveProfit = labaBersih.coerceAtLeast(0.0)
-                            val totalFlowBase = (positiveProfit + totalPengeluaran + totalKomisiKurir).coerceAtLeast(1.0)
-                            val profitShare = (positiveProfit / totalFlowBase).toFloat().coerceIn(0f, 1f)
-                            val opShare = (totalPengeluaran / totalFlowBase).toFloat().coerceIn(0f, 1f)
-                            val komisiShare = (totalKomisiKurir / totalFlowBase).toFloat().coerceIn(0f, 1f)
-
-                            val profitPct = (profitShare * 100).toInt()
-                            val opPct = (opShare * 100).toInt()
-                            val komisiPct = (komisiShare * 100).toInt()
-
-                            Surface(
-                                shape = RoundedCornerShape(SantoyaRadius.lg),
-                                color = heroSubPanelColor,
-                                border = BorderStroke(1.dp, heroBorderColor),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Komposisi Arus Kas",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = onHero.copy(alpha = 0.85f)
-                                        )
-                                        Text(
-                                            text = "${filteredTx.size} Trx • ${filteredExp.size} Biaya",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = heroAccent
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // Multi-segment Pure Compose Progress Bar
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp)
-                                            .clip(CircleShape)
-                                            .background(onHero.copy(alpha = 0.15f))
-                                    ) {
-                                        if (profitShare > 0.01f) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(profitShare.coerceAtLeast(0.03f))
-                                                    .height(8.dp)
-                                                    .background(HeroGlowEmeraldSoft)
-                                            )
-                                        }
-                                        if (opShare > 0.01f) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(opShare.coerceAtLeast(0.03f))
-                                                    .height(8.dp)
-                                                    .background(HeroGlowRoseSoft)
-                                            )
-                                        }
-                                        if (komisiShare > 0.01f) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .weight(komisiShare.coerceAtLeast(0.03f))
-                                                    .height(8.dp)
-                                                    .background(HeroGlowAmberSoft)
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        CashflowLegendDot(
-                                            color = HeroGlowEmeraldSoft,
-                                            label = "Laba ($profitPct%)"
-                                        )
-                                        CashflowLegendDot(
-                                            color = HeroGlowRoseSoft,
-                                            label = "Operasional ($opPct%)"
-                                        )
-                                        CashflowLegendDot(
-                                            color = HeroGlowAmberSoft,
-                                            label = "Komisi ($komisiPct%)"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 2B. Bento Grid Breakdown: Total Pendapatan & Total Pengeluaran + Detail Cards
-                item {
-                    val totalOmzetKotor = pendapatanLunas + piutangKasbonPeriode
-                    val collectionRatio = if (totalOmzetKotor > 0.0) {
-                        (pendapatanLunas / totalOmzetKotor).toFloat().coerceIn(0f, 1f)
-                    } else {
-                        1f
-                    }
-                    val lunasCount = filteredTx.count { it.transaksi.status.equals("Lunas", ignoreCase = true) }
-                    val dpCount = filteredTx.count {
-                        !it.transaksi.status.equals("Lunas", ignoreCase = true) && it.transaksi.uangMuka > 0L
-                    }
-                    val pendapatanSubtitle = if (dpCount > 0) {
-                        "$lunasCount Lunas • $dpCount Sebagian (${(collectionRatio * 100).toInt()}%)"
-                    } else {
-                        "$lunasCount Lunas (${(collectionRatio * 100).toInt()}% tertagih)"
-                    }
-
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        // Top Asymmetric 2-Column Bento Grid: Total Pendapatan (1.14f) vs Total Pengeluaran (1f)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Max),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            BentoFinancialCard(
-                                modifier = Modifier
-                                    .weight(1.14f)
-                                    .fillMaxHeight(),
-                                gradientColors = listOf(profitColor, AccentEmerald),
-                                label = "Total Pendapatan",
-                                amount = FormatUtils.formatRupiah(pendapatanLunas),
-                                subtitle = pendapatanSubtitle,
-                                accentColor = profitColor,
-                                progress = collectionRatio,
-                                comparisonBadge = if (showMonthlyComparison) {
-                                    {
-                                        MonthlyRevenueComparisonBadge(
-                                            bulanIni = effectiveBulanIniRevenue,
-                                            bulanLalu = bulanLaluRev,
-                                            upColor = profitColor,
-                                            downColor = lossColor
-                                        )
-                                    }
-                                } else {
-                                    null
-                                },
-                                iconContent = {
-                                    HydroDropletSparkIcon(
-                                        tint = MaterialTheme.santoyaColors.onHero,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                            )
-
-                            val expenseRatio = if (pendapatanLunas > 0) {
-                                (totalBebanKeluar / pendapatanLunas).toFloat().coerceIn(0f, 1f)
                             } else {
-                                1f
+                                null
+                            },
+                            iconContent = {
+                                HydroDropletSparkIcon(
+                                    tint = santoyaColors.onHero,
+                                    modifier = Modifier.size(19.dp)
+                                )
                             }
-                            BentoFinancialCard(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
+                        )
+
+                        LaporanBentoFinancialCard(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                            gradientColors = listOf(lossColor, AccentRose),
+                            label = stringResource(R.string.laporan_total_expense),
+                            amount = FormatUtils.formatRupiah(summary.totalBebanKeluar),
+                            subtitle = stringResource(R.string.laporan_expense_ratio_desc),
+                            accentColor = lossColor,
+                            progress = summary.expenseRatioFraction,
+                            badgePercentOverride = expenseBadgeOverride,
+                            iconContent = {
+                                HydroExpenseFlowIcon(
+                                    tint = santoyaColors.onHero,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
+                        )
+                    }
+
+                    HydroBentoCard(
+                        accentColor = MaterialTheme.colorScheme.primary,
+                        cornerRadius = SantoyaRadius.lg,
+                        tintAlpha = 0.05f,
+                        showWaterRipple = false,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            LaporanFinancialBreakdownRow(
                                 gradientColors = listOf(lossColor, AccentRose),
-                                label = "Total Pengeluaran",
-                                amount = FormatUtils.formatRupiah(totalBebanKeluar),
-                                subtitle = "Porsi beban dari pendapatan",
+                                title = stringResource(R.string.laporan_operational_cost),
+                                subtitle = "${summary.filteredExp.size} catatan pengeluaran",
+                                nominalText = "- ${FormatUtils.formatRupiah(summary.totalPengeluaran)}",
                                 accentColor = lossColor,
-                                progress = expenseRatio,
                                 iconContent = {
                                     HydroExpenseFlowIcon(
-                                        tint = MaterialTheme.santoyaColors.onHero,
+                                        tint = santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
                             )
-                        }
 
-                        // Secondary Breakdown Card: Biaya Operasional Kas & Komisi Kurir (+ Piutang Kasbon if any)
-                        HydroBentoCard(
-                            accentColor = MaterialTheme.colorScheme.primary,
-                            cornerRadius = SantoyaRadius.lg,
-                            tintAlpha = 0.05f,
-                            showWaterRipple = false,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                FinancialBreakdownRow(
-                                    gradientColors = listOf(lossColor, AccentRose),
-                                    title = "Biaya Operasional",
-                                    subtitle = "${filteredExp.size} catatan pengeluaran",
-                                    nominalText = "- ${FormatUtils.formatRupiah(totalPengeluaran)}",
-                                    accentColor = lossColor,
-                                    iconContent = {
-                                        HydroExpenseFlowIcon(
-                                            tint = MaterialTheme.santoyaColors.onHero,
-                                            modifier = Modifier.size(19.dp)
-                                        )
-                                    }
-                                )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                            )
 
+                            LaporanFinancialBreakdownRow(
+                                gradientColors = listOf(santoyaColors.warning, AccentAmber),
+                                title = stringResource(R.string.laporan_courier_commission),
+                                subtitle = stringResource(R.string.laporan_courier_commission_desc),
+                                nominalText = "- ${FormatUtils.formatRupiah(summary.totalKomisiKurir)}",
+                                accentColor = santoyaColors.warning,
+                                iconContent = {
+                                    HydroCourierWaveIcon(
+                                        tint = santoyaColors.onHero,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                            )
+
+                            if (summary.piutangKasbonPeriode > 0.0) {
                                 HorizontalDivider(
                                     modifier = Modifier.padding(vertical = 10.dp),
                                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
                                 )
 
-                                FinancialBreakdownRow(
-                                    gradientColors = listOf(santoyaColors.warning, AccentAmber),
-                                    title = "Komisi Kurir",
-                                    subtitle = "Total komisi kurir periode ini",
-                                    nominalText = "- ${FormatUtils.formatRupiah(totalKomisiKurir)}",
+                                LaporanFinancialBreakdownRow(
+                                    gradientColors = listOf(santoyaColors.warning, AccentRose),
+                                    title = stringResource(R.string.laporan_receivables),
+                                    subtitle = stringResource(R.string.laporan_receivables_desc),
+                                    nominalText = FormatUtils.formatRupiah(summary.piutangKasbonPeriode),
                                     accentColor = santoyaColors.warning,
                                     iconContent = {
-                                        HydroCourierWaveIcon(
-                                            tint = MaterialTheme.santoyaColors.onHero,
+                                        HydroReceiptNoteIcon(
+                                            tint = santoyaColors.onHero,
                                             modifier = Modifier.size(19.dp)
                                         )
                                     }
                                 )
+                            }
 
-                                if (piutangKasbonPeriode > 0) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(vertical = 10.dp),
-                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                                    )
+                            if (summary.pelunasanKasbonPeriode > 0.0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 10.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
+                                )
 
-                                    FinancialBreakdownRow(
-                                        gradientColors = listOf(santoyaColors.warning, AccentRose),
-                                        title = "Piutang Kasbon",
-                                        subtitle = "Masuk ke laba setelah dilunasi",
-                                        nominalText = FormatUtils.formatRupiah(piutangKasbonPeriode),
-                                        accentColor = santoyaColors.warning,
-                                        iconContent = {
-                                            HydroReceiptNoteIcon(
-                                                tint = MaterialTheme.santoyaColors.onHero,
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-                                    )
-                                }
-
-                                if (pelunasanKasbonPeriode > 0) {
-                                    HorizontalDivider(
-                                        modifier = Modifier.padding(vertical = 10.dp),
-                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
-                                    )
-
-                                    FinancialBreakdownRow(
-                                        gradientColors = listOf(profitColor, AccentEmerald),
-                                        title = "Pelunasan Kasbon",
-                                        subtitle = "Kas masuk dari pembayaran kasbon periode ini",
-                                        nominalText = FormatUtils.formatRupiah(pelunasanKasbonPeriode),
-                                        accentColor = profitColor,
-                                        iconContent = {
-                                            HydroReceiptNoteIcon(
-                                                tint = MaterialTheme.santoyaColors.onHero,
-                                                modifier = Modifier.size(19.dp)
-                                            )
-                                        }
-                                    )
-                                }
+                                LaporanFinancialBreakdownRow(
+                                    gradientColors = listOf(profitColor, AccentEmerald),
+                                    title = stringResource(R.string.laporan_receivable_payments),
+                                    subtitle = stringResource(R.string.laporan_receivable_payments_desc),
+                                    nominalText = FormatUtils.formatRupiah(summary.pelunasanKasbonPeriode),
+                                    accentColor = profitColor,
+                                    iconContent = {
+                                        HydroReceiptNoteIcon(
+                                            tint = santoyaColors.onHero,
+                                            modifier = Modifier.size(19.dp)
+                                        )
+                                    }
+                                )
                             }
                         }
                     }
                 }
             }
 
-            // 3. Estimasi Proyeksi Run-Rate Bulan Ini (Hanya ditampilkan saat mode Bulanan & ada aktivitas)
-            if (showMonthlyComparison && hasPeriodActivity) {
+            // 2C. Grafik Tren Arus Kas Harian/Bulanan Interaktif
+            if (summary.trendPoints.size >= 2) {
+                item {
+                    LaporanTrendChartCard(
+                        trendPoints = summary.trendPoints,
+                        isMonthly = summary.isMonthlyTrendGranularity,
+                        profitColor = profitColor,
+                        lossColor = lossColor
+                    )
+                }
+            }
+
+            // 2D. Kesehatan Umur Piutang Kasbon Aktif
             item {
-                val monthProgress = (currentDay.toFloat() / daysInMonth.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
-                val projectedColor = if (projectedProfit >= 0) profitColor else lossColor
+                LaporanAgingCard(
+                    agingSummary = kasbonAgingSummary,
+                    onOpenKasbonCustomers = {
+                        viewModel.setPelangganTab(1)
+                        viewModel.navigateTo(SantoyaScreen.PELANGGAN)
+                    }
+                )
+            }
+        }
+
+        // 3. Proyeksi Akhir Bulan (Mode Bulanan)
+        if (showMonthlyComparison && summary.hasPeriodActivity) {
+            item {
+                val monthProgress = (currentDay.toFloat() / daysInMonth.toFloat()).coerceIn(0f, 1f)
+                val projectedColor = if (monthlyProjection.projectedProfit >= 0.0) profitColor else lossColor
                 HydroBentoCard(
                     accentColor = MaterialTheme.colorScheme.primary,
                     cornerRadius = SantoyaRadius.xl,
@@ -1073,21 +1093,21 @@ fun LaporanScreen(
                                     elevation = 3.dp
                                 ) {
                                     HydroReportChartIcon(
-                                        tint = MaterialTheme.santoyaColors.onHero,
+                                        tint = santoyaColors.onHero,
                                         modifier = Modifier.size(19.dp)
                                     )
                                 }
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Proyeksi Akhir Bulan",
+                                        text = stringResource(R.string.laporan_projection_title),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.SemiBold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = "Hari ke-$currentDay dari $daysInMonth hari",
+                                        text = stringResource(R.string.laporan_projection_day, currentDay, daysInMonth),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1
@@ -1100,7 +1120,7 @@ fun LaporanScreen(
                                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f)
                             ) {
                                 Text(
-                                    text = "${(monthProgress * 100).toInt()}% Bulan",
+                                    text = stringResource(R.string.laporan_projection_percent_month, (monthProgress * 100).toInt()),
                                     style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -1142,20 +1162,20 @@ fun LaporanScreen(
                                             modifier = Modifier.size(13.dp)
                                         )
                                         Text(
-                                            text = "Proyeksi Volume",
+                                            text = stringResource(R.string.laporan_projection_volume),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                     Spacer(modifier = Modifier.height(3.dp))
                                     Text(
-                                        text = "$projectedGalon Galon",
+                                        text = "${FormatUtils.formatNumber(monthlyProjection.projectedGalon)} ${stringResource(R.string.unit_galon)}",
                                         style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "Aktual: $monthGalon Galon",
+                                        text = stringResource(R.string.laporan_projection_actual_galon, monthlyProjection.monthGalon),
                                         style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -1169,13 +1189,13 @@ fun LaporanScreen(
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Text(
-                                        text = "Proyeksi Laba",
+                                        text = stringResource(R.string.laporan_projection_profit),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                     Spacer(modifier = Modifier.height(3.dp))
                                     SantoyaAdaptiveCurrencyText(
-                                        amount = projectedProfit,
+                                        amount = monthlyProjection.projectedProfit,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = projectedColor,
@@ -1183,8 +1203,11 @@ fun LaporanScreen(
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                     SantoyaAdaptiveCurrencyText(
-                                        amount = monthNetProfit,
-                                        customText = "Aktual: ${FormatUtils.formatRupiah(monthNetProfit)}",
+                                        amount = monthlyProjection.monthNetProfit,
+                                        customText = stringResource(
+                                            R.string.laporan_projection_actual_profit,
+                                            FormatUtils.formatRupiah(monthlyProjection.monthNetProfit)
+                                        ),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         minFontSize = 10.sp,
@@ -1196,10 +1219,10 @@ fun LaporanScreen(
                     }
                 }
             }
-            }
+        }
 
-            // 4. Peringkat Penjualan Terbanyak (Desa & Kurir) — 5 Teratas Expand/Collapse
-            if (hasPeriodActivity) {
+        // 4. Peringkat Penjualan (Desa & Kurir)
+        if (summary.hasPeriodActivity) {
             item {
                 HydroBentoCard(
                     accentColor = santoyaColors.rankGold,
@@ -1222,21 +1245,21 @@ fun LaporanScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.EmojiEvents,
                                     contentDescription = null,
-                                    tint = MaterialTheme.santoyaColors.onHero,
+                                    tint = santoyaColors.onHero,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Peringkat Penjualan",
+                                    text = stringResource(R.string.laporan_ranking_title),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Penjualan galon per desa & kurir",
+                                    text = stringResource(R.string.laporan_ranking_subtitle),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
@@ -1244,9 +1267,10 @@ fun LaporanScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(10.dp))
-                        val activeEntries = if (rankingTabIndex == 0) rankedDesaEntries else rankedKurirEntries
-                        val activityUnit = if (rankingTabIndex == 0) "Transaksi" else "Kirim"
-                        val unitCategoryLabel = if (rankingTabIndex == 0) "Desa" else "Kurir"
+                        val isKurirTab = rankingTabIndex == 1
+                        val activeEntries = if (!isKurirTab) rankedDesaEntries else rankedKurirEntries
+                        val activityUnit = if (!isKurirTab) "Transaksi" else "Kirim"
+                        val unitCategoryLabel = if (!isKurirTab) "Wilayah" else "Kurir"
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1258,7 +1282,7 @@ fun LaporanScreen(
                                     rankingTabIndex = 0
                                     showAllRanking = false
                                 },
-                                label = { Text("Desa (${rankedDesaEntries.size})", maxLines = 1) },
+                                label = { Text(stringResource(R.string.laporan_ranking_tab_wilayah, rankedDesaEntries.size), maxLines = 1) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Outlined.LocationOn,
@@ -1268,7 +1292,8 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = SantoyaSize.touchTarget),
+                                    .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("chip_ranking_wilayah"),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1281,7 +1306,7 @@ fun LaporanScreen(
                                     rankingTabIndex = 1
                                     showAllRanking = false
                                 },
-                                label = { Text("Kurir (${rankedKurirEntries.size})", maxLines = 1) },
+                                label = { Text(stringResource(R.string.laporan_ranking_tab_kurir, rankedKurirEntries.size), maxLines = 1) },
                                 leadingIcon = {
                                     HydroCourierWaveIcon(
                                         tint = if (rankingTabIndex == 1) {
@@ -1294,7 +1319,8 @@ fun LaporanScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .heightIn(min = SantoyaSize.touchTarget),
+                                    .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("chip_ranking_kurir"),
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primary,
                                     selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
@@ -1307,24 +1333,26 @@ fun LaporanScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Urutkan:",
+                                    text = stringResource(R.string.laporan_sort_label),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     fontWeight = FontWeight.Medium
                                 )
                                 Row(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.weight(1f),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     val isGalonSort = rankingSortMode == RankingSortMode.GALON
                                     SantoyaFilterPill(
-                                        label = "Galon",
+                                        label = stringResource(R.string.laporan_sort_galon),
                                         selected = isGalonSort,
                                         onClick = { rankingSortMode = RankingSortMode.GALON },
+                                        centerContent = true,
                                         leadingIconContent = {
                                             HydroGalonIcon(
                                                 tint = if (isGalonSort) {
@@ -1335,13 +1363,16 @@ fun LaporanScreen(
                                                 modifier = Modifier.size(14.dp)
                                             )
                                         },
-                                        modifier = Modifier.testTag("chip_sort_ranking_galon")
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("chip_sort_ranking_galon")
                                     )
                                     val isOmzetSort = rankingSortMode == RankingSortMode.OMZET
                                     SantoyaFilterPill(
-                                        label = "Omzet",
+                                        label = stringResource(R.string.laporan_sort_omzet),
                                         selected = isOmzetSort,
                                         onClick = { rankingSortMode = RankingSortMode.OMZET },
+                                        centerContent = true,
                                         leadingIconContent = {
                                             HydroReportChartIcon(
                                                 tint = if (isOmzetSort) {
@@ -1352,7 +1383,9 @@ fun LaporanScreen(
                                                 modifier = Modifier.size(14.dp)
                                             )
                                         },
-                                        modifier = Modifier.testTag("chip_sort_ranking_omzet")
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .testTag("chip_sort_ranking_omzet")
                                     )
                                 }
                             }
@@ -1367,7 +1400,7 @@ fun LaporanScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Belum ada transaksi di periode ini",
+                                    text = stringResource(R.string.laporan_empty_tx_period),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -1379,11 +1412,12 @@ fun LaporanScreen(
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 displayedEntries.forEachIndexed { index, entry ->
-                                    SalesRankingItemCard(
+                                    LaporanSalesRankingItemCard(
                                         rank = index + 1,
                                         entry = entry,
                                         activityUnit = activityUnit,
-                                        sortMode = rankingSortMode
+                                        sortMode = rankingSortMode,
+                                        showCommission = isKurirTab
                                     )
                                 }
                                 if (showAllRanking && activeEntries.size > 5) {
@@ -1437,9 +1471,9 @@ fun LaporanScreen(
                                     ) {
                                         Text(
                                             text = if (showAllRanking) {
-                                                "Tampilkan 5 Teratas"
+                                                stringResource(R.string.laporan_show_top_5)
                                             } else {
-                                                "Lihat Semua (${activeEntries.size})"
+                                                stringResource(R.string.laporan_show_all_count, activeEntries.size)
                                             },
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.SemiBold
@@ -1451,275 +1485,254 @@ fun LaporanScreen(
                     }
                 }
             }
+        }
 
-            // 5. Strategic Export Panel (PDF & CSV + Mode Ringkasan) — Placed ABOVE transaction list so it's always reachable
-            item {
-                HydroBentoCard(
-                    accentColor = MaterialTheme.colorScheme.secondary,
-                    cornerRadius = SantoyaRadius.xl,
-                    tintAlpha = 0.06f,
-                    showWaterRipple = false,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        // 5. Panel Ekspor Laporan PDF & CSV
+        item {
+            HydroBentoCard(
+                accentColor = MaterialTheme.colorScheme.secondary,
+                cornerRadius = SantoyaRadius.xl,
+                tintAlpha = 0.06f,
+                showWaterRipple = false,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        HydroGradientBadge(
+                            gradientColors = listOf(MaterialTheme.colorScheme.secondary, AccentCyan),
+                            size = 34.dp,
+                            cornerRadius = 11.dp,
+                            elevation = 2.dp
                         ) {
-                            HydroGradientBadge(
-                                gradientColors = listOf(MaterialTheme.colorScheme.secondary, AccentCyan),
-                                size = 34.dp,
-                                cornerRadius = 11.dp,
-                                elevation = 2.dp
-                            ) {
-                                HydroReceiptNoteIcon(
-                                    tint = MaterialTheme.santoyaColors.onHero,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
+                            HydroReceiptNoteIcon(
+                                tint = santoyaColors.onHero,
+                                modifier = Modifier.size(17.dp)
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.laporan_export_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Ekspor Laporan",
-                                style = MaterialTheme.typography.titleSmall,
+                                text = stringResource(R.string.laporan_export_summary_title),
+                                style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                            Text(
+                                text = stringResource(R.string.laporan_export_summary_subtitle),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                        Switch(
+                            checked = isSummaryMode,
+                            onCheckedChange = { isSummaryMode = it },
+                            modifier = Modifier.testTag("switch_pdf_summary_mode")
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (!isKaryawan && depotProfile.isOwnerRole() && !depotProfile.hasConfiguredDepotName()) {
+                                    showQuickFillForPdf = true
+                                } else {
+                                    launchPdfExport(depotProfile)
+                                }
+                            },
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_export_pdf")
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Ringkasan Harian (PDF)",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    text = "Gabungkan total per hari di PDF",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = isSummaryMode,
-                                onCheckedChange = { isSummaryMode = it }
+                            Icon(
+                                imageVector = Icons.Outlined.PictureAsPdf,
+                                contentDescription = stringResource(R.string.laporan_export_pdf),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.laporan_export_pdf),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 12.dp),
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        OutlinedButton(
+                            onClick = {
+                                val csvContent = ExportHelper.generateCsv(
+                                    transaksiList = effectiveTransaksiList,
+                                    pengeluaranList = effectivePengeluaranList,
+                                    kasbonLogList = allKasbonLogs,
+                                    pelangganList = allPelanggan,
+                                    startTime = startTime,
+                                    endTime = endTime,
+                                    periodeLabel = periodRangeLabel,
+                                    kasbonAgingSummary = kasbonAgingSummary,
+                                    rankedDesaEntries = rankedDesaEntries
+                                )
+                                val csvFileName = ExportHelper.buildExportFileName(
+                                    prefix = "Laporan_Santoya",
+                                    periodeLabel = periodRangeLabel,
+                                    extension = "csv"
+                                )
+                                ExportHelper.shareExportFile(
+                                    context = context,
+                                    filename = csvFileName,
+                                    content = csvContent,
+                                    mimeType = "text/csv"
+                                )
+                            },
+                            shape = RoundedCornerShape(SantoyaRadius.sm),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = SantoyaSize.touchTarget)
+                                .testTag("btn_export_csv")
                         ) {
-                            OutlinedButton(
-                                onClick = {
-                                    val html = buildString {
-                                        val totalGalon = filteredTx.sumOf { it.transaksi.jumlah }
-                                        val totalLunas = pendapatanLunas
-                                        val totalKasbon = piutangKasbonPeriode
-                                        val totalKomisi = totalKomisiKurir
-                                        val netProfit = labaBersih
-                                        val marginFormatted = FormatUtils.formatPercent(marginLabaPersen)
-
-                                        append("<html><head><style>")
-                                        append("body { font-family: Arial, sans-serif; padding: 20px; color: #333; }")
-                                        append("h1 { color: #0284C7; font-size: 20px; margin-bottom: 2px; }")
-                                        append(".subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }")
-                                        append(".card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; margin-bottom: 15px; }")
-                                        append("table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 12px; }")
-                                        append("th, td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; }")
-                                        append("th { background: #f1f5f9; }")
-                                        append(".right { text-align: right; }")
-                                        append("</style></head><body>")
-                                        append("<h1>Laporan Keuangan Santoya RO</h1>")
-                                        append("<div class='subtitle'>Periode: ${if (!isCustomDateRange && startTime == 0L) "Semua Riwayat" else "${FormatUtils.formatDateUi(startTime)} s/d ${FormatUtils.formatDateUi(endTime)}"}</div>")
-
-                                        append("<div class='card'>")
-                                        append("<b>Ringkasan Finansial:</b><br/>")
-                                        append("• Total Galon Terjual: $totalGalon Galon<br/>")
-                                        append("• Pendapatan Lunas: ${FormatUtils.formatRupiah(totalLunas)}<br/>")
-                                        append("• Piutang Kasbon: ${FormatUtils.formatRupiah(totalKasbon)}<br/>")
-                                        append("• Komisi Kurir: ${FormatUtils.formatRupiah(totalKomisi)}<br/>")
-                                        append("• Total Pengeluaran Operasional: ${FormatUtils.formatRupiah(totalPengeluaran)}<br/>")
-                                        append("<b>• Laba Bersih: ${FormatUtils.formatRupiah(netProfit)} (Margin: $marginFormatted)</b>")
-                                        append("</div>")
-
-                                        if (isSummaryMode) {
-                                            val groupedByDate = filteredTx
-                                                .groupBy { FormatUtils.formatDateShort(it.transaksi.tanggal) }
-                                                .map { (tgl, list) ->
-                                                    val galonSum = list.sumOf { it.transaksi.jumlah }
-                                                    val lunasSum = list.sumOf {
-                                                        if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
-                                                            it.transaksi.total_harga
-                                                        } else {
-                                                            it.transaksi.uangMuka.toDouble()
-                                                        }
-                                                    }
-                                                    val kasbonSum = list
-                                                        .filter { it.transaksi.status.equals("Kasbon", ignoreCase = true) }
-                                                        .sumOf { it.transaksi.remainingKasbonAmount() }
-                                                    arrayOf(tgl, galonSum.toString(), FormatUtils.formatRupiah(lunasSum), FormatUtils.formatRupiah(kasbonSum))
-                                                }
-                                            append("<h3>Ringkasan Penjualan Harian (${groupedByDate.size} Hari)</h3>")
-                                            append("<table><thead><tr><th>Tanggal</th><th>Galon</th><th class='right'>Pendapatan Lunas</th><th class='right'>Kasbon</th></tr></thead><tbody>")
-                                            groupedByDate.forEach { row ->
-                                                append("<tr>")
-                                                append("<td>${row[0]}</td>")
-                                                append("<td>${row[1]} Galon</td>")
-                                                append("<td class='right'>${row[2]}</td>")
-                                                append("<td class='right'>${row[3]}</td>")
-                                                append("</tr>")
-                                            }
-                                            append("</tbody></table>")
-                                        } else {
-                                            val limitedTx = filteredTx.take(100)
-                                            append("<h3>Daftar Transaksi (${filteredTx.size})</h3>")
-                                            append("<table><thead><tr><th>No</th><th>Tanggal</th><th>Pelanggan</th><th>Jumlah</th><th class='right'>Total</th><th>Status</th></tr></thead><tbody>")
-                                            limitedTx.forEachIndexed { idx, item ->
-                                                val trx = item.transaksi
-                                                val statusDetail = if (trx.status.equals("Kasbon", ignoreCase = true) && trx.uangMuka > 0L) {
-                                                    "Kasbon (Uang Muka: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())})"
-                                                } else {
-                                                    trx.status
-                                                }
-                                                append("<tr>")
-                                                append("<td>${idx + 1}</td>")
-                                                append("<td>${FormatUtils.formatDateShort(trx.tanggal)}</td>")
-                                                append("<td>${item.pelanggan?.nama ?: "-"}</td>")
-                                                append("<td>${trx.jumlah}</td>")
-                                                append("<td class='right'>${FormatUtils.formatRupiah(trx.total_harga)}</td>")
-                                                append("<td>$statusDetail</td>")
-                                                append("</tr>")
-                                            }
-                                            append("</tbody></table>")
-                                            if (filteredTx.size > 100) {
-                                                append("<p style='text-align:center; font-style:italic;'>*Menampilkan 100 transaksi terbaru. Ekspor CSV untuk data lengkap.</p>")
-                                            }
-                                        }
-
-                                        append("</body></html>")
-                                    }
-                                    PdfExporter.printHtmlAsPdf(context, html, "Laporan_Keuangan_Santoya")
-                                },
-                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = SantoyaSize.touchTarget)
-                                    .testTag("btn_export_pdf")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.PictureAsPdf,
-                                    contentDescription = stringResource(R.string.laporan_export_pdf),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.laporan_export_pdf),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    val csvContent = ExportHelper.generateCsv(filteredTx, filteredExp)
-                                    ExportHelper.shareExportFile(
-                                        context = context,
-                                        filename = "Laporan_Santoya_${System.currentTimeMillis()}.csv",
-                                        content = csvContent,
-                                        mimeType = "text/csv"
-                                    )
-                                },
-                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = SantoyaSize.touchTarget)
-                                    .testTag("btn_export_csv")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.TableView,
-                                    contentDescription = stringResource(R.string.laporan_export_csv),
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.laporan_export_csv),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Outlined.TableView,
+                                contentDescription = stringResource(R.string.laporan_export_csv),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.laporan_export_csv),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
             }
+        }
 
-            // 6. Rincian Transaksi & Pengeluaran (Sorted Terbaru + Paginated 15 Default with Expand/Collapse)
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    shape = RoundedCornerShape(SantoyaRadius.lg),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        // 6. Rincian Transaksi, Pelunasan Kasbon, & Pengeluaran (3 Tab)
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(SantoyaRadius.lg),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                TabRow(
+                    selectedTabIndex = detailTabIndex,
+                    containerColor = MaterialTheme.colorScheme.surface
                 ) {
-                    TabRow(
-                        selectedTabIndex = detailTabIndex,
-                        containerColor = MaterialTheme.colorScheme.surface
-                    ) {
-                        Tab(
-                            selected = detailTabIndex == 0,
-                            onClick = {
-                                detailTabIndex = 0
-                                showAllDetails = false
-                            },
-                            text = {
-                                Text(
-                                    text = "Transaksi (${filteredTx.size})",
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                            }
-                        )
-                        Tab(
-                            selected = detailTabIndex == 1,
-                            onClick = {
-                                detailTabIndex = 1
-                                showAllDetails = false
-                            },
-                            text = {
-                                Text(
-                                    text = "Pengeluaran (${filteredExp.size})",
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1
-                                )
-                            }
-                        )
-                    }
+                    Tab(
+                        selected = detailTabIndex == 0,
+                        onClick = {
+                            detailTabIndex = 0
+                            showAllDetails = false
+                        },
+                        modifier = Modifier.testTag("tab_laporan_transaksi"),
+                        text = {
+                            Text(
+                                text = stringResource(R.string.laporan_tab_transaksi, summary.filteredTx.size),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = detailTabIndex == 1,
+                        onClick = {
+                            detailTabIndex = 1
+                            showAllDetails = false
+                        },
+                        modifier = Modifier.testTag("tab_laporan_pelunasan"),
+                        text = {
+                            Text(
+                                text = stringResource(R.string.laporan_tab_pelunasan, summary.filteredKasbonLogs.size),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    )
+                    Tab(
+                        selected = detailTabIndex == 2,
+                        onClick = {
+                            detailTabIndex = 2
+                            showAllDetails = false
+                        },
+                        modifier = Modifier.testTag("tab_laporan_pengeluaran"),
+                        text = {
+                            Text(
+                                text = stringResource(R.string.laporan_tab_pengeluaran, summary.filteredExp.size),
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    )
                 }
             }
+        }
 
-            if (detailTabIndex == 0) {
-                if (filteredTx.isEmpty()) {
+        when (detailTabIndex) {
+            0 -> {
+                item {
+                    SantoyaSearchBar(
+                        query = txSearchQuery,
+                        onQueryChange = { txSearchQuery = it },
+                        placeholder = stringResource(R.string.laporan_search_tx_placeholder),
+                        testTag = "input_search_laporan_tx",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                val searchedTx = if (txSearchQuery.isBlank()) {
+                    summary.filteredTx
+                } else {
+                    val q = txSearchQuery.trim().lowercase()
+                    summary.filteredTx.filter { item ->
+                        val cName = item.pelanggan?.nama?.lowercase() ?: "umum"
+                        val kName = item.kurir?.nama?.lowercase().orEmpty()
+                        val pName = item.produk?.nama_produk?.lowercase().orEmpty()
+                        val metode = item.transaksi.metode_bayar.lowercase()
+                        val statusStr = item.transaksi.status.lowercase()
+                        cName.contains(q) || kName.contains(q) || pName.contains(q) || metode.contains(q) || statusStr.contains(q)
+                    }
+                }
+
+                if (searchedTx.isEmpty()) {
                     item {
-                        EmptyPeriodListCard(
+                        LaporanEmptyPeriodListCard(
                             icon = Icons.Outlined.AccountBalanceWallet,
-                            message = "Belum ada transaksi di periode ini"
+                            message = stringResource(R.string.laporan_empty_tx_period)
                         )
                     }
                 } else {
-                    val displayedTx = if (showAllDetails) filteredTx else filteredTx.take(15)
+                    val displayedTx = if (showAllDetails) searchedTx else searchedTx.take(15)
                     items(displayedTx, key = { it.transaksi.id }) { item ->
                         val trx = item.transaksi
                         val isLunas = trx.status.equals("Lunas", ignoreCase = true)
@@ -1735,11 +1748,28 @@ fun LaporanScreen(
                         } else {
                             listOf(santoyaColors.warning, AccentAmber)
                         }
+                        val customerName = item.pelanggan?.nama?.trim()?.ifBlank { "Umum" } ?: "Umum"
+
                         HydroBentoCard(
                             accentColor = itemAccent,
                             cornerRadius = SantoyaRadius.lg,
                             tintAlpha = 0.06f,
                             showWaterRipple = false,
+                            onClick = {
+                                val cKasbon = item.pelanggan?.sisa_kasbon ?: trx.remainingKasbonAmount()
+                                val receiptText = SantoyaReceiptHelper.generateSaleReceipt(item, cKasbon, depotProfile)
+                                viewModel.showReceiptDialog(
+                                    ActiveReceiptDialog(
+                                        title = "Struk Transaksi Penjualan",
+                                        receiptText = receiptText,
+                                        customerPhone = item.pelanggan?.no_hp,
+                                        data = item,
+                                        receiptBuilder = { profile ->
+                                            SantoyaReceiptHelper.generateSaleReceipt(item, cKasbon, profile)
+                                        }
+                                    )
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -1760,14 +1790,14 @@ fun LaporanScreen(
                                         elevation = 2.dp
                                     ) {
                                         HydroGalonIcon(
-                                            tint = MaterialTheme.santoyaColors.onHero,
+                                            tint = santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "${item.pelanggan?.nama ?: "Umum"} • ${trx.jumlah} Galon",
+                                            text = "$customerName • ${trx.jumlah} ${stringResource(R.string.unit_galon)}",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             maxLines = 1,
@@ -1782,7 +1812,7 @@ fun LaporanScreen(
                                         )
                                         if (isBayarSebagian) {
                                             Text(
-                                                text = "Uang Muka: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
+                                                text = "Terbayar: ${FormatUtils.formatRupiah(trx.uangMuka.toDouble())} • Sisa: ${FormatUtils.formatRupiah(trx.remainingKasbonAmount())}",
                                                 style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
                                                 fontWeight = FontWeight.Medium,
                                                 color = santoyaColors.warning,
@@ -1817,7 +1847,7 @@ fun LaporanScreen(
                         }
                     }
 
-                    if (filteredTx.size > 15) {
+                    if (searchedTx.size > 15) {
                         item {
                             OutlinedButton(
                                 onClick = { showAllDetails = !showAllDetails },
@@ -1825,12 +1855,13 @@ fun LaporanScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("btn_toggle_all_tx_details")
                             ) {
                                 Text(
                                     text = if (showAllDetails) {
-                                        "Tampilkan 15 Terbaru"
+                                        stringResource(R.string.laporan_show_latest_15)
                                     } else {
-                                        "Lihat Semua (${filteredTx.size})"
+                                        stringResource(R.string.laporan_show_all_count, searchedTx.size)
                                     },
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold
@@ -1839,16 +1870,60 @@ fun LaporanScreen(
                         }
                     }
                 }
-            } else {
-                if (filteredExp.isEmpty()) {
+            }
+
+            1 -> {
+                if (summary.filteredKasbonLogs.isEmpty()) {
                     item {
-                        EmptyPeriodListCard(
-                            icon = Icons.Outlined.ShoppingCart,
-                            message = "Belum ada pengeluaran di periode ini"
+                        LaporanEmptyPeriodListCard(
+                            icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                            message = stringResource(R.string.laporan_empty_pelunasan_period)
                         )
                     }
                 } else {
-                    val displayedExp = if (showAllDetails) filteredExp else filteredExp.take(15)
+                    val displayedLogs = if (showAllDetails) summary.filteredKasbonLogs else summary.filteredKasbonLogs.take(15)
+                    items(displayedLogs, key = { "log_${it.log.id}_${it.log.syncId}" }) { logDetail ->
+                        LaporanKasbonLogItemCard(
+                            item = logDetail,
+                            profitColor = profitColor
+                        )
+                    }
+
+                    if (summary.filteredKasbonLogs.size > 15) {
+                        item {
+                            OutlinedButton(
+                                onClick = { showAllDetails = !showAllDetails },
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("btn_toggle_all_pelunasan_details")
+                            ) {
+                                Text(
+                                    text = if (showAllDetails) {
+                                        stringResource(R.string.laporan_show_latest_15)
+                                    } else {
+                                        stringResource(R.string.laporan_show_all_count, summary.filteredKasbonLogs.size)
+                                    },
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            else -> {
+                if (summary.filteredExp.isEmpty()) {
+                    item {
+                        LaporanEmptyPeriodListCard(
+                            icon = Icons.Outlined.ShoppingCart,
+                            message = stringResource(R.string.laporan_empty_expense_period)
+                        )
+                    }
+                } else {
+                    val displayedExp = if (showAllDetails) summary.filteredExp else summary.filteredExp.take(15)
                     items(displayedExp, key = { it.id }) { pengeluaran ->
                         val catColor = resolvePengeluaranCategoryColor(
                             kategori = pengeluaran.kategori,
@@ -1881,7 +1956,7 @@ fun LaporanScreen(
                                         PengeluaranCategoryIcon(
                                             kategori = pengeluaran.kategori,
                                             namaItem = pengeluaran.nama_item,
-                                            tint = MaterialTheme.santoyaColors.onHero,
+                                            tint = santoyaColors.onHero,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -1918,508 +1993,47 @@ fun LaporanScreen(
                         }
                     }
 
-                    if (filteredExp.size > 15) {
+                    if (summary.filteredExp.size > 15) {
                         item {
                             OutlinedButton(
                                 onClick = { showAllDetails = !showAllDetails },
-                                shape = RoundedCornerShape(12.dp),
+                                shape = RoundedCornerShape(SantoyaRadius.md),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .heightIn(min = SantoyaSize.touchTarget)
+                                    .testTag("btn_toggle_all_exp_details")
                             ) {
                                 Text(
                                     text = if (showAllDetails) {
-                                        "Tampilkan 15 Terbaru"
+                                        stringResource(R.string.laporan_show_latest_15)
                                     } else {
-                                        "Lihat Semua (${filteredExp.size})"
+                                        stringResource(R.string.laporan_show_all_count, summary.filteredExp.size)
                                     },
                                     style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
                 }
             }
-            }
+        }
     }
-}
 
-private data class QuadrupleMonthStats(
-    val monthGalon: Int,
-    val projectedGalon: Int,
-    val monthNetProfit: Double,
-    val projectedProfit: Double
-)
-
-private fun extractNormalizedDesaName(rawAlamat: String?): String {
-    if (rawAlamat.isNullOrBlank()) return "Umum / Santoya"
-    val cleaned = rawAlamat.trim()
-        .replace(Regex("(?i)^(jl\\.?\\s*raya|jalan\\s*raya|jl\\.?|jalan|desa|kp\\.?|kampung|kel\\.?|kelurahan)\\s+"), "")
-        .replace(Regex("(?i)\\s+(no\\.?|nomor|blok|rt|rw|#)\\s*[0-9a-zA-Z/.-]+.*$"), "")
-        .replace(Regex("\\s+#?[0-9]+$"), "")
-        .trim()
-    return if (cleaned.isBlank()) "Umum / Santoya" else cleaned
-}
-
-@Composable
-private fun CashflowLegendDot(
-    color: Color,
-    label: String
-) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(7.dp)
-                .clip(CircleShape)
-                .background(color)
+    if (showQuickFillForPdf) {
+        DepotQuickFillDialog(
+            initialProfile = depotProfile,
+            onDismiss = { showQuickFillForPdf = false },
+            onSaveAndContinue = { name, addr, phone ->
+                showQuickFillForPdf = false
+                viewModel.quickSaveDepotProfile(name, addr, phone) { updated ->
+                    launchPdfExport(updated)
+                }
+            },
+            onSkip = {
+                showQuickFillForPdf = false
+                launchPdfExport(depotProfile)
+            }
         )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.santoyaColors.onHero.copy(alpha = 0.85f),
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun MonthlyRevenueComparisonBadge(
-    bulanIni: Double,
-    bulanLalu: Double,
-    upColor: Color,
-    downColor: Color
-) {
-    val isPreviousZero = bulanLalu <= 0.0
-    val growthPercent = if (!isPreviousZero) {
-        ((bulanIni - bulanLalu) / bulanLalu) * 100.0
-    } else {
-        0.0
-    }
-    val isUp = isPreviousZero || growthPercent >= 0.0
-    val badgeColor = when {
-        isPreviousZero -> MaterialTheme.colorScheme.primary
-        isUp -> upColor
-        else -> downColor
-    }
-    val badgeIcon = if (isUp) {
-        Icons.AutoMirrored.Outlined.TrendingUp
-    } else {
-        Icons.AutoMirrored.Outlined.TrendingDown
-    }
-    val badgeText = when {
-        isPreviousZero -> "Baru bulan ini"
-        growthPercent > 0.0 -> "+${growthPercent.roundToInt()}% vs bulan lalu"
-        growthPercent < 0.0 -> "${growthPercent.roundToInt()}% vs bulan lalu"
-        else -> "0% vs bulan lalu"
-    }
-
-    Surface(
-        shape = RoundedCornerShape(SantoyaRadius.xs),
-        color = badgeColor.copy(alpha = 0.12f),
-        border = BorderStroke(0.8.dp, badgeColor.copy(alpha = 0.35f))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = badgeIcon,
-                contentDescription = null,
-                tint = badgeColor,
-                modifier = Modifier.size(13.dp)
-            )
-            Text(
-                text = badgeText,
-                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                fontWeight = FontWeight.SemiBold,
-                color = badgeColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
-}
-
-@Composable
-private fun BentoFinancialCard(
-    modifier: Modifier = Modifier,
-    gradientColors: List<Color>,
-    label: String,
-    amount: String,
-    subtitle: String,
-    accentColor: Color,
-    progress: Float,
-    comparisonBadge: (@Composable () -> Unit)? = null,
-    iconContent: @Composable () -> Unit
-) {
-    HydroBentoCard(
-        accentColor = accentColor,
-        cornerRadius = SantoyaRadius.xl,
-        tintAlpha = 0.09f,
-        showWaterRipple = true,
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(14.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                HydroGradientBadge(
-                    gradientColors = gradientColors,
-                    size = 38.dp,
-                    cornerRadius = 12.dp,
-                    elevation = 3.dp
-                ) {
-                    iconContent()
-                }
-                Surface(
-                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                    color = accentColor.copy(alpha = 0.14f)
-                ) {
-                    Text(
-                        text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            SantoyaAdaptiveCurrencyText(
-                amount = 0.0,
-                customText = amount,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-                minFontSize = 11.sp,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            if (comparisonBadge != null) {
-                Spacer(modifier = Modifier.height(5.dp))
-                comparisonBadge()
-            }
-
-            Spacer(modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(5.dp)
-                    .clip(CircleShape),
-                color = accentColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun FinancialBreakdownRow(
-    gradientColors: List<Color>,
-    title: String,
-    subtitle: String,
-    nominalText: String,
-    accentColor: Color,
-    iconContent: @Composable () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
-        ) {
-            HydroGradientBadge(
-                gradientColors = gradientColors,
-                size = 38.dp,
-                cornerRadius = 12.dp,
-                elevation = 2.dp
-            ) {
-                iconContent()
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-        Spacer(modifier = Modifier.width(10.dp))
-        SantoyaAdaptiveCurrencyText(
-            amount = 0.0,
-            customText = nominalText,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = accentColor,
-            minFontSize = 11.sp,
-            textAlign = TextAlign.End,
-            modifier = Modifier.widthIn(max = 148.dp)
-        )
-    }
-}
-
-@Composable
-private fun EmptyPeriodListCard(
-    icon: ImageVector,
-    message: String
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(SantoyaRadius.lg),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 28.dp, horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun SalesRankingItemCard(
-    rank: Int,
-    entry: RankingEntryUi,
-    activityUnit: String,
-    sortMode: RankingSortMode
-) {
-    val santoyaColors = MaterialTheme.santoyaColors
-    val rankColor = when (rank) {
-        1 -> santoyaColors.rankGold
-        2 -> santoyaColors.rankSilver
-        3 -> santoyaColors.rankBronze
-        else -> MaterialTheme.colorScheme.primary
-    }
-    val rankGradient = when (rank) {
-        1 -> listOf(santoyaColors.rankGold, AccentAmber)
-        2 -> listOf(santoyaColors.rankSilver, santoyaColors.rankSilver.copy(alpha = 0.78f))
-        3 -> listOf(santoyaColors.rankBronze, AccentAmber)
-        else -> listOf(MaterialTheme.colorScheme.primary, AccentCyan)
-    }
-    val animatedProgress by animateFloatAsState(
-        targetValue = entry.progressFraction,
-        animationSpec = tween(durationMillis = 260),
-        label = "ranking_progress_anim"
-    )
-    val shareText = remember(entry.omzetSharePercent) {
-        RankingMetricsHelper.formatOmzetSharePercent(entry.omzetSharePercent)
-    }
-
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        border = BorderStroke(1.dp, rankColor.copy(alpha = if (rank <= 3) 0.25f else 0.12f)),
-        shape = RoundedCornerShape(SantoyaRadius.md),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Baris 1: Lencana peringkat + Nama lengkap + Pil volume Galon
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    if (rank <= 3) {
-                        HydroGradientBadge(
-                            gradientColors = rankGradient,
-                            size = 30.dp,
-                            cornerRadius = 9.dp,
-                            elevation = 2.dp
-                        ) {
-                            Text(
-                                text = "#$rank",
-                                style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                fontWeight = FontWeight.Bold,
-                                color = santoyaColors.onHero
-                            )
-                        }
-                    } else {
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.sm),
-                            color = rankColor.copy(alpha = 0.14f),
-                            modifier = Modifier.size(30.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "#$rank",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                                    fontWeight = FontWeight.Bold,
-                                    color = rankColor
-                                )
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = entry.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Surface(
-                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                    color = if (sortMode == RankingSortMode.GALON) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        HydroGalonIcon(
-                            tint = if (sortMode == RankingSortMode.GALON) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(13.dp)
-                        )
-                        Text(
-                            text = "${FormatUtils.formatNumber(entry.totalGalon)} Galon",
-                            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (sortMode == RankingSortMode.GALON) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Baris 2: Baris penuh khusus Transaksi + Porsi Kontribusi (kiri) dan Omzet Utuh (kanan)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "${FormatUtils.formatNumber(entry.totalTransaksi)} $activityUnit • $shareText",
-                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                SantoyaAdaptiveCurrencyText(
-                    amount = entry.totalPendapatan,
-                    style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
-                    fontWeight = FontWeight.Bold,
-                    color = if (sortMode == RankingSortMode.OMZET) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                    minFontSize = 11.sp,
-                    textAlign = TextAlign.End
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(4.dp)
-                    .clip(CircleShape),
-                color = rankColor,
-                trackColor = MaterialTheme.colorScheme.surfaceVariant
-            )
-        }
     }
 }

@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,8 @@ import com.example.ui.screens.RevokedAccessDialog
 import com.example.ui.screens.RoleConfirmationDialog
 import com.example.ui.screens.SessionPreparingDialog
 import com.example.ui.theme.MyApplicationTheme
+import com.example.util.GoogleSignInHelper
+import com.example.util.OfflineSessionManager
 import com.example.util.SyncConnectionStatus
 import com.example.util.configureAppCheck
 import com.example.viewmodel.SantoyaScreen
@@ -80,10 +83,18 @@ class MainActivity : ComponentActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 val auth = remember { Firebase.auth }
                 var currentUser by remember { mutableStateOf(auth.currentUser) }
+                var isOfflineSessionActive by remember {
+                    mutableStateOf(
+                        auth.currentUser == null && viewModel.isPersistedOfflineModeActive()
+                    )
+                }
 
                 DisposableEffect(auth) {
                     val listener = FirebaseAuth.AuthStateListener { a ->
                         currentUser = a.currentUser
+                        if (a.currentUser != null) {
+                            isOfflineSessionActive = false
+                        }
                     }
                     auth.addAuthStateListener(listener)
                     onDispose {
@@ -91,24 +102,43 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (currentUser == null) {
+                if (currentUser == null && !isOfflineSessionActive) {
                     LaunchedEffect(Unit) {
                         viewModel.stopRealtimeSync()
                     }
+                    val offlineSummary by viewModel.offlineLocalSummary.collectAsStateWithLifecycle()
+                    val lastSession = remember(currentUser, isOfflineSessionActive) {
+                        viewModel.getLastSessionInfo()
+                    }
                     AuthScreen(
                         onAuthSuccess = {
+                            isOfflineSessionActive = false
                             currentUser = Firebase.auth.currentUser
-                        }
+                        },
+                        onEnterOfflineMode = {
+                            isOfflineSessionActive = true
+                            viewModel.enterOfflineLocalMode()
+                        },
+                        offlineSummary = offlineSummary,
+                        lastSession = lastSession
                     )
                 } else {
-                    key(currentUser?.uid) {
+                    val isOfflineMode = currentUser == null && isOfflineSessionActive
+                    val activeSessionKey = currentUser?.uid ?: OfflineSessionManager.OFFLINE_LOCAL_UID
+                    key(activeSessionKey) {
                         val activeUser = currentUser
-                        LaunchedEffect(activeUser?.uid, activeUser?.email) {
+                        LaunchedEffect(activeSessionKey, activeUser?.email, activeUser?.displayName) {
                             if (activeUser != null) {
-                                viewModel.startRealtimeSync(activeUser.uid, activeUser.email)
+                                viewModel.startRealtimeSync(
+                                    uid = activeUser.uid,
+                                    email = activeUser.email,
+                                    displayName = activeUser.displayName
+                                )
+                            } else if (isOfflineSessionActive) {
+                                viewModel.enterOfflineLocalMode()
                             }
                         }
-                        DisposableEffect(activeUser?.uid) {
+                        DisposableEffect(activeSessionKey) {
                             onDispose {
                                 viewModel.stopRealtimeSync()
                             }
@@ -121,6 +151,7 @@ class MainActivity : ComponentActivity() {
                         val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
                         val busyActionMessage by viewModel.busyActionMessage.collectAsStateWithLifecycle()
                         val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
+                        val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
                         var showSyncInfoSheet by remember { mutableStateOf(false) }
 
                         if (syncState.isSwitchingOwner) {
@@ -128,7 +159,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         // Kunci seluruh UI jika akses karyawan dicabut pemilik.
-                        if (syncState.status == SyncConnectionStatus.REVOKED) {
+                        if (!isOfflineMode && syncState.status == SyncConnectionStatus.REVOKED) {
                             RevokedAccessDialog(
                                 ownerEmail = syncState.ownerEmail,
                                 onSignOut = {
@@ -147,7 +178,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         // Tampilkan gerbang konfirmasi peran bagi akun baru yang belum terdaftar di depot mana pun.
-                        if (syncState.status == SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION) {
+                        if (!isOfflineMode && syncState.status == SyncConnectionStatus.AWAITING_ROLE_CONFIRMATION) {
                             RoleConfirmationDialog(
                                 userEmail = activeUser?.email.orEmpty(),
                                 onRecheckStaffLink = { onDone ->
@@ -191,15 +222,15 @@ class MainActivity : ComponentActivity() {
                                                 Column {
                                                     Text(
                                                         text = when (currentScreen) {
-                                                            SantoyaScreen.DASHBOARD -> "Santoya RO"
-                                                            SantoyaScreen.TRANSAKSI -> "Transaksi"
-                                                            SantoyaScreen.PELANGGAN -> "Pelanggan"
-                                                            SantoyaScreen.KURIR -> "Karyawan & Komisi"
-                                                            SantoyaScreen.PRODUK -> "Produk & Harga"
-                                                            SantoyaScreen.PENGELUARAN -> "Pengeluaran"
-                                                            SantoyaScreen.LAPORAN -> "Laporan Keuangan"
-                                                            SantoyaScreen.SETTINGS -> "Pengaturan"
-                                                            SantoyaScreen.PERAWATAN -> "Jadwal Perawatan RO"
+                                                            SantoyaScreen.DASHBOARD -> stringResource(R.string.nav_title_dashboard)
+                                                            SantoyaScreen.TRANSAKSI -> stringResource(R.string.nav_title_transaksi)
+                                                            SantoyaScreen.PELANGGAN -> stringResource(R.string.nav_title_pelanggan)
+                                                            SantoyaScreen.KURIR -> stringResource(R.string.nav_title_kurir)
+                                                            SantoyaScreen.PRODUK -> stringResource(R.string.nav_title_produk)
+                                                            SantoyaScreen.PENGELUARAN -> stringResource(R.string.nav_title_pengeluaran)
+                                                            SantoyaScreen.LAPORAN -> stringResource(R.string.nav_title_laporan)
+                                                            SantoyaScreen.SETTINGS -> stringResource(R.string.nav_title_settings)
+                                                            SantoyaScreen.PERAWATAN -> stringResource(R.string.nav_title_perawatan)
                                                         },
                                                         style = MaterialTheme.typography.titleLarge,
                                                         fontWeight = FontWeight.Bold,
@@ -208,15 +239,15 @@ class MainActivity : ComponentActivity() {
                                                     )
                                                     Text(
                                                         text = when (currentScreen) {
-                                                            SantoyaScreen.DASHBOARD -> "Beranda"
-                                                            SantoyaScreen.TRANSAKSI -> "Kasir & daftar nota"
-                                                            SantoyaScreen.PELANGGAN -> "Data pelanggan & kasbon"
-                                                            SantoyaScreen.KURIR -> "Atur kurir & komisi per galon"
-                                                            SantoyaScreen.PRODUK -> "Atur harga galon"
-                                                            SantoyaScreen.PENGELUARAN -> "Catat belanja & biaya depot"
-                                                            SantoyaScreen.LAPORAN -> "Omzet, laba bersih & ekspor"
-                                                            SantoyaScreen.SETTINGS -> "Akun, sinkron & cadangan data"
-                                                            SantoyaScreen.PERAWATAN -> "Jadwal servis & riwayat perawatan"
+                                                            SantoyaScreen.DASHBOARD -> stringResource(R.string.nav_sub_dashboard)
+                                                            SantoyaScreen.TRANSAKSI -> stringResource(R.string.nav_sub_transaksi)
+                                                            SantoyaScreen.PELANGGAN -> stringResource(R.string.nav_sub_pelanggan)
+                                                            SantoyaScreen.KURIR -> stringResource(R.string.nav_sub_kurir)
+                                                            SantoyaScreen.PRODUK -> stringResource(R.string.nav_sub_produk)
+                                                            SantoyaScreen.PENGELUARAN -> stringResource(R.string.nav_sub_pengeluaran)
+                                                            SantoyaScreen.LAPORAN -> stringResource(R.string.nav_sub_laporan)
+                                                            SantoyaScreen.SETTINGS -> stringResource(R.string.nav_sub_settings)
+                                                            SantoyaScreen.PERAWATAN -> stringResource(R.string.nav_sub_perawatan)
                                                         },
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -228,7 +259,7 @@ class MainActivity : ComponentActivity() {
                                             navigationIcon = {
                                                 SantoyaTopBarIconButton(
                                                     icon = Icons.AutoMirrored.Outlined.ArrowBack,
-                                                    contentDescription = "Kembali ke Beranda",
+                                                    contentDescription = stringResource(R.string.nav_back_home_cd),
                                                     onClick = { viewModel.navigateTo(SantoyaScreen.DASHBOARD) },
                                                     tint = MaterialTheme.colorScheme.onSurface,
                                                     modifier = Modifier
@@ -250,7 +281,7 @@ class MainActivity : ComponentActivity() {
                                                         Spacer(modifier = Modifier.width(4.dp))
                                                         SantoyaTopBarIconButton(
                                                             icon = Icons.Outlined.Settings,
-                                                            contentDescription = "Pengaturan",
+                                                            contentDescription = stringResource(R.string.dashboard_settings_cd),
                                                             onClick = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
                                                             modifier = Modifier.testTag("btn_top_settings")
                                                         )
@@ -286,6 +317,15 @@ class MainActivity : ComponentActivity() {
                                     AppNavigation(
                                         viewModel = viewModel,
                                         auth = auth,
+                                        isOfflineMode = isOfflineMode,
+                                        onExitOfflineToAuth = {
+                                            viewModel.exitOfflineSessionKeepLocalData()
+                                            isOfflineSessionActive = false
+                                        },
+                                        onGoogleLinked = {
+                                            isOfflineSessionActive = false
+                                            currentUser = Firebase.auth.currentUser
+                                        },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -295,13 +335,19 @@ class MainActivity : ComponentActivity() {
                         receiptDialogData?.let { activeReceipt ->
                             ReceiptDialog(
                                 dialogData = activeReceipt,
+                                depotProfile = depotProfile,
+                                isOwner = !isKaryawan && depotProfile.isOwnerRole(),
+                                onQuickSaveDepotProfile = { name, addr, phone, onDone ->
+                                    viewModel.quickSaveDepotProfile(name, addr, phone, onDone)
+                                },
                                 onDismiss = { viewModel.dismissReceiptDialog() }
                             )
                         }
 
                         if (showSyncInfoSheet) {
                             val activeUser = currentUser
-                            val canSwitchToStaffWaiting = !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(activeUser?.email) &&
+                            val canSwitchToStaffWaiting = !isOfflineMode &&
+                                !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(activeUser?.email) &&
                                 (!isKaryawan || !com.example.util.KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
                             SantoyaSyncInfoBottomSheet(
                                 syncState = syncState,
@@ -311,6 +357,13 @@ class MainActivity : ComponentActivity() {
                                         viewModel.syncToCloud(this@MainActivity, uid)
                                     }
                                 },
+                                onForcePushAll = if (!isOfflineMode && activeUser != null) {
+                                    {
+                                        activeUser.uid.let { uid ->
+                                            viewModel.forcePushAllLocalToCloud(this@MainActivity, uid)
+                                        }
+                                    }
+                                } else null,
                                 onNavigateToSettings = if (!isKaryawan) {
                                     {
                                         viewModel.navigateTo(SantoyaScreen.SETTINGS)
@@ -321,6 +374,23 @@ class MainActivity : ComponentActivity() {
                                     {
                                         showSyncInfoSheet = false
                                         viewModel.switchToStaffWaitingMode()
+                                    }
+                                } else null,
+                                isOfflineLocalMode = isOfflineMode,
+                                onConnectGoogleAccount = if (isOfflineMode) {
+                                    {
+                                        val credentialManager = CredentialManager.create(this@MainActivity)
+                                        GoogleSignInHelper.signIn(
+                                            context = this@MainActivity,
+                                            credentialManager = credentialManager,
+                                            coroutineScope = coroutineScope,
+                                            onLoadingChange = {},
+                                            onSuccess = {
+                                                isOfflineSessionActive = false
+                                                currentUser = Firebase.auth.currentUser
+                                            },
+                                            onError = { err -> viewModel.showSnackbar(err) }
+                                        )
                                     }
                                 } else null
                             )

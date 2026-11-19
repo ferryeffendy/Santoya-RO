@@ -1,14 +1,9 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -16,125 +11,78 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowForward
-import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.automirrored.outlined.TrendingUp
-import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.AutoGraph
 import androidx.compose.material.icons.outlined.Block
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.HourglassEmpty
-import androidx.compose.material.icons.outlined.NotificationsActive
-import androidx.compose.material.icons.outlined.People
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Pengeluaran
 import com.example.data.entity.TransaksiDetail
-import com.example.ui.components.HydroBentoCard
-import com.example.ui.components.HydroCustomerDropIcon
-import com.example.ui.components.HydroExpenseFlowIcon
-import com.example.ui.components.HydroGalonIcon
-import com.example.ui.components.HydroGradientBadge
-import com.example.ui.components.HydroMaintenanceWrenchIcon
-import com.example.ui.components.HydroReceiptNoteIcon
-import com.example.ui.components.HydroReportChartIcon
-import com.example.ui.components.PerawatanComponentIcon
-import com.example.ui.components.RealtimeSyncStatusPill
-import com.example.ui.components.SantoyaAdaptiveCurrencyText
-import com.example.ui.components.SantoyaEmptyState
-import com.example.ui.components.SantoyaEmptyType
-import com.example.ui.components.SantoyaLoadingSkeleton
+import com.example.ui.components.BentoFeaturedTransaksiCard
+import com.example.ui.components.DashboardDepotReminderCard
+import com.example.ui.components.DashboardPerawatanReminderStrip
+import com.example.ui.components.DepotProfileEditSheet
+import com.example.ui.components.HydroWaveHeroCard
+import com.example.ui.components.KaryawanVerticalMenuList
+import com.example.ui.components.OwnerVerticalMenuList
 import com.example.ui.components.SantoyaSyncInfoBottomSheet
-import com.example.ui.components.SantoyaTopBarIconButton
-import com.example.ui.theme.AccentAmber
-import com.example.ui.theme.AccentCyan
-import com.example.ui.theme.HeroGlowAmber
-import com.example.ui.theme.HeroGlowAmberSoft
-import com.example.ui.theme.HeroGlowCyan
-import com.example.ui.theme.HeroGlowCyanSoft
-import com.example.ui.theme.HeroGlowEmerald
-import com.example.ui.theme.HeroGlowEmeraldSoft
-import com.example.ui.theme.HeroGlowRose
-import com.example.ui.theme.HeroGlowRoseSoft
-import com.example.ui.theme.SantoyaLeafGreen
-import com.example.ui.theme.SantoyaNavy
-import com.example.ui.theme.SantoyaNavyBorder
-import com.example.ui.theme.SantoyaNavyPanel
+import com.example.ui.components.WaveHeader
 import com.example.ui.theme.SantoyaRadius
-import com.example.ui.theme.SantoyaSize
-import com.example.ui.theme.SantoyaWaterBlue
-import com.example.ui.theme.pressClickEffect
-import com.example.ui.theme.santoyaColors
-import com.example.util.CrmOrderStatus
 import com.example.util.FormatUtils
-import com.google.firebase.Firebase
-import com.google.firebase.auth.auth
+import com.example.util.GoogleSignInHelper
 import com.example.util.KaryawanScopeHelper
-import com.example.util.PerawatanScheduler
-import com.example.util.PerawatanStatus
-import com.example.util.SantoyaReceiptHelper
+import com.example.util.LaporanFinanceCalculator
 import com.example.util.SyncConnectionStatus
-import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.LaporanPeriode
 import com.example.viewmodel.PelangganUiModel
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Layar Beranda utama Santoya RO:
+ * - WaveHeader animatif berbasis Canvas API di bagian atas
+ * - Hero Gelombang Air untuk ringkasan kas, laba bersih, piutang, dan volume galon
+ * - Menu Utama vertikal rapi: 1 Kartu Transaksi Utama diikuti daftar menu vertikal seragam
+ */
 @Composable
 fun DashboardScreen(
     viewModel: SantoyaViewModel,
@@ -144,30 +92,37 @@ fun DashboardScreen(
     pelangganUiModels: List<PelangganUiModel>? = null,
     onNavigateToTransaksi: () -> Unit = { viewModel.navigateTo(SantoyaScreen.TRANSAKSI) },
     onNavigateToPelanggan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PELANGGAN) },
-    onNavigateToProduk: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
-    onNavigateToKurir: () -> Unit = { viewModel.navigateTo(SantoyaScreen.KURIR) },
+    @Suppress("UNUSED_PARAMETER") onNavigateToProduk: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
+    @Suppress("UNUSED_PARAMETER") onNavigateToKurir: () -> Unit = { viewModel.navigateTo(SantoyaScreen.KURIR) },
     onNavigateToPengeluaran: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PENGELUARAN) },
     onNavigateToLaporan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.LAPORAN) },
     onNavigateToSettings: () -> Unit = { viewModel.navigateTo(SantoyaScreen.SETTINGS) },
     onNavigateToPerawatan: () -> Unit = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
     onSignOut: (() -> Unit)? = null,
+    onGoogleLinked: () -> Unit = {},
+    isOfflineMode: Boolean = false,
     isKaryawan: Boolean = false,
     activeKaryawan: Kurir? = null,
     modifier: Modifier = Modifier
 ) {
-    val santoyaColors = MaterialTheme.santoyaColors
+    val context = LocalContext.current
+    val credentialManager = remember { CredentialManager.create(context) }
+    val coroutineScope = rememberCoroutineScope()
+
     val scopedTransactionsFromVm by viewModel.scopedTransaksi.collectAsStateWithLifecycle()
     val scopedPelangganFromVm by viewModel.scopedPelanggan.collectAsStateWithLifecycle()
     val allKasbonLogsFromVm by viewModel.allKasbonLogs.collectAsStateWithLifecycle()
     val scopedPelangganUiModelsFromVm by viewModel.scopedPelangganUiModels.collectAsStateWithLifecycle()
     val allPengeluaranFromVm by viewModel.allPengeluaran.collectAsStateWithLifecycle()
-    val perawatanRemindersFromVm by viewModel.perawatanReminders.collectAsStateWithLifecycle()
     val activeKaryawanFromVm by viewModel.activeKaryawan.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
-    val isInitialDataLoaded by viewModel.isInitialDataLoaded.collectAsStateWithLifecycle()
+    val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
+    val perawatanReminders by viewModel.perawatanReminders.collectAsStateWithLifecycle()
+    val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
+
     var showKaryawanSignOutDialog by remember { mutableStateOf(false) }
     var showSyncInfoSheet by remember { mutableStateOf(false) }
-    val effectivePerawatanReminders = if (isKaryawan) emptyList() else perawatanRemindersFromVm
+    var showDepotProfileSheet by remember { mutableStateOf(false) }
 
     val rawTransaksiList = transaksiList ?: scopedTransactionsFromVm
     val rawPelangganList = pelangganList ?: scopedPelangganFromVm
@@ -185,15 +140,9 @@ fun DashboardScreen(
     val monthStart = FormatUtils.getStartOfMonth()
 
     val todayTransactions = remember(effectiveTransaksiList, todayStart, todayEnd) {
-        effectiveTransaksiList.filter {
-            it.transaksi.tanggal in todayStart..todayEnd
-        }
-    }
-
-    val todayPengeluaran = remember(effectivePengeluaranList, todayStart, todayEnd) {
-        effectivePengeluaranList.filter {
-            it.tanggal in todayStart..todayEnd
-        }
+        effectiveTransaksiList
+            .filter { it.transaksi.tanggal in todayStart..todayEnd }
+            .sortedByDescending { it.transaksi.tanggal }
     }
 
     val monthTransactions = remember(effectiveTransaksiList, monthStart, todayEnd) {
@@ -209,42 +158,42 @@ fun DashboardScreen(
         )
     }
 
-    // 1. Pendapatan Tunai Langsung Hari Ini (dari transaksi hari ini: tunai lunas di awal & DP bayar sebagian)
-    val penjualanTunaiLangsungHariIni = remember(todayTransactions) {
-        todayTransactions.sumOf {
-            when {
-                it.transaksi.status.equals("Lunas", ignoreCase = true) &&
-                    (it.transaksi.tanggalBayar == null || it.transaksi.tanggalBayar == it.transaksi.tanggal) -> {
-                    it.transaksi.total_harga
-                }
-                it.transaksi.uangMuka > 0L -> {
-                    it.transaksi.uangMuka.toDouble()
-                }
-                else -> 0.0
-            }
+    // Ringkasan Arus Kas & Laba Bersih Hari Ini (Single Source of Truth)
+    val todaySummary = remember(
+        effectiveTransaksiList,
+        effectivePengeluaranList,
+        allKasbonLogsFromVm,
+        effectivePelangganList,
+        todayStart,
+        todayEnd
+    ) {
+        LaporanFinanceCalculator.summarizePeriod(
+            allTransaksi = effectiveTransaksiList,
+            allPengeluaran = effectivePengeluaranList,
+            allKasbonLogs = allKasbonLogsFromVm,
+            allPelanggan = effectivePelangganList,
+            startTime = todayStart,
+            endTime = todayEnd
+        )
+    }
+    val pendapatanLunasHariIni = todaySummary.totalKasMasuk
+    val labaBersihHariIni = todaySummary.labaBersih
+    val pengeluaranHariIni = todaySummary.totalPengeluaran
+    val marginPercentText = remember(todaySummary) {
+        if (todaySummary.totalKasMasuk > 0.0) {
+            FormatUtils.formatPercent(todaySummary.marginLabaPersen, decimals = 0)
+        } else {
+            ""
         }
     }
 
-    // 1B. Pelunasan Kasbon Hari Ini (dari log pelunasan kasbon hari ini)
-    val pelunasanKasbonHariIni = remember(allKasbonLogsFromVm, todayStart, todayEnd) {
-        allKasbonLogsFromVm.filter { it.tanggal in todayStart..todayEnd && it.jumlah_bayar > 0.0 }
-            .sumOf { it.jumlah_bayar }
-    }
-
-    // Total Kas Masuk Hari Ini
-    val pendapatanLunasHariIni = penjualanTunaiLangsungHariIni + pelunasanKasbonHariIni
-
-    // 2. Laba Bersih Hari Ini (Pendapatan Tunai - Pengeluaran Operasional - Komisi Kurir)
-    val totalKomisiHariIni = remember(todayTransactions) {
-        todayTransactions.sumOf { it.transaksi.total_komisi }
-    }
-    val totalPengeluaranHariIni = remember(todayPengeluaran) {
-        todayPengeluaran.sumOf { it.nominal }
-    }
-    val labaBersihHariIni = pendapatanLunasHariIni - totalPengeluaranHariIni - totalKomisiHariIni
-
-    // 3. Total Piutang / Kasbon Tersinkronisasi
-    val effectiveUiModels = remember(pelangganUiModels, scopedPelangganUiModelsFromVm, effectivePelangganList, effectiveTransaksiList) {
+    // Total Piutang / Kasbon Tersinkronisasi
+    val effectiveUiModels = remember(
+        pelangganUiModels,
+        scopedPelangganUiModelsFromVm,
+        effectivePelangganList,
+        effectiveTransaksiList
+    ) {
         pelangganUiModels
             ?: if (pelangganList == null && transaksiList == null) {
                 scopedPelangganUiModelsFromVm
@@ -259,12 +208,10 @@ fun DashboardScreen(
         effectiveKasbonByCustomer.values.sum()
     }
 
-    // 4. Total Galon Hari Ini
+    // Total Galon Hari Ini & Proyeksi Bulan Ini
     val totalGalonHariIni = remember(todayTransactions) {
         todayTransactions.sumOf { it.transaksi.jumlah }
     }
-
-    // 5. Estimasi Galon Bulan Ini (Proyeksi: Total Galon Bulan Ini / Tgl Hari Ini * Total Hari Bulan Ini)
     val totalGalonBulanIni = remember(monthTransactions) {
         monthTransactions.sumOf { it.transaksi.jumlah }
     }
@@ -272,1384 +219,344 @@ fun DashboardScreen(
     val totalDaysInMonth = FormatUtils.getDaysInCurrentMonth()
     val estimasiGalonBulanIni = ((totalGalonBulanIni.toDouble() / currentDayOfMonth.toDouble()) * totalDaysInMonth).roundToInt()
 
-    // 6. CRM Jadwal Order Pelanggan (Due Soon / Overdue)
-    val crmJadwalCustomers = remember(effectiveUiModels) {
-        effectiveUiModels.filter {
-            it.crmPrediction.status == CrmOrderStatus.OVERDUE ||
-                it.crmPrediction.status == CrmOrderStatus.DUE_SOON
-        }
+    val customerCountText = remember(effectivePelangganList.size) {
+        FormatUtils.formatNumber(effectivePelangganList.size)
     }
 
-    // 7. Daftar Transaksi Terbaru (Utamakan Hari Ini, Fallback ke 4 Transaksi Terakhir Lintas Hari)
-    val recentTransactionsToShow = remember(todayTransactions, effectiveTransaksiList) {
-        if (todayTransactions.isNotEmpty()) {
-            todayTransactions.take(4)
+    val topBarTitle = remember(depotProfile) {
+        if (depotProfile.hasConfiguredDepotName()) {
+            depotProfile.effectiveDepotName()
         } else {
-            effectiveTransaksiList.take(4)
+            null
         }
     }
-    val isShowingTodayTransactions = todayTransactions.isNotEmpty()
 
     Scaffold(
         modifier = modifier.testTag("dashboard_screen"),
         containerColor = MaterialTheme.colorScheme.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Column {
-                TopAppBar(
-                    windowInsets = WindowInsets(0, 0, 0, 0),
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painter = painterResource(id = R.drawable.logo_santoya),
-                                contentDescription = stringResource(R.string.dashboard_logo_cd),
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.size(38.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = stringResource(R.string.dashboard_brand_title),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = stringResource(R.string.dashboard_brand_subtitle),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    },
-                    actions = {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(end = 4.dp)
-                        ) {
-                            RealtimeSyncStatusPill(
-                                syncState = syncState,
-                                onClick = { showSyncInfoSheet = true },
-                                modifier = Modifier.testTag("dashboard_sync_pill")
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            if (!isKaryawan) {
-                                SantoyaTopBarIconButton(
-                                    icon = Icons.Outlined.Settings,
-                                    contentDescription = stringResource(R.string.dashboard_settings_cd),
-                                    onClick = onNavigateToSettings,
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.testTag("dashboard_settings_button")
-                                )
-                            } else if (onSignOut != null) {
-                                SantoyaTopBarIconButton(
-                                    icon = Icons.AutoMirrored.Outlined.Logout,
-                                    contentDescription = stringResource(R.string.dashboard_sign_out_cd),
-                                    onClick = { showKaryawanSignOutDialog = true },
-                                    tint = MaterialTheme.colorScheme.error,
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                                    modifier = Modifier.testTag("dashboard_karyawan_sign_out_button")
-                                )
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
-                )
-
-                HorizontalDivider(
-                    thickness = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
-                )
-            }
+            WaveHeader(
+                title = topBarTitle ?: stringResource(R.string.dashboard_brand_title),
+                subtitle = stringResource(R.string.dashboard_brand_subtitle),
+                syncState = syncState,
+                isKaryawan = isKaryawan,
+                onSyncClick = { showSyncInfoSheet = true },
+                onSettingsClick = onNavigateToSettings,
+                onSignOutClick = if (onSignOut != null) {
+                    { showKaryawanSignOutDialog = true }
+                } else {
+                    null
+                },
+                isCompact = LocalDensity.current.fontScale >= 1.15f
+            )
         }
     ) { innerPadding ->
-        LazyColumn(
+        BoxWithConstraints(
+            contentAlignment = Alignment.TopCenter,
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(innerPadding)
         ) {
-            if (syncState.status == SyncConnectionStatus.REVOKED) {
-                item {
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Block,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = stringResource(R.string.dashboard_revoked_banner),
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                }
-            }
+            val density = LocalDensity.current
+            val fontScale = density.fontScale
+            val isCompact = maxHeight < 640.dp || maxWidth < 360.dp || fontScale >= 1.15f
+            val isVeryNarrow = maxWidth < 340.dp
+            val isExpandedLayout = maxWidth >= 720.dp
 
-            // 1. Solid Deep Hydro Navy Hero Card (Zero Gradient, Zero Glassmorphism, Organic Logo Curve)
-            item {
-                Card(
-                    shape = RoundedCornerShape(SantoyaRadius.xl),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                    colors = CardDefaults.cardColors(containerColor = SantoyaNavy),
-                    border = BorderStroke(1.dp, SantoyaNavyBorder),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
+            val horizontalPadding = when {
+                isVeryNarrow -> 10.dp
+                isExpandedLayout -> 24.dp
+                isCompact -> 12.dp
+                else -> 16.dp
+            }
+            val topContentPadding = if (isCompact) 4.dp else 8.dp
+            val bottomContentPadding = if (isCompact) 10.dp else 16.dp
+            val menuSpacing = if (isCompact) 8.dp else 10.dp
+
+            val hasRevokedBanner = syncState.status == SyncConnectionStatus.REVOKED
+            val hasDepotReminder = !isKaryawan && depotProfile.isOwnerRole() && !depotProfile.hasConfiguredDepotName()
+
+            // Hitung apakah seluruh Menu Utama vertikal pas satu layar tanpa scroll
+            val minMenuTotalHeightDp = if (isKaryawan) {
+                if (isCompact) 224.dp else 252.dp
+            } else {
+                if (isCompact) 292.dp else 326.dp
+            }
+            val navBarBottomDp = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+            var topSectionHeightPx by remember { mutableIntStateOf(0) }
+            val topSectionHeightDp = with(density) { topSectionHeightPx.toDp() }
+            val availableMenuHeightDp = maxHeight - navBarBottomDp - topContentPadding - bottomContentPadding - topSectionHeightDp
+            val fitMenuToRemainingScreen = !isExpandedLayout &&
+                topSectionHeightPx > 0 &&
+                fontScale < 1.35f &&
+                availableMenuHeightDp >= minMenuTotalHeightDp
+
+            val scrollState = rememberScrollState()
+
+            val heroSection: @Composable () -> Unit = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(if (isCompact) 8.dp else 10.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(SantoyaNavy)
-                            .drawBehind {
-                                // Minimalist organic water droplet & leaf vein line art in top-right corner
-                                val w = size.width
-                                val h = size.height
-                                val curve1 = Path().apply {
-                                    moveTo(w * 0.72f, 0f)
-                                    cubicTo(w * 0.76f, h * 0.28f, w * 0.88f, h * 0.36f, w, h * 0.38f)
-                                }
-                                drawPath(
-                                    path = curve1,
-                                    color = santoyaColors.onHero.copy(alpha = 0.24f),
-                                    style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                                val curve2 = Path().apply {
-                                    moveTo(w * 0.82f, 0f)
-                                    quadraticTo(w * 0.86f, h * 0.22f, w, h * 0.26f)
-                                }
-                                drawPath(
-                                    path = curve2,
-                                    color = HeroGlowEmeraldSoft.copy(alpha = 0.36f),
-                                    style = Stroke(width = 1.6.dp.toPx(), cap = StrokeCap.Round)
-                                )
-                            }
-                            .padding(20.dp)
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            // Top Section: Primary Revenue Hero
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .pressClickEffect(onClick = {
-                                        if (isKaryawan) {
-                                            viewModel.setTransaksiTab(1)
-                                            onNavigateToTransaksi()
-                                        } else {
-                                            viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
-                                            onNavigateToLaporan()
-                                        }
-                                    }),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.AccountBalanceWallet,
-                                            contentDescription = null,
-                                            tint = HeroGlowCyanSoft,
-                                            modifier = Modifier.size(15.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isKaryawan) {
-                                                stringResource(R.string.dashboard_hero_staff_deposit)
-                                            } else {
-                                                stringResource(R.string.dashboard_hero_owner_revenue)
-                                            },
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            letterSpacing = 0.7.sp,
-                                            color = santoyaColors.onHero.copy(alpha = 0.78f)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    SantoyaAdaptiveCurrencyText(
-                                        amount = if (isKaryawan) karyawanMetrics.setoranTunaiHariIni else pendapatanLunasHariIni,
-                                        style = MaterialTheme.typography.headlineLarge,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = santoyaColors.onHero,
-                                        minFontSize = 18.sp,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-
-                                Column(
-                                    horizontalAlignment = Alignment.End,
-                                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(50),
-                                        color = SantoyaNavyPanel,
-                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                    ) {
-                                        Text(
-                                            text = FormatUtils.formatDateUi(System.currentTimeMillis()),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.Medium,
-                                            color = santoyaColors.onHero,
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                        )
-                                    }
-                                    if (isKaryawan && effectiveActiveKaryawan != null) {
-                                        Surface(
-                                            shape = RoundedCornerShape(50),
-                                            color = SantoyaLeafGreen,
-                                            border = BorderStroke(1.dp, HeroGlowEmeraldSoft)
-                                        ) {
-                                            Text(
-                                                text = effectiveActiveKaryawan.nama,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = santoyaColors.onHero,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (!isKaryawan) {
-                                // Middle Section (Pemilik): Solid Sub-Panels (Laba Bersih & Total Piutang)
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    // Laba Bersih Hari Ini
-                                    val isPositiveProfit = labaBersihHariIni >= 0.0
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
-                                                onNavigateToLaporan()
-                                            }),
-                                        shape = RoundedCornerShape(SantoyaRadius.lg),
-                                        color = SantoyaNavyPanel,
-                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = if (isPositiveProfit) SantoyaLeafGreen else HeroGlowRose,
-                                                    modifier = Modifier.size(24.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.AutoMirrored.Outlined.TrendingUp,
-                                                            contentDescription = null,
-                                                            tint = santoyaColors.onHero,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_net_profit_label),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            SantoyaAdaptiveCurrencyText(
-                                                amount = labaBersihHariIni,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isPositiveProfit) HeroGlowEmeraldSoft else HeroGlowRoseSoft,
-                                                minFontSize = 11.sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.dashboard_net_profit_desc),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = santoyaColors.onHero.copy(alpha = 0.65f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-
-                                    // Total Piutang / Kasbon
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setPelangganTab(1)
-                                                onNavigateToPelanggan()
-                                            }),
-                                        shape = RoundedCornerShape(SantoyaRadius.lg),
-                                        color = SantoyaNavyPanel,
-                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = HeroGlowAmber,
-                                                    modifier = Modifier.size(24.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.HourglassEmpty,
-                                                            contentDescription = null,
-                                                            tint = santoyaColors.onHero,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_receivables_label),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            SantoyaAdaptiveCurrencyText(
-                                                amount = totalPiutangAktif,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = HeroGlowAmberSoft,
-                                                minFontSize = 11.sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.dashboard_receivables_cta),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = santoyaColors.onHero.copy(alpha = 0.65f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Bottom Section (Pemilik): Solid Production Volume & Monthly Projection Bar
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(SantoyaRadius.lg),
-                                    color = SantoyaNavyPanel,
-                                    border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        // Total Galon Hari Ini
-                                        Row(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .pressClickEffect(onClick = {
-                                                    viewModel.setTransaksiTab(0)
-                                                    onNavigateToTransaksi()
-                                                }),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                                color = SantoyaWaterBlue,
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.WaterDrop,
-                                                        contentDescription = null,
-                                                        tint = santoyaColors.onHero,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_galon_today_label),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Row(verticalAlignment = Alignment.Bottom) {
-                                                    Text(
-                                                        text = FormatUtils.formatNumber(totalGalonHariIni),
-                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = santoyaColors.onHero,
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.weight(1f, fill = false)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.unit_galon),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        modifier = Modifier.padding(bottom = 2.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                        // Solid Vertical Divider
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(horizontal = 8.dp)
-                                                .width(1.dp)
-                                                .height(34.dp)
-                                                .background(SantoyaNavyBorder)
-                                        )
-
-                                        // Estimasi Galon Bulan Ini
-                                        Row(
-                                            modifier = Modifier
-                                                .weight(1.15f)
-                                                .pressClickEffect(onClick = {
-                                                    viewModel.setLaporanPeriode(LaporanPeriode.BULAN_INI)
-                                                    onNavigateToLaporan()
-                                                }),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                                color = SantoyaLeafGreen,
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.AutoGraph,
-                                                        contentDescription = null,
-                                                        tint = santoyaColors.onHero,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_galon_month_estimate_label),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Row(verticalAlignment = Alignment.Bottom) {
-                                                    Text(
-                                                        text = FormatUtils.formatNumber(estimasiGalonBulanIni),
-                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = HeroGlowEmeraldSoft,
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.weight(1f, fill = false)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.unit_galon),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        modifier = Modifier.padding(bottom = 2.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Middle Section (Karyawan): Rekap Galon & Komisi Hari Ini vs Bulan Ini
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("card_komisi_hari_ini")
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setTransaksiTab(1)
-                                                onNavigateToTransaksi()
-                                            }),
-                                        shape = RoundedCornerShape(SantoyaRadius.lg),
-                                        color = SantoyaNavyPanel,
-                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = HeroGlowEmerald,
-                                                    modifier = Modifier.size(24.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.WaterDrop,
-                                                            contentDescription = null,
-                                                            tint = santoyaColors.onHero,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_staff_commission_today),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            SantoyaAdaptiveCurrencyText(
-                                                amount = karyawanMetrics.komisiHariIni,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = HeroGlowEmeraldSoft,
-                                                minFontSize = 11.sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.dashboard_staff_galon_orders,
-                                                    karyawanMetrics.galonHariIni,
-                                                    karyawanMetrics.pesananHariIni
-                                                ),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = santoyaColors.onHero.copy(alpha = 0.75f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .testTag("card_komisi_bulan_ini")
-                                            .pressClickEffect(onClick = {
-                                                viewModel.setTransaksiTab(1)
-                                                onNavigateToTransaksi()
-                                            }),
-                                        shape = RoundedCornerShape(SantoyaRadius.lg),
-                                        color = SantoyaNavyPanel,
-                                        border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-                                            verticalArrangement = Arrangement.spacedBy(5.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Surface(
-                                                    shape = CircleShape,
-                                                    color = HeroGlowCyan,
-                                                    modifier = Modifier.size(24.dp)
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center) {
-                                                        Icon(
-                                                            imageVector = Icons.Outlined.AutoGraph,
-                                                            contentDescription = null,
-                                                            tint = santoyaColors.onHero,
-                                                            modifier = Modifier.size(14.dp)
-                                                        )
-                                                    }
-                                                }
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_staff_commission_month),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.78f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                            SantoyaAdaptiveCurrencyText(
-                                                amount = karyawanMetrics.komisiBulanIni,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = HeroGlowCyanSoft,
-                                                minFontSize = 11.sp,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Text(
-                                                text = stringResource(
-                                                    R.string.dashboard_staff_galon_orders,
-                                                    karyawanMetrics.galonBulanIni,
-                                                    karyawanMetrics.pesananBulanIni
-                                                ),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = santoyaColors.onHero.copy(alpha = 0.75f),
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Bottom Section (Karyawan): Piutang Pelanggan Saya & Total Pelanggan Saya
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(SantoyaRadius.lg),
-                                    color = SantoyaNavyPanel,
-                                    border = BorderStroke(1.dp, SantoyaNavyBorder)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .weight(1.1f)
-                                                .pressClickEffect(onClick = {
-                                                    viewModel.setPelangganTab(1)
-                                                    onNavigateToPelanggan()
-                                                }),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                                color = HeroGlowAmber,
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.HourglassEmpty,
-                                                        contentDescription = null,
-                                                        tint = santoyaColors.onHero,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_staff_receivables),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                SantoyaAdaptiveCurrencyText(
-                                                    amount = totalPiutangAktif,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = HeroGlowAmberSoft,
-                                                    minFontSize = 11.sp,
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )
-                                            }
-                                        }
-
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(horizontal = 8.dp)
-                                                .width(1.dp)
-                                                .height(34.dp)
-                                                .background(SantoyaNavyBorder)
-                                        )
-
-                                        Row(
-                                            modifier = Modifier
-                                                .weight(0.95f)
-                                                .pressClickEffect(onClick = {
-                                                    viewModel.setPelangganTab(0)
-                                                    onNavigateToPelanggan()
-                                                }),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                                color = HeroGlowCyan,
-                                                modifier = Modifier.size(36.dp)
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center) {
-                                                    Icon(
-                                                        imageVector = Icons.Outlined.People,
-                                                        contentDescription = null,
-                                                        tint = santoyaColors.onHero,
-                                                        modifier = Modifier.size(18.dp)
-                                                    )
-                                                }
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = stringResource(R.string.dashboard_staff_customers),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = santoyaColors.onHero.copy(alpha = 0.72f),
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                                Row(verticalAlignment = Alignment.Bottom) {
-                                                    Text(
-                                                        text = "${effectivePelangganList.size}",
-                                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = santoyaColors.onHero,
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.weight(1f, fill = false)
-                                                    )
-                                                    Spacer(modifier = Modifier.width(4.dp))
-                                                    Text(
-                                                        text = stringResource(R.string.unit_orang),
-                                                        style = MaterialTheme.typography.labelSmall,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = santoyaColors.onHero.copy(alpha = 0.75f),
-                                                        maxLines = 1,
-                                                        softWrap = false,
-                                                        modifier = Modifier.padding(bottom = 2.dp)
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Smart CRM Order Alert Banner
-            if (crmJadwalCustomers.isNotEmpty()) {
-                item {
-                    val overdueCount = crmJadwalCustomers.count { it.crmPrediction.status == CrmOrderStatus.OVERDUE }
-                    HydroBentoCard(
-                        accentColor = santoyaColors.warning,
-                        cornerRadius = SantoyaRadius.lg,
-                        tintAlpha = 0.14f,
-                        onClick = {
-                            viewModel.setPelangganTab(2) // Tab Jadwal
-                            onNavigateToPelanggan()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    if (hasRevokedBanner) {
+                        Surface(
+                            shape = RoundedCornerShape(SantoyaRadius.lg),
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.45f)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                HydroGradientBadge(
-                                    gradientColors = listOf(AccentAmber, santoyaColors.warning),
-                                    size = 38.dp,
-                                    cornerRadius = SantoyaRadius.md
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.NotificationsActive,
-                                        contentDescription = null,
-                                        tint = santoyaColors.onHero,
-                                        modifier = Modifier.size(19.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "${crmJadwalCustomers.size} Pelanggan Perlu Pengingat",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = if (overdueCount > 0) {
-                                            "$overdueCount terlambat • Ketuk untuk kirim pengingat"
-                                        } else {
-                                            "Ada jadwal isi ulang galon hari ini"
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = santoyaColors.warning,
-                                        fontWeight = FontWeight.Medium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(SantoyaRadius.sm),
-                                color = santoyaColors.warningContainer,
-                                border = BorderStroke(1.dp, santoyaColors.warning.copy(alpha = 0.35f))
-                            ) {
                                 Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                                    contentDescription = "Lihat Jadwal",
-                                    tint = santoyaColors.warning,
-                                    modifier = Modifier
-                                        .padding(8.dp)
-                                        .size(16.dp)
+                                    imageVector = Icons.Outlined.Block,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = stringResource(R.string.dashboard_revoked_banner),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
                     }
-                }
-            }
 
-            // 2b. Pengingat Perawatan Mesin RO (Khusus Pemilik: Terlambat, Hari Ini, & H-3)
-            if (!isKaryawan && effectivePerawatanReminders.isNotEmpty()) {
-                item {
-                    val overdueCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.TERLAMBAT }
-                    val dueTodayCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.HARI_INI }
-                    val soonCount = effectivePerawatanReminders.count { it.status == PerawatanStatus.MENDEKATI }
-                    val alertColor = if (overdueCount > 0) MaterialTheme.colorScheme.error else santoyaColors.warning
-                    val alertContainer = if (overdueCount > 0) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
-                    val alertOnContainer = if (overdueCount > 0) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
-
-                    HydroBentoCard(
-                        accentColor = alertColor,
-                        cornerRadius = SantoyaRadius.lg,
-                        tintAlpha = 0.12f,
-                        onClick = onNavigateToPerawatan,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("card_dashboard_perawatan_reminder")
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    HydroGradientBadge(
-                                        gradientColors = listOf(alertColor, AccentCyan),
-                                        size = 38.dp,
-                                        cornerRadius = SantoyaRadius.md
-                                    ) {
-                                        HydroMaintenanceWrenchIcon(
-                                            tint = santoyaColors.onHero,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Perawatan Mesin RO (${effectivePerawatanReminders.size})",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        val statusSummary = buildList {
-                                            if (overdueCount > 0) add("$overdueCount terlambat")
-                                            if (dueTodayCount > 0) add("$dueTodayCount hari ini")
-                                            if (soonCount > 0) add("$soonCount H-3")
-                                        }.joinToString(" • ")
-                                        Text(
-                                            text = statusSummary,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = alertColor,
-                                            fontWeight = FontWeight.Medium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = alertContainer,
-                                    border = BorderStroke(1.dp, alertColor.copy(alpha = 0.35f)),
-                                    modifier = Modifier.testTag("btn_dashboard_perawatan_reminder")
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "Kelola",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = alertOnContainer
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                                            contentDescription = "Buka Jadwal Perawatan",
-                                            tint = alertOnContainer,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                effectivePerawatanReminders.take(3).forEach { eval ->
-                                    val isLate = eval.status == PerawatanStatus.TERLAMBAT
-                                    val pillBg = if (isLate) MaterialTheme.colorScheme.errorContainer else santoyaColors.warningContainer
-                                    val pillFg = if (isLate) MaterialTheme.colorScheme.onErrorContainer else santoyaColors.onWarningContainer
-                                    val rowIconTint = if (isLate) MaterialTheme.colorScheme.error else santoyaColors.warning
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            PerawatanComponentIcon(
-                                                syncId = eval.item.syncId,
-                                                nama = eval.item.nama,
-                                                tint = rowIconTint,
-                                                accentColor = rowIconTint,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = eval.item.nama,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(SantoyaRadius.xs),
-                                            color = pillBg
-                                        ) {
-                                            Text(
-                                                text = PerawatanScheduler.formatStatusBadge(eval),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = pillFg,
-                                                maxLines = 1,
-                                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Menu Navigasi Utama — Bento Editorial Asimetris (1 Kartu Lebar + 2 Kartu Vertikal Asimetris + 1 Kartu Penuh)
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Menu Utama",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = "Akses Cepat Depot",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // BARIS 1: KARTU LEBAR UTAMA — TRANSAKSI (Mist Water Blue Surface + Water Blue & Leaf Line Art)
-                    EditorialPrimaryWideBentoCard(
-                        title = "Transaksi",
-                        subtitle = "Catat penjualan galon, pengantaran & pembayaran",
-                        badgeTag = "+ Nota Baru",
-                        surfaceTint = MaterialTheme.colorScheme.primaryContainer,
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        testTag = "nav_transaksi_button",
-                        onClick = {
-                            viewModel.setTransaksiTab(0)
-                            onNavigateToTransaksi()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        HydroGalonIcon(
-                            tint = MaterialTheme.colorScheme.primary,
-                            leafAccent = santoyaColors.success,
-                            modifier = Modifier.size(26.dp)
+                    if (hasDepotReminder) {
+                        DashboardDepotReminderCard(
+                            onSetupClick = { showDepotProfileSheet = true }
                         )
                     }
 
-                    if (!isKaryawan) {
-                        // BARIS 2: 2 KARTU HORIZONTAL BERDAMPINGAN (Ikon di Kiri, Teks di Kanan)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Max),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            EditorialCompactHorizontalBentoCard(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                title = "Pelanggan",
-                                subtitle = "${effectivePelangganList.size} Profil & Kasbon",
-                                iconContainerColor = santoyaColors.successContainer,
-                                accentColor = santoyaColors.success,
-                                testTag = "nav_pelanggan_button",
-                                onClick = {
-                                    viewModel.setPelangganTab(0)
-                                    onNavigateToPelanggan()
-                                }
-                            ) {
-                                HydroCustomerDropIcon(
-                                    tint = santoyaColors.success,
-                                    waterAccent = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(21.dp)
-                                )
-                            }
-
-                            EditorialCompactHorizontalBentoCard(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                title = "Pengeluaran",
-                                subtitle = "Catat biaya depot",
-                                iconContainerColor = MaterialTheme.colorScheme.errorContainer,
-                                accentColor = MaterialTheme.colorScheme.error,
-                                testTag = "nav_pengeluaran_button",
-                                onClick = onNavigateToPengeluaran
-                            ) {
-                                HydroExpenseFlowIcon(
-                                    tint = MaterialTheme.colorScheme.error,
-                                    leafAccent = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(21.dp)
-                                )
-                            }
-                        }
-
-                        // BARIS 3: 1 KARTU PENUH — LAPORAN & ANALITIK (Kombinasi Biru Air & Hijau Daun Logo)
-                        EditorialFullBannerBentoCard(
-                            title = "Laporan",
-                            subtitle = "Evaluasi omzet, komisi kurir & laba bersih",
-                            badgeTag = "Analitik",
-                            iconContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                            accentColor = MaterialTheme.colorScheme.primary,
-                            testTag = "nav_laporan_button",
-                            onClick = onNavigateToLaporan,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            HydroReportChartIcon(
-                                tint = MaterialTheme.colorScheme.primary,
-                                leafAccent = santoyaColors.success,
-                                modifier = Modifier.size(23.dp)
-                            )
-                        }
-                    } else {
-                        // Mode Karyawan: Kartu Pelanggan Penuh di bawah Transaksi
-                        EditorialFullBannerBentoCard(
-                            title = "Pelanggan",
-                            subtitle = "${effectivePelangganList.size} Profil pelanggan & catatan kasbon",
-                            badgeTag = "Data Pelanggan",
-                            iconContainerColor = santoyaColors.successContainer,
-                            accentColor = santoyaColors.success,
-                            testTag = "nav_pelanggan_button",
-                            onClick = {
-                                viewModel.setPelangganTab(0)
-                                onNavigateToPelanggan()
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            HydroCustomerDropIcon(
-                                tint = santoyaColors.success,
-                                waterAccent = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(23.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // 4. Aktivitas Transaksi Terbaru
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isShowingTodayTransactions) {
-                            "Transaksi Hari Ini"
-                        } else {
-                            "Transaksi Terakhir"
-                        },
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (effectiveTransaksiList.isNotEmpty()) {
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.sm),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                            modifier = Modifier.pressClickEffect(onClick = {
+                    HydroWaveHeroCard(
+                        isKaryawan = isKaryawan,
+                        isCompact = isCompact,
+                        pendapatanLunasHariIni = pendapatanLunasHariIni,
+                        labaBersihHariIni = labaBersihHariIni,
+                        totalPiutangAktif = totalPiutangAktif,
+                        totalGalonHariIni = totalGalonHariIni,
+                        estimasiGalonBulanIni = estimasiGalonBulanIni,
+                        karyawanMetrics = karyawanMetrics,
+                        activeKaryawan = effectiveActiveKaryawan,
+                        pelangganCount = effectivePelangganList.size,
+                        onPrimaryHeroClick = {
+                            if (isKaryawan) {
                                 viewModel.setTransaksiTab(1)
                                 onNavigateToTransaksi()
-                            })
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Lihat Semua",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(12.dp)
-                                )
+                            } else {
+                                viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                                onNavigateToLaporan()
                             }
+                        },
+                        onNetProfitClick = {
+                            viewModel.setLaporanPeriode(LaporanPeriode.HARI_INI)
+                            onNavigateToLaporan()
+                        },
+                        onReceivablesClick = {
+                            viewModel.setPelangganTab(1)
+                            onNavigateToPelanggan()
+                        },
+                        onGalonTodayClick = {
+                            viewModel.setTransaksiTab(0)
+                            onNavigateToTransaksi()
+                        },
+                        onMonthEstimateClick = {
+                            viewModel.setLaporanPeriode(LaporanPeriode.BULAN_INI)
+                            onNavigateToLaporan()
+                        },
+                        onStaffCustomersClick = {
+                            viewModel.setPelangganTab(0)
+                            onNavigateToPelanggan()
                         }
+                    )
+
+                    if (!isKaryawan && perawatanReminders.isNotEmpty()) {
+                        DashboardPerawatanReminderStrip(
+                            reminders = perawatanReminders,
+                            isCompact = isCompact,
+                            onClick = onNavigateToPerawatan
+                        )
                     }
                 }
             }
 
-            if (!isInitialDataLoaded && recentTransactionsToShow.isEmpty()) {
-                item {
-                    SantoyaLoadingSkeleton(
-                        itemCount = 2,
-                        message = "Memuat aktivitas terbaru..."
-                    )
-                }
-            } else if (recentTransactionsToShow.isEmpty()) {
-                item {
-                    SantoyaEmptyState(
-                        emptyType = SantoyaEmptyType.TRANSAKSI,
-                        title = "Belum ada transaksi",
-                        subtitle = if (isKaryawan) {
-                            "Belum ada penjualan. Catat orderan pertama hari ini."
+            if (isExpandedLayout) {
+                Row(
+                    modifier = Modifier
+                        .widthIn(max = 1080.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .navigationBarsPadding()
+                        .padding(
+                            start = horizontalPadding,
+                            end = horizontalPadding,
+                            top = topContentPadding,
+                            bottom = bottomContentPadding
+                        ),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(
+                        modifier = Modifier.weight(0.95f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        heroSection()
+                    }
+                    Column(
+                        modifier = Modifier.weight(1.05f),
+                        verticalArrangement = Arrangement.spacedBy(menuSpacing)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.dashboard_menu_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        BentoFeaturedTransaksiCard(
+                            todayGallons = totalGalonHariIni,
+                            todayOrderCount = todayTransactions.size,
+                            isCompact = isCompact,
+                            onClick = {
+                                viewModel.setTransaksiTab(0)
+                                onNavigateToTransaksi()
+                            }
+                        )
+                        if (!isKaryawan) {
+                            OwnerVerticalMenuList(
+                                customerCountText = customerCountText,
+                                totalPiutang = totalPiutangAktif,
+                                todayExpense = pengeluaranHariIni,
+                                profitMarginPercentText = marginPercentText,
+                                isCompact = isCompact,
+                                fitToScreen = false,
+                                onPelangganClick = {
+                                    viewModel.setPelangganTab(0)
+                                    onNavigateToPelanggan()
+                                },
+                                onPengeluaranClick = onNavigateToPengeluaran,
+                                onLaporanClick = onNavigateToLaporan
+                            )
                         } else {
-                            "Belum ada penjualan. Yuk catat transaksi pertama."
-                        },
-                        compact = true,
-                        primaryActionLabel = "Buat Transaksi",
-                        primaryActionIcon = Icons.Outlined.Add,
-                        onPrimaryAction = {
-                            viewModel.setTransaksiTab(0)
-                            onNavigateToTransaksi()
+                            KaryawanVerticalMenuList(
+                                customerCountText = customerCountText,
+                                totalPiutang = totalPiutangAktif,
+                                galonHariIni = karyawanMetrics.galonHariIni,
+                                pesananHariIni = karyawanMetrics.pesananHariIni,
+                                isCompact = isCompact,
+                                fitToScreen = false,
+                                onPelangganClick = {
+                                    viewModel.setPelangganTab(0)
+                                    onNavigateToPelanggan()
+                                },
+                                onHistoryClick = {
+                                    viewModel.setTransaksiTab(1)
+                                    onNavigateToTransaksi()
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             } else {
-                items(recentTransactionsToShow, key = { it.transaksi.id }) { detail ->
-                    val isKasbon = detail.transaksi.status.equals("Kasbon", ignoreCase = true)
-                    val metodeDisplay = if (isKasbon) {
-                        "Belum dibayar"
-                    } else {
-                        FormatUtils.formatMetodeBayarLabel(detail.transaksi.metode_bayar)
+                val rootColumnModifier = Modifier
+                    .widthIn(max = 640.dp)
+                    .fillMaxWidth()
+                    .let { base ->
+                        if (fitMenuToRemainingScreen) {
+                            base.fillMaxHeight()
+                        } else {
+                            base.verticalScroll(scrollState)
+                        }
                     }
-                    val subInfoParts = mutableListOf("${detail.transaksi.jumlah} Galon", metodeDisplay)
-                    if (detail.kurir != null) {
-                        subInfoParts.add(detail.kurir.nama)
-                    }
-                    if (!isShowingTodayTransactions) {
-                        subInfoParts.add(FormatUtils.formatDateUi(detail.transaksi.tanggal))
-                    }
+                    .navigationBarsPadding()
+                    .padding(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = topContentPadding,
+                        bottom = bottomContentPadding
+                    )
 
-                    val statusAccent = if (isKasbon) santoyaColors.warning else santoyaColors.success
-
-                    HydroBentoCard(
-                        accentColor = statusAccent,
-                        cornerRadius = SantoyaRadius.lg,
-                        tintAlpha = 0.05f,
-                        showWaterRipple = false,
-                        modifier = Modifier.fillMaxWidth()
+                Column(modifier = rootColumnModifier) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .onSizeChanged { size ->
+                                if (topSectionHeightPx != size.height) {
+                                    topSectionHeightPx = size.height
+                                }
+                            }
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 12.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(3.5.dp)
-                                        .height(36.dp)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(statusAccent)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.md),
-                                    color = if (isKasbon) santoyaColors.warningContainer else MaterialTheme.colorScheme.primaryContainer,
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (isKasbon) santoyaColors.warning.copy(alpha = 0.35f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-                                    ),
-                                    modifier = Modifier.size(38.dp)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        HydroGalonIcon(
-                                            tint = if (isKasbon) santoyaColors.warning else MaterialTheme.colorScheme.primary,
-                                            leafAccent = if (isKasbon) santoyaColors.warning else santoyaColors.success,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = detail.pelanggan?.nama ?: "Pelanggan Umum",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f, fill = false)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Surface(
-                                            shape = RoundedCornerShape(SantoyaRadius.xs),
-                                            color = if (isKasbon) santoyaColors.warningContainer else santoyaColors.successContainer
-                                        ) {
-                                            Text(
-                                                text = detail.transaksi.status.uppercase(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (isKasbon) santoyaColors.onWarningContainer else santoyaColors.onSuccessContainer,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = subInfoParts.joinToString(" • "),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = if (isKasbon) santoyaColors.warning else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
+                        heroSection()
+
+                        Spacer(modifier = Modifier.height(if (isCompact) 12.dp else 14.dp))
+
+                        Text(
+                            text = stringResource(R.string.dashboard_menu_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 10.dp))
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .let { base -> if (fitMenuToRemainingScreen) base.weight(1f) else base },
+                        verticalArrangement = Arrangement.spacedBy(menuSpacing)
+                    ) {
+                        BentoFeaturedTransaksiCard(
+                            todayGallons = totalGalonHariIni,
+                            todayOrderCount = todayTransactions.size,
+                            isCompact = isCompact,
+                            onClick = {
+                                viewModel.setTransaksiTab(0)
+                                onNavigateToTransaksi()
+                            },
+                            modifier = if (fitMenuToRemainingScreen) {
+                                Modifier.weight(if (isKaryawan) 0.36f else 0.28f)
+                            } else {
+                                Modifier
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                SantoyaAdaptiveCurrencyText(
-                                    amount = detail.transaksi.total_harga,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    minFontSize = 11.sp,
-                                    textAlign = TextAlign.End,
-                                    modifier = Modifier.widthIn(max = 118.dp)
-                                )
-                                IconButton(
-                                    onClick = {
-                                        val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
-                                            ?: effectivePelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
-                                            ?: 0.0
-                                        val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                        viewModel.showReceiptDialog(
-                                            ActiveReceiptDialog(
-                                                title = "Struk Transaksi Penjualan",
-                                                receiptText = text,
-                                                customerPhone = detail.pelanggan?.no_hp,
-                                                data = detail
-                                            )
-                                        )
-                                    },
-                                    modifier = Modifier.size(SantoyaSize.touchTarget)
-                                ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(SantoyaRadius.sm),
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                                        modifier = Modifier.size(34.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            HydroReceiptNoteIcon(
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(17.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                        )
+
+                        if (!isKaryawan) {
+                            OwnerVerticalMenuList(
+                                customerCountText = customerCountText,
+                                totalPiutang = totalPiutangAktif,
+                                todayExpense = pengeluaranHariIni,
+                                profitMarginPercentText = marginPercentText,
+                                isCompact = isCompact,
+                                fitToScreen = fitMenuToRemainingScreen,
+                                onPelangganClick = {
+                                    viewModel.setPelangganTab(0)
+                                    onNavigateToPelanggan()
+                                },
+                                onPengeluaranClick = onNavigateToPengeluaran,
+                                onLaporanClick = onNavigateToLaporan,
+                                modifier = if (fitMenuToRemainingScreen) Modifier.weight(0.72f) else Modifier
+                            )
+                        } else {
+                            KaryawanVerticalMenuList(
+                                customerCountText = customerCountText,
+                                totalPiutang = totalPiutangAktif,
+                                galonHariIni = karyawanMetrics.galonHariIni,
+                                pesananHariIni = karyawanMetrics.pesananHariIni,
+                                isCompact = isCompact,
+                                fitToScreen = fitMenuToRemainingScreen,
+                                onPelangganClick = {
+                                    viewModel.setPelangganTab(0)
+                                    onNavigateToPelanggan()
+                                },
+                                onHistoryClick = {
+                                    viewModel.setTransaksiTab(1)
+                                    onNavigateToTransaksi()
+                                },
+                                modifier = if (fitMenuToRemainingScreen) Modifier.weight(0.64f) else Modifier
+                            )
                         }
                     }
                 }
@@ -1660,8 +567,13 @@ fun DashboardScreen(
     if (showKaryawanSignOutDialog && onSignOut != null) {
         AlertDialog(
             onDismissRequest = { showKaryawanSignOutDialog = false },
-            title = { Text("Keluar Akun Karyawan", fontWeight = FontWeight.Bold) },
-            text = { Text("Keluar dari akun Google ini sekarang?") },
+            title = {
+                Text(
+                    text = stringResource(R.string.dashboard_staff_sign_out_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = { Text(stringResource(R.string.dashboard_staff_sign_out_message)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -1673,312 +585,87 @@ fun DashboardScreen(
                         contentColor = MaterialTheme.colorScheme.onError
                     )
                 ) {
-                    Text("Keluar")
+                    Text(stringResource(R.string.action_sign_out))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showKaryawanSignOutDialog = false }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
     }
 
     if (showSyncInfoSheet) {
-        val context = LocalContext.current
         val currentUser = Firebase.auth.currentUser
         val currentUserId = currentUser?.uid
-        val canSwitchToStaffWaiting = !KaryawanScopeHelper.isPrimaryOwnerEmail(currentUser?.email) &&
+        val canSwitchToStaffWaiting = !isOfflineMode &&
+            !KaryawanScopeHelper.isPrimaryOwnerEmail(currentUser?.email) &&
             (!isKaryawan || !KaryawanScopeHelper.isPrimaryOwnerEmail(syncState.ownerEmail))
         SantoyaSyncInfoBottomSheet(
             syncState = syncState,
+            isOfflineLocalMode = isOfflineMode,
             onDismiss = { showSyncInfoSheet = false },
             onSyncNow = {
                 currentUserId?.let { uid ->
                     viewModel.syncToCloud(context, uid)
                 }
             },
+            onConnectGoogleAccount = if (isOfflineMode) {
+                {
+                    GoogleSignInHelper.signIn(
+                        context = context,
+                        credentialManager = credentialManager,
+                        coroutineScope = coroutineScope,
+                        onLoadingChange = {},
+                        onSuccess = onGoogleLinked,
+                        onError = { msg -> viewModel.showSnackbar(msg) }
+                    )
+                }
+            } else {
+                null
+            },
             onNavigateToSettings = if (!isKaryawan) {
                 {
                     showSyncInfoSheet = false
                     onNavigateToSettings()
                 }
-            } else null,
+            } else {
+                null
+            },
             onSwitchToStaffWaiting = if (canSwitchToStaffWaiting) {
                 {
                     showSyncInfoSheet = false
                     viewModel.switchToStaffWaitingMode()
                 }
-            } else null
+            } else {
+                null
+            }
         )
     }
-}
 
-/**
- * 1. KARTU LEBAR UTAMA (Full-Width Primary Editorial Bento)
- * Menggunakan permukaan Biru Muda Sejuk (#E8F3FC) solid dengan aksen Biru Air & Hijau Daun.
- */
-@Composable
-private fun EditorialPrimaryWideBentoCard(
-    title: String,
-    subtitle: String,
-    badgeTag: String,
-    surfaceTint: Color,
-    accentColor: Color,
-    testTag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    iconContent: @Composable () -> Unit
-) {
-    val santoyaColors = MaterialTheme.santoyaColors
-    val onContainerColor = MaterialTheme.colorScheme.onPrimaryContainer
-    Surface(
-        shape = RoundedCornerShape(SantoyaRadius.xl),
-        color = surfaceTint,
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.42f)),
-        shadowElevation = 0.dp,
-        modifier = modifier
-            .testTag(testTag)
-            .pressClickEffect(pressedScale = 0.98f, onClick = onClick)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .drawBehind {
-                    val w = size.width
-                    val h = size.height
-                    val leafArc = Path().apply {
-                        moveTo(w * 0.80f, h)
-                        quadraticTo(w * 0.88f, h * 0.45f, w, h * 0.25f)
-                    }
-                    drawPath(
-                        path = leafArc,
-                        color = santoyaColors.success.copy(alpha = 0.16f),
-                        style = Stroke(width = 1.8.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-                .padding(horizontal = 16.dp, vertical = 15.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(SantoyaRadius.lg),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        iconContent()
+    if (showDepotProfileSheet) {
+        val isOwnerProfile = !isKaryawan && depotProfile.isOwnerRole()
+        DepotProfileEditSheet(
+            profile = depotProfile,
+            isOwner = isOwnerProfile,
+            isSaving = isBusyAction,
+            onDismiss = { showDepotProfileSheet = false },
+            onSave = { owner, depot, phone, addr, footer, depotType, tankCapacity ->
+                viewModel.saveDepotProfile(
+                    ownerName = owner,
+                    depotName = depot,
+                    phoneNumber = phone,
+                    address = addr,
+                    receiptFooter = footer,
+                    depotType = depotType,
+                    tankCapacityLiters = tankCapacity
+                ) { ok ->
+                    if (ok) {
+                        showDepotProfileSheet = false
                     }
                 }
-                Spacer(modifier = Modifier.width(14.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = onContainerColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = onContainerColor.copy(alpha = 0.78f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
-            Spacer(modifier = Modifier.width(10.dp))
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = accentColor
-            ) {
-                Text(
-                    text = badgeTag,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
-                )
-            }
-        }
-    }
-}
-
-/**
- * 2. KARTU HORIZONTAL 2 KOLOM (Pelanggan & Pengeluaran)
- * Tata letak sejajar horizontal (ikon di kiri, judul & subjudul di kanan) selaras dengan kartu Laporan.
- */
-@Composable
-private fun EditorialCompactHorizontalBentoCard(
-    title: String,
-    subtitle: String,
-    iconContainerColor: Color,
-    accentColor: Color,
-    testTag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    iconContent: @Composable () -> Unit
-) {
-    HydroBentoCard(
-        accentColor = accentColor,
-        cornerRadius = SantoyaRadius.lg,
-        tintAlpha = 0.04f,
-        showWaterRipple = true,
-        onClick = onClick,
-        modifier = modifier.testTag(testTag)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = RoundedCornerShape(SantoyaRadius.md),
-                color = iconContainerColor,
-                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    iconContent()
-                }
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
-    }
-}
-
-/**
- * 3. KARTU PENUH EDITORIAL (Full-Width Bottom Banner Bento — Laporan)
- * Tata letak horizontal bersih dengan ikon Line Art di kiri, deskripsi di tengah, dan lencana/panah di kanan.
- */
-@Composable
-private fun EditorialFullBannerBentoCard(
-    title: String,
-    subtitle: String,
-    badgeTag: String,
-    iconContainerColor: Color,
-    accentColor: Color,
-    testTag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    iconContent: @Composable () -> Unit
-) {
-    val santoyaColors = MaterialTheme.santoyaColors
-    HydroBentoCard(
-        accentColor = accentColor,
-        cornerRadius = SantoyaRadius.lg,
-        tintAlpha = 0.05f,
-        showWaterRipple = true,
-        onClick = onClick,
-        modifier = modifier.testTag(testTag)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 15.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(SantoyaRadius.md),
-                    color = iconContainerColor,
-                    border = BorderStroke(1.dp, accentColor.copy(alpha = 0.28f)),
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        iconContent()
-                    }
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.xs),
-                            color = santoyaColors.successContainer,
-                            border = BorderStroke(1.dp, santoyaColors.success.copy(alpha = 0.3f))
-                        ) {
-                            Text(
-                                text = badgeTag,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = santoyaColors.onSuccessContainer,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                maxLines = 1
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Surface(
-                shape = CircleShape,
-                color = iconContainerColor,
-                border = BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
-                modifier = Modifier.size(32.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowForward,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-            }
-        }
+        )
     }
 }

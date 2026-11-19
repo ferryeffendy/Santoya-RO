@@ -54,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,6 +66,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.credentials.CredentialManager
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.BuildConfig
 import com.example.R
@@ -72,11 +74,12 @@ import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
 import com.example.data.entity.TransaksiDetail
-import com.example.ui.components.HydroCourierWaveIcon
-import com.example.ui.components.HydroGalonIcon
-import com.example.ui.components.HydroMaintenanceWrenchIcon
+import com.example.ui.components.DepotProfileEditSheet
+import com.example.ui.components.DepotProfileSummaryCard
 import com.example.ui.components.ImportJsonDialog
 import com.example.ui.components.RealtimeSyncStatusPill
+import com.example.ui.components.SyncActiveStageProgressBox
+import com.example.ui.components.SyncQueueBreakdownChips
 import com.example.ui.theme.SantoyaRadius
 import com.example.ui.theme.SantoyaSize
 import com.example.ui.theme.SantoyaSpacing
@@ -84,6 +87,7 @@ import com.example.ui.theme.pressClickEffect
 import com.example.ui.theme.santoyaColors
 import com.example.util.ExportHelper
 import com.example.util.FormatUtils
+import com.example.util.GoogleSignInHelper
 import com.example.util.SyncConnectionStatus
 import com.example.viewmodel.SantoyaScreen
 import com.example.viewmodel.SantoyaViewModel
@@ -97,23 +101,37 @@ fun SettingsScreen(
     transaksiList: List<TransaksiDetail>,
     produkList: List<Produk>,
     kurirList: List<Kurir>,
+    isOfflineMode: Boolean = false,
+    onExitOfflineToAuth: () -> Unit = {},
+    onGoogleLinked: () -> Unit = {},
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val credentialManager = remember { CredentialManager.create(context) }
+    val coroutineScope = rememberCoroutineScope()
     var showImportDialog by remember { mutableStateOf(false) }
     var showSignOutDialog by remember { mutableStateOf(false) }
+    var showExitOfflineDialog by remember { mutableStateOf(false) }
+    var showResetOfflineDialog by remember { mutableStateOf(false) }
+    var isLinkingGoogle by remember { mutableStateOf(false) }
     var showRestoreCloudDialog by remember { mutableStateOf(false) }
-    var showCloudDiagnosticDialog by remember { mutableStateOf(false) }
+    var showForcePushCloudDialog by remember { mutableStateOf(false) }
+    var showRestoreAutoBackupDialog by remember { mutableStateOf(false) }
 
+    val isKaryawan by viewModel.isKaryawan.collectAsStateWithLifecycle()
+    val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
+    val hasPendingProfileSync by viewModel.hasPendingProfileSync.collectAsStateWithLifecycle()
+    val isBusyAction by viewModel.isBusyAction.collectAsStateWithLifecycle()
     val isSyncingCloud by viewModel.isSyncingCloud.collectAsStateWithLifecycle()
     val activeSyncPushMode by viewModel.activeSyncPushMode.collectAsStateWithLifecycle()
     val cloudSyncError by viewModel.cloudSyncError.collectAsStateWithLifecycle()
     val lastSyncSummary by viewModel.lastSyncSummary.collectAsStateWithLifecycle()
     val syncState by viewModel.realtimeSyncState.collectAsStateWithLifecycle()
     val perawatanEvaluations by viewModel.allPerawatanEvaluations.collectAsStateWithLifecycle()
-    val perawatanReminders by viewModel.perawatanReminders.collectAsStateWithLifecycle()
-    val currentUser = remember { Firebase.auth.currentUser }
+    val currentUser = remember(isOfflineMode) { if (isOfflineMode) null else Firebase.auth.currentUser }
+    var showDepotProfileSheet by remember { mutableStateOf(false) }
+    val isOwnerProfile = !isKaryawan && depotProfile.isOwnerRole()
 
     LazyColumn(
         modifier = modifier
@@ -123,9 +141,35 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp)
     ) {
 
-        // 1. Profil Pemilik
+        // 0. Profil Pemilik & Depot (untuk kop struk Bluetooth, nota WhatsApp, dan laporan PDF)
         item {
-            SettingsSectionTitle(stringResource(R.string.settings_section_profile))
+            SettingsSectionTitle(stringResource(R.string.depot_profile_section_title))
+            Spacer(modifier = Modifier.height(8.dp))
+            DepotProfileSummaryCard(
+                profile = depotProfile,
+                isOwner = isOwnerProfile,
+                onClick = { showDepotProfileSheet = true },
+                hasPendingSync = hasPendingProfileSync,
+                isOfflineMode = isOfflineMode,
+                onCopyProfile = { summaryText ->
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                    if (clipboard != null) {
+                        val clip = android.content.ClipData.newPlainText("Profil Depot", summaryText)
+                        clipboard.setPrimaryClip(clip)
+                        viewModel.showSnackbar(context.getString(R.string.depot_profile_copied_snackbar))
+                    }
+                }
+            )
+        }
+
+        // 1. Profil Pengguna (Pemilik / Karyawan)
+        item {
+            val sectionTitle = if (isKaryawan) {
+                stringResource(R.string.settings_section_profile_staff)
+            } else {
+                stringResource(R.string.settings_section_profile_owner)
+            }
+            SettingsSectionTitle(sectionTitle)
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -142,14 +186,22 @@ fun SettingsScreen(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
+                            color = when {
+                                isOfflineMode -> MaterialTheme.santoyaColors.warningContainer
+                                isKaryawan -> MaterialTheme.colorScheme.tertiaryContainer
+                                else -> MaterialTheme.colorScheme.primaryContainer
+                            },
                             modifier = Modifier.size(46.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
                                     imageVector = Icons.Outlined.AccountCircle,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = when {
+                                        isOfflineMode -> MaterialTheme.santoyaColors.warning
+                                        isKaryawan -> MaterialTheme.colorScheme.tertiary
+                                        else -> MaterialTheme.colorScheme.primary
+                                    },
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -158,8 +210,18 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(14.dp))
 
                         Column(modifier = Modifier.weight(1f)) {
+                            val defaultName = when {
+                                isOfflineMode -> stringResource(R.string.offline_profile_title)
+                                isKaryawan -> stringResource(R.string.settings_profile_default_karyawan)
+                                else -> stringResource(R.string.settings_profile_default_owner)
+                            }
+                            val defaultAccount = when {
+                                isOfflineMode -> stringResource(R.string.offline_profile_subtitle)
+                                isKaryawan -> stringResource(R.string.settings_profile_account_karyawan)
+                                else -> stringResource(R.string.settings_profile_account_owner)
+                            }
                             Text(
-                                text = currentUser?.displayName?.takeIf { it.isNotBlank() } ?: "Pemilik Santoya RO",
+                                text = currentUser?.displayName?.takeIf { it.isNotBlank() } ?: defaultName,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -167,7 +229,7 @@ fun SettingsScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = currentUser?.email?.takeIf { it.isNotBlank() } ?: "Akun Utama Depot",
+                                text = currentUser?.email?.takeIf { it.isNotBlank() } ?: defaultAccount,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -176,23 +238,39 @@ fun SettingsScreen(
                         }
 
                         IconButton(
-                            onClick = { showSignOutDialog = true },
+                            onClick = {
+                                if (isOfflineMode) {
+                                    showExitOfflineDialog = true
+                                } else {
+                                    showSignOutDialog = true
+                                }
+                            },
                             modifier = Modifier
                                 .size(SantoyaSize.touchTarget)
                                 .testTag("btn_sign_out")
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Outlined.Logout,
-                                contentDescription = "Keluar Akun",
+                                contentDescription = stringResource(R.string.settings_sign_out_cd),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
+                    val badgeText = when {
+                        isOfflineMode -> stringResource(R.string.offline_mode_badge)
+                        isKaryawan -> stringResource(R.string.settings_profile_badge_karyawan)
+                        else -> stringResource(R.string.settings_profile_badge_owner)
+                    }
+                    val badgeColor = when {
+                        isOfflineMode -> MaterialTheme.santoyaColors.warning
+                        isKaryawan -> MaterialTheme.colorScheme.tertiary
+                        else -> MaterialTheme.santoyaColors.success
+                    }
                     Surface(
                         shape = RoundedCornerShape(SantoyaRadius.sm),
-                        color = MaterialTheme.santoyaColors.success.copy(alpha = 0.12f)
+                        color = badgeColor.copy(alpha = 0.12f)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
@@ -201,93 +279,120 @@ fun SettingsScreen(
                             Box(
                                 modifier = Modifier
                                     .size(7.dp)
-                                    .background(color = MaterialTheme.santoyaColors.success, shape = CircleShape)
+                                    .background(color = badgeColor, shape = CircleShape)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Akses Pemilik Aktif",
+                                text = badgeText,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.santoyaColors.success
+                                color = badgeColor
                             )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(SantoyaRadius.sm),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(
+                                R.string.settings_profile_stats,
+                                pelangganList.size,
+                                produkList.size,
+                                transaksiList.size
+                            ),
+                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
                     }
                 }
             }
         }
 
-        // 2. Kelola Depot (Master Data dinaikkan ke posisi ke-2)
-        item {
-            SettingsSectionTitle(stringResource(R.string.settings_section_depot))
-            Spacer(modifier = Modifier.height(8.dp))
+        // 1B. Master Data Operasional Depot (Produk & Harga, Kurir & Komisi, Perawatan Mesin)
+        if (!isKaryawan) {
+            item {
+                SettingsSectionTitle(stringResource(R.string.settings_section_depot))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            Card(
-                shape = RoundedCornerShape(SantoyaRadius.lg),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column {
-                    SettingsMenuRow(
-                        title = "Produk & Harga",
-                        subtitle = "${produkList.size} produk • Atur jenis & harga jual galon",
-                        iconColor = MaterialTheme.santoyaColors.success,
-                        onClick = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
-                        modifier = Modifier.testTag("menu_master_produk"),
-                        iconContent = {
-                            HydroGalonIcon(
-                                tint = MaterialTheme.santoyaColors.success,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    SettingsMenuRow(
-                        title = "Karyawan & Komisi",
-                        subtitle = "${kurirList.size} karyawan • Atur akun kurir & komisi antar",
-                        iconColor = MaterialTheme.colorScheme.tertiary,
-                        onClick = { viewModel.navigateTo(SantoyaScreen.KURIR) },
-                        modifier = Modifier.testTag("menu_kelola_kurir"),
-                        iconContent = {
-                            HydroCourierWaveIcon(
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                    )
-                    val perawatanSubtitle = if (perawatanReminders.isNotEmpty()) {
-                        "${perawatanEvaluations.size} jadwal • ${perawatanReminders.size} perlu perhatian"
-                    } else {
-                        "${perawatanEvaluations.size} jadwal • Atur servis & ganti filter RO"
+                Card(
+                    shape = RoundedCornerShape(SantoyaRadius.lg),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        SettingsMenuRow(
+                            title = stringResource(R.string.settings_menu_produk_title),
+                            subtitle = stringResource(R.string.settings_menu_produk_subtitle, produkList.size),
+                            iconColor = MaterialTheme.santoyaColors.success,
+                            onClick = { viewModel.navigateTo(SantoyaScreen.PRODUK) },
+                            modifier = Modifier.testTag("settings_nav_produk_button"),
+                            iconContent = {
+                                com.example.ui.components.HydroGalonIcon(
+                                    tint = MaterialTheme.santoyaColors.success,
+                                    leafAccent = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        )
+
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+
+                        SettingsMenuRow(
+                            title = stringResource(R.string.settings_menu_kurir_title),
+                            subtitle = stringResource(R.string.settings_menu_kurir_subtitle, kurirList.size),
+                            iconColor = MaterialTheme.colorScheme.primary,
+                            onClick = { viewModel.navigateTo(SantoyaScreen.KURIR) },
+                            modifier = Modifier.testTag("settings_nav_kurir_button"),
+                            iconContent = {
+                                com.example.ui.components.HydroCourierWaveIcon(
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        )
+
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+
+                        val dueCount = perawatanEvaluations.count { it.isReminderDue }
+                        SettingsMenuRow(
+                            title = stringResource(R.string.settings_menu_perawatan_title),
+                            subtitle = if (dueCount > 0) {
+                                stringResource(R.string.settings_menu_perawatan_subtitle_alert, perawatanEvaluations.size, dueCount)
+                            } else {
+                                stringResource(R.string.settings_menu_perawatan_subtitle_normal, perawatanEvaluations.size)
+                            },
+                            iconColor = MaterialTheme.santoyaColors.warning,
+                            onClick = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
+                            modifier = Modifier.testTag("settings_nav_perawatan_button"),
+                            iconContent = {
+                                com.example.ui.components.HydroMaintenanceWrenchIcon(
+                                    tint = MaterialTheme.santoyaColors.warning,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        )
                     }
-                    SettingsMenuRow(
-                        title = "Jadwal Perawatan RO",
-                        subtitle = perawatanSubtitle,
-                        iconColor = MaterialTheme.colorScheme.primary,
-                        onClick = { viewModel.navigateTo(SantoyaScreen.PERAWATAN) },
-                        modifier = Modifier.testTag("menu_jadwal_perawatan"),
-                        iconContent = {
-                            HydroMaintenanceWrenchIcon(
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    )
                 }
             }
         }
 
-        // 3. Sinkronisasi Antar Perangkat (Gabungan Cloud + Offline-First)
+        // 2. Sinkronisasi Antar Perangkat (Gabungan Cloud + Offline-First)
         item {
             SettingsSectionTitle(stringResource(R.string.settings_section_sync))
             Spacer(modifier = Modifier.height(8.dp))
@@ -331,7 +436,11 @@ fun SettingsScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = stringResource(R.string.settings_sync_subtitle),
+                                text = if (isOfflineMode) {
+                                    stringResource(R.string.offline_profile_subtitle)
+                                } else {
+                                    stringResource(R.string.settings_sync_subtitle)
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -357,91 +466,185 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = Icons.Outlined.Shield,
                                     contentDescription = null,
-                                    tint = MaterialTheme.santoyaColors.success,
+                                    tint = if (isOfflineMode) MaterialTheme.santoyaColors.warning else MaterialTheme.santoyaColors.success,
                                     modifier = Modifier.size(15.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = stringResource(R.string.settings_sync_offline_note),
+                                    text = if (isOfflineMode) {
+                                        stringResource(R.string.offline_mode_badge)
+                                    } else {
+                                        stringResource(R.string.settings_sync_offline_note)
+                                    },
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
 
-                            if (syncState.pendingCount > 0) {
+                            if (isOfflineMode) {
                                 Text(
-                                    text = "${syncState.pendingCount} transaksi menunggu koneksi untuk dikirim",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.santoyaColors.warning
-                                )
-                            }
-
-                            val lastSyncedAt = syncState.lastSyncedAt
-                            if (lastSyncedAt != null) {
-                                Text(
-                                    text = "Terakhir diperbarui: ${FormatUtils.formatDate(lastSyncedAt)}",
+                                    text = stringResource(R.string.offline_connect_google_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (syncState.pendingCount > 0) {
+                                    Text(
+                                        text = stringResource(R.string.offline_sync_sheet_merge_ready, syncState.pendingCount),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.santoyaColors.warning
+                                    )
+                                }
+                                if (syncState.pendingByCollection.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    SyncQueueBreakdownChips(pendingByCollection = syncState.pendingByCollection)
+                                }
                             } else {
-                                Text(
-                                    text = "Semua perubahan langsung tersimpan ke Cloud.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                                if (syncState.pendingCount > 0) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.settings_sync_pending_count, syncState.pendingCount),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.santoyaColors.warning,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (!isSyncingCloud) {
+                                            TextButton(
+                                                onClick = { viewModel.retryPendingSyncNow() },
+                                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                modifier = Modifier
+                                                    .heightIn(min = 32.dp)
+                                                    .testTag("btn_retry_pending_queue_now")
+                                            ) {
+                                                Text(
+                                                    text = stringResource(R.string.sync_btn_retry_queue_now),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
 
-                            lastSyncSummary?.let { summary ->
-                                Text(
-                                    text = "Rekap Cloud: ${summary.pelangganCount} pelanggan • ${summary.transaksiCount} transaksi",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                if (syncState.pendingByCollection.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    SyncQueueBreakdownChips(pendingByCollection = syncState.pendingByCollection)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                }
+
+                                if (syncState.isAutoRetryScheduled && syncState.autoRetryAttempt > 0) {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.sync_auto_retry_scheduled_note,
+                                            syncState.autoRetryAttempt,
+                                            syncState.maxAutoRetryAttempts
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.santoyaColors.warning
+                                    )
+                                }
+
+                                if (syncState.expectedListenerCount > 0) {
+                                    val isHealthy = syncState.activeListenerCount >= syncState.expectedListenerCount
+                                    val healthColor = if (isHealthy) {
+                                        MaterialTheme.santoyaColors.success
+                                    } else {
+                                        MaterialTheme.santoyaColors.warning
+                                    }
+                                    val healthNote = if (isHealthy) {
+                                        stringResource(R.string.sync_channel_health_healthy)
+                                    } else {
+                                        stringResource(R.string.sync_channel_health_degraded)
+                                    }
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(6.dp)
+                                                .background(color = healthColor, shape = CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "${
+                                                stringResource(
+                                                    R.string.sync_channel_health_format,
+                                                    syncState.activeListenerCount,
+                                                    syncState.expectedListenerCount
+                                                )
+                                            } • $healthNote",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                val lastSyncedAt = syncState.lastSyncedAt
+                                if (lastSyncedAt != null) {
+                                    Text(
+                                        text = stringResource(R.string.settings_sync_last_synced, FormatUtils.formatDateTime(lastSyncedAt)),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.settings_sync_realtime_note),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                lastSyncSummary?.let { summary ->
+                                    Text(
+                                        text = if (isKaryawan) {
+                                            stringResource(
+                                                R.string.settings_sync_summary_recap,
+                                                summary.pelangganCount,
+                                                summary.transaksiCount
+                                            )
+                                        } else {
+                                            stringResource(
+                                                R.string.settings_sync_summary_recap_full,
+                                                summary.pelangganCount,
+                                                summary.transaksiCount,
+                                                summary.produkCount,
+                                                summary.kurirCount,
+                                                summary.pengeluaranCount
+                                            )
+                                        },
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
 
-                    AnimatedVisibility(visible = isSyncingCloud) {
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.sm),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                    val activeStageLabel = syncState.syncStageLabel?.takeIf { it.isNotBlank() }
+                        ?: if (isSyncingCloud) {
+                            if (activeSyncPushMode == false) {
+                                stringResource(R.string.settings_sync_pull_progress)
+                            } else {
+                                stringResource(R.string.settings_sync_push_progress)
+                            }
+                        } else {
+                            null
+                        }
+
+                    AnimatedVisibility(visible = isSyncingCloud || activeStageLabel != null) {
+                        SyncActiveStageProgressBox(
+                            stageLabel = activeStageLabel ?: stringResource(R.string.settings_sync_push_progress),
+                            progressFraction = syncState.syncProgressFraction,
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .padding(top = 10.dp)
                                 .testTag("banner_sync_loading")
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = if (activeSyncPushMode == false) {
-                                            stringResource(R.string.settings_sync_pull_progress)
-                                        } else {
-                                            stringResource(R.string.settings_sync_push_progress)
-                                        },
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(8.dp))
-                                LinearProgressIndicator(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.surface
-                                )
-                            }
-                        }
+                        )
                     }
 
                     val effectiveSyncError = cloudSyncError?.takeIf { it.isNotBlank() }
@@ -478,7 +681,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
                                     Text(
-                                        text = effectiveSyncError ?: "Periksa koneksi internet Anda.",
+                                        text = effectiveSyncError ?: stringResource(R.string.settings_sync_error_default),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onErrorContainer
                                     )
@@ -502,144 +705,36 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Surface(
-                        shape = RoundedCornerShape(SantoyaRadius.sm),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Penggunaan Firestore Sesi Ini",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                                TextButton(
-                                    onClick = { showCloudDiagnosticDialog = true },
-                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                                    modifier = Modifier
-                                        .height(28.dp)
-                                        .testTag("btn_open_cloud_diagnostic")
-                                ) {
-                                    Text(
-                                        text = "Detail Ukur",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text(
-                                            text = "Reads Sesi Ini",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                        Text(
-                                            text = "${syncState.sessionReads} Dokumen",
-                                            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(SantoyaRadius.sm),
-                                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Column(modifier = Modifier.padding(8.dp)) {
-                                        Text(
-                                            text = "Writes Sesi Ini",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                        Text(
-                                            text = "${syncState.sessionWrites} Dokumen",
-                                            style = MaterialTheme.typography.titleSmall.copy(fontFeatureSettings = "tnum"),
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.secondary
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Text(
-                                text = "Kuota gratis Spark: 50.000 reads & 20.000 writes/hari. Cache lokal SQLite menyerap pembacaan layar kasir (0 reads cloud).",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
+                    if (isOfflineMode) {
                         Button(
                             onClick = {
-                                val uid = currentUser?.uid
-                                if (!uid.isNullOrBlank()) {
-                                    viewModel.syncToCloud(context, uid)
-                                }
+                                GoogleSignInHelper.signIn(
+                                    context = context,
+                                    credentialManager = credentialManager,
+                                    coroutineScope = coroutineScope,
+                                    onLoadingChange = { isLinkingGoogle = it },
+                                    onSuccess = onGoogleLinked,
+                                    onError = { msg -> viewModel.showSnackbar(msg) }
+                                )
                             },
-                            enabled = !isSyncingCloud && currentUser != null,
+                            enabled = !isLinkingGoogle,
                             shape = RoundedCornerShape(SantoyaRadius.md),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .height(SantoyaSize.touchTarget)
-                                .testTag("btn_sync_to_cloud")
+                                .testTag("btn_connect_google_offline")
                         ) {
-                            if (isSyncingCloud && activeSyncPushMode != false) {
+                            if (isLinkingGoogle) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_sync_btn_backing_up),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
                                 )
                             } else {
                                 Icon(
@@ -647,58 +742,199 @@ fun SettingsScreen(
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.offline_connect_google_btn),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { showExitOfflineDialog = true },
+                                enabled = !isLinkingGoogle,
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(SantoyaSize.touchTarget)
+                                    .testTag("btn_exit_offline_to_auth")
+                            ) {
                                 Text(
-                                    text = stringResource(R.string.settings_sync_btn_backup),
-                                    style = MaterialTheme.typography.titleSmall,
+                                    text = stringResource(R.string.offline_exit_to_login_btn),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { showResetOfflineDialog = true },
+                                enabled = !isLinkingGoogle,
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(SantoyaSize.touchTarget)
+                                    .testTag("btn_reset_offline_data")
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.offline_reset_data_btn),
+                                    style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val uid = currentUser?.uid
+                                    if (!uid.isNullOrBlank()) {
+                                        viewModel.syncToCloud(context, uid)
+                                    }
+                                },
+                                enabled = !isSyncingCloud && currentUser != null,
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary
+                                ),
+                                modifier = if (isKaryawan) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(SantoyaSize.touchTarget)
+                                        .testTag("btn_sync_to_cloud")
+                                } else {
+                                    Modifier
+                                        .weight(1f)
+                                        .height(SantoyaSize.touchTarget)
+                                        .testTag("btn_sync_to_cloud")
+                                }
+                            ) {
+                                if (isSyncingCloud && activeSyncPushMode != false) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.settings_sync_btn_backing_up),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Outlined.CloudUpload,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.settings_sync_btn_backup),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+
+                            if (!isKaryawan) {
+                                OutlinedButton(
+                                    onClick = { showRestoreCloudDialog = true },
+                                    enabled = !isSyncingCloud && currentUser != null,
+                                    shape = RoundedCornerShape(SantoyaRadius.md),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.primary
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(SantoyaSize.touchTarget)
+                                        .testTag("btn_restore_from_cloud")
+                                ) {
+                                    if (isSyncingCloud && activeSyncPushMode == false) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            strokeWidth = 2.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = stringResource(R.string.settings_sync_btn_restoring),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = Icons.Outlined.CloudDownload,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = stringResource(R.string.settings_sync_btn_restore),
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         OutlinedButton(
-                            onClick = { showRestoreCloudDialog = true },
+                            onClick = { showForcePushCloudDialog = true },
                             enabled = !isSyncingCloud && currentUser != null,
                             shape = RoundedCornerShape(SantoyaRadius.md),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.primary
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             ),
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
                                 .height(SantoyaSize.touchTarget)
-                                .testTag("btn_restore_from_cloud")
+                                .testTag("btn_force_push_all_cloud")
                         ) {
-                            if (isSyncingCloud && activeSyncPushMode == false) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_sync_btn_restoring),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Outlined.CloudDownload,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.settings_sync_btn_restore),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Outlined.CloudUpload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.sync_btn_force_push_all),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -707,7 +943,7 @@ fun SettingsScreen(
 
         // 4. Laporan & File Cadangan
         item {
-            SettingsSectionTitle("Laporan & File Cadangan")
+            SettingsSectionTitle(stringResource(R.string.settings_section_backup))
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -729,7 +965,11 @@ fun SettingsScreen(
                                     transaksiList = transaksiList,
                                     produkList = produkList.ifEmpty { viewModel.allProduk.value },
                                     kurirList = kurirList.ifEmpty { viewModel.allKurir.value },
-                                    pengeluaranList = viewModel.allPengeluaran.value
+                                    pengeluaranList = viewModel.allPengeluaran.value,
+                                    kasbonLogList = viewModel.allKasbonLogs.value,
+                                    perawatanList = perawatanEvaluations.map { it.item },
+                                    perawatanLogList = viewModel.allPerawatanLogs.value,
+                                    depotProfile = depotProfile
                                 )
                                 ExportHelper.shareExportFile(
                                     context = context,
@@ -737,6 +977,7 @@ fun SettingsScreen(
                                     content = json,
                                     mimeType = "application/json"
                                 )
+                                viewModel.showSnackbar(context.getString(R.string.settings_export_json_success))
                             },
                             shape = RoundedCornerShape(SantoyaRadius.md),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -755,7 +996,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                "File Cadangan",
+                                stringResource(R.string.settings_backup_btn_json),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -767,7 +1008,9 @@ fun SettingsScreen(
                             onClick = {
                                 val csv = ExportHelper.generateCsv(
                                     transaksiList = transaksiList,
-                                    pengeluaranList = viewModel.allPengeluaran.value
+                                    pengeluaranList = viewModel.allPengeluaran.value,
+                                    kasbonLogList = viewModel.allKasbonLogs.value,
+                                    pelangganList = pelangganList
                                 )
                                 ExportHelper.shareExportFile(
                                     context = context,
@@ -775,6 +1018,7 @@ fun SettingsScreen(
                                     content = csv,
                                     mimeType = "text/csv"
                                 )
+                                viewModel.showSnackbar(context.getString(R.string.settings_export_csv_success))
                             },
                             shape = RoundedCornerShape(SantoyaRadius.md),
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -793,7 +1037,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                "Laporan Excel",
+                                stringResource(R.string.settings_backup_btn_excel),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
@@ -802,70 +1046,67 @@ fun SettingsScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    FilledTonalButton(
-                        onClick = { showImportDialog = true },
-                        shape = RoundedCornerShape(SantoyaRadius.md),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(SantoyaSize.touchTarget)
-                            .testTag("btn_import_json")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.UploadFile,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            "Pulihkan dari File Cadangan",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    if (ExportHelper.hasAutoBackup(context)) {
+                    if (!isKaryawan) {
                         Spacer(modifier = Modifier.height(10.dp))
-                        OutlinedButton(
-                            onClick = {
-                                val autoJson = ExportHelper.readAutoBackupJson(context)
-                                if (!autoJson.isNullOrBlank()) {
-                                    viewModel.importJsonData(autoJson)
-                                }
-                            },
+
+                        FilledTonalButton(
+                            onClick = { showImportDialog = true },
                             shape = RoundedCornerShape(SantoyaRadius.md),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = MaterialTheme.colorScheme.tertiary
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             ),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(SantoyaSize.touchTarget)
-                                .testTag("btn_restore_auto_backup")
+                                .testTag("btn_import_json")
                         ) {
                             Icon(
-                                imageVector = Icons.Outlined.Restore,
+                                imageVector = Icons.Outlined.UploadFile,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "Pulihkan Cadangan Otomatis HP",
+                                stringResource(R.string.settings_backup_btn_restore_file),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold
                             )
+                        }
+
+                        if (ExportHelper.hasAutoBackup(context)) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = { showRestoreAutoBackupDialog = true },
+                                shape = RoundedCornerShape(SantoyaRadius.md),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.tertiary
+                                ),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(SantoyaSize.touchTarget)
+                                    .testTag("btn_restore_auto_backup")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Restore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    stringResource(R.string.settings_backup_btn_restore_auto),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Simpan Laporan Excel (CSV) untuk pembukuan atau File Cadangan untuk arsip HP.",
+                        text = stringResource(R.string.settings_backup_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -875,7 +1116,7 @@ fun SettingsScreen(
 
         // 5. Tentang Aplikasi
         item {
-            SettingsSectionTitle("Tentang Aplikasi")
+            SettingsSectionTitle(stringResource(R.string.settings_section_about))
             Spacer(modifier = Modifier.height(8.dp))
 
             Card(
@@ -904,13 +1145,13 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(
-                                text = "Santoya RO",
+                                text = stringResource(R.string.settings_about_app_name),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Aplikasi Kasir Depot Air Minum",
+                                text = stringResource(R.string.settings_about_app_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -926,21 +1167,29 @@ fun SettingsScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         SystemInfoRow(
-                            label = "Versi Aplikasi",
+                            label = stringResource(R.string.settings_about_version_label),
                             value = "v${BuildConfig.VERSION_NAME}"
                         )
                         SystemInfoRow(
-                            label = "Penyimpanan Data",
-                            value = "HP & Cloud Otomatis"
+                            label = stringResource(R.string.settings_about_storage_label),
+                            value = stringResource(R.string.settings_about_storage_value)
                         )
                         SystemInfoRow(
-                            label = "Keamanan Data",
-                            value = "Cloud Terenkripsi"
+                            label = stringResource(R.string.settings_about_security_label),
+                            value = stringResource(R.string.settings_about_security_value)
                         )
                         SystemInfoRow(
-                            label = "Status Operasional",
-                            value = "Terhubung",
-                            valueColor = MaterialTheme.santoyaColors.success,
+                            label = stringResource(R.string.settings_about_status_label),
+                            value = if (isOfflineMode) {
+                                stringResource(R.string.offline_mode_badge)
+                            } else {
+                                stringResource(R.string.settings_about_status_connected)
+                            },
+                            valueColor = if (isOfflineMode) {
+                                MaterialTheme.santoyaColors.warning
+                            } else {
+                                MaterialTheme.santoyaColors.success
+                            },
                             showStatusDot = true
                         )
                     }
@@ -993,6 +1242,72 @@ fun SettingsScreen(
         )
     }
 
+    if (showExitOfflineDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitOfflineDialog = false },
+            title = {
+                Text(stringResource(R.string.offline_exit_dialog_title), fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(stringResource(R.string.offline_exit_dialog_msg))
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showExitOfflineDialog = false
+                        onExitOfflineToAuth()
+                    },
+                    modifier = Modifier.testTag("btn_confirm_exit_offline")
+                ) {
+                    Text(stringResource(R.string.offline_exit_dialog_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showExitOfflineDialog = false },
+                    modifier = Modifier.testTag("btn_cancel_exit_offline")
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showResetOfflineDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetOfflineDialog = false },
+            title = {
+                Text(stringResource(R.string.offline_reset_dialog_title), fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(stringResource(R.string.offline_reset_dialog_msg))
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetOfflineDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
+                        contentColor = MaterialTheme.colorScheme.onError
+                    ),
+                    modifier = Modifier.testTag("btn_confirm_reset_offline")
+                ) {
+                    Text(stringResource(R.string.action_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showResetOfflineDialog = false },
+                    modifier = Modifier.testTag("btn_cancel_reset_offline")
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
     if (showRestoreCloudDialog) {
         AlertDialog(
             onDismissRequest = { showRestoreCloudDialog = false },
@@ -1027,89 +1342,95 @@ fun SettingsScreen(
         )
     }
 
-    if (showCloudDiagnosticDialog) {
-        val dbId = context.getString(R.string.firestore_database_id)
+    if (showForcePushCloudDialog) {
         AlertDialog(
-            onDismissRequest = { showCloudDiagnosticDialog = false },
+            onDismissRequest = { showForcePushCloudDialog = false },
             title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Outlined.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Pengukuran Reads Firestore", fontWeight = FontWeight.Bold)
-                }
+                Text(stringResource(R.string.sync_force_push_dialog_title), fontWeight = FontWeight.Bold)
             },
             text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(SantoyaRadius.sm),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Penggunaan Sesi Aplikasi:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-                            Text("• Dokumen dibaca (Reads): ${syncState.sessionReads}", style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
-                            Text("• Dokumen ditulis (Writes): ${syncState.sessionWrites}", style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
-                            Text("• Kuota Gratis Spark: 50.000 reads & 20.000 writes / hari", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.santoyaColors.success, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
-
-                    Text(
-                        text = "Cara Cek Reads Aktual di Firebase Console:",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "1. Buka console.firebase.google.com dengan browser.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "2. Pilih project: gen-lang-client-0963336772",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "3. Masuk menu Build > Firestore Database, lalu klik tab Usage (Penggunaan).",
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(SantoyaRadius.xs),
-                            color = MaterialTheme.santoyaColors.warning.copy(alpha = 0.15f),
-                            border = BorderStroke(1.dp, MaterialTheme.santoyaColors.warning.copy(alpha = 0.4f)),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "PENTING: Di pojok kiri atas halaman Firestore, ubah dropdown database dari (default) ke database khusus depot:\n$dbId\n(Jika tetap di default, grafik akan selalu 0 karena data tersimpan di database khusus).",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Mengapa Sangat Hemat?\nAplikasi Santoya RO menggunakan arsitektur Offline-First (Room SQLite lokal). Saat Anda membuka daftar transaksi, riwayat kasir, daftar pelanggan, kasbon, dan laporan laba bersih, semua dibaca langsung dari memori HP lokal (0 reads). Firestore hanya membaca saat inisialisasi listener atau sinkronisasi perubahan antar-HP.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(stringResource(R.string.sync_force_push_dialog_msg))
             },
             confirmButton = {
                 Button(
-                    onClick = { showCloudDiagnosticDialog = false },
-                    modifier = Modifier.testTag("btn_close_cloud_diagnostic")
+                    onClick = {
+                        showForcePushCloudDialog = false
+                        val uid = currentUser?.uid
+                        if (!uid.isNullOrBlank()) {
+                            viewModel.forcePushAllLocalToCloud(context, uid)
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_confirm_force_push_cloud")
                 ) {
-                    Text("Tutup")
+                    Text(stringResource(R.string.sync_force_push_dialog_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showForcePushCloudDialog = false },
+                    modifier = Modifier.testTag("btn_cancel_force_push_cloud")
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showRestoreAutoBackupDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreAutoBackupDialog = false },
+            title = {
+                Text(stringResource(R.string.settings_backup_dialog_auto_title), fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(stringResource(R.string.settings_backup_dialog_auto_msg))
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showRestoreAutoBackupDialog = false
+                        val autoJson = ExportHelper.readAutoBackupJson(context)
+                        if (autoJson != null) {
+                            viewModel.importJsonData(autoJson)
+                        } else {
+                            viewModel.showSnackbar(context.getString(R.string.import_dialog_read_error))
+                        }
+                    },
+                    modifier = Modifier.testTag("btn_confirm_restore_auto_backup")
+                ) {
+                    Text(stringResource(R.string.settings_backup_dialog_auto_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRestoreAutoBackupDialog = false },
+                    modifier = Modifier.testTag("btn_cancel_restore_auto_backup")
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+
+    if (showDepotProfileSheet) {
+        DepotProfileEditSheet(
+            profile = depotProfile,
+            isOwner = isOwnerProfile,
+            isSaving = isBusyAction,
+            onDismiss = { showDepotProfileSheet = false },
+            onSave = { owner, depot, phone, addr, footer, depotType, tankCapacity ->
+                viewModel.saveDepotProfile(
+                    ownerName = owner,
+                    depotName = depot,
+                    phoneNumber = phone,
+                    address = addr,
+                    receiptFooter = footer,
+                    depotType = depotType,
+                    tankCapacityLiters = tankCapacity
+                ) { ok ->
+                    if (ok) {
+                        showDepotProfileSheet = false
+                    }
                 }
             }
         )

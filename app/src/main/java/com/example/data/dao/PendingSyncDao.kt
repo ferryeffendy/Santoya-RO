@@ -13,6 +13,9 @@ interface PendingSyncDao {
     fun observePendingCount(): Flow<Int>
 
     @Query("SELECT * FROM pending_sync ORDER BY updatedAt ASC")
+    fun observeAllPending(): Flow<List<PendingSyncEntity>>
+
+    @Query("SELECT * FROM pending_sync ORDER BY updatedAt ASC")
     suspend fun getAllPending(): List<PendingSyncEntity>
 
     @Query("SELECT * FROM pending_sync WHERE collectionName = :collectionName AND syncId = :syncId LIMIT 1")

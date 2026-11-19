@@ -13,6 +13,7 @@ import com.example.data.dao.PengeluaranDao
 import com.example.data.dao.PerawatanDao
 import com.example.data.dao.PerawatanLogDao
 import com.example.data.dao.ProdukDao
+import com.example.data.dao.TangkiRefillDao
 import com.example.data.dao.TransaksiDao
 import com.example.data.entity.Kurir
 import com.example.data.dao.KasbonLogDao
@@ -23,6 +24,7 @@ import com.example.data.entity.Pengeluaran
 import com.example.data.entity.PerawatanItem
 import com.example.data.entity.PerawatanLog
 import com.example.data.entity.Produk
+import com.example.data.entity.TangkiRefill
 import com.example.data.entity.Transaksi
 import com.example.util.PerawatanScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -39,9 +41,10 @@ import kotlinx.coroutines.launch
         KasbonLog::class,
         PendingSyncEntity::class,
         PerawatanItem::class,
-        PerawatanLog::class
+        PerawatanLog::class,
+        TangkiRefill::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -55,6 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun pendingSyncDao(): PendingSyncDao
     abstract fun perawatanDao(): PerawatanDao
     abstract fun perawatanLogDao(): PerawatanLogDao
+    abstract fun tangkiRefillDao(): TangkiRefillDao
 
     companion object {
         @Volatile
@@ -292,6 +296,36 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transaksi` ADD COLUMN `waterType` TEXT NOT NULL DEFAULT 'RO'")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `tangki_refill` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `tanggal` INTEGER NOT NULL,
+                        `volumeLiter` REAL NOT NULL,
+                        `totalHarga` REAL NOT NULL,
+                        `namaPemasok` TEXT NOT NULL DEFAULT '',
+                        `catatan` TEXT NOT NULL DEFAULT '',
+                        `linkedExpenseId` INTEGER,
+                        `pengeluaranSyncId` TEXT,
+                        `updatedAt` INTEGER NOT NULL,
+                        `syncId` TEXT NOT NULL,
+                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                        `deletedBy` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_tangki_refill_tanggal` ON `tangki_refill` (`tanggal`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_tangki_refill_syncId` ON `tangki_refill` (`syncId`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_tangki_refill_linkedExpenseId` ON `tangki_refill` (`linkedExpenseId`)")
+                db.execSQL(
+                    "INSERT OR IGNORE INTO `produk` (`id`, `nama_produk`, `harga`, `updatedAt`, `syncId`) VALUES (2, 'Galon Air Mineral 19L', 5000.0, 1, 'default_galon_mineral_19l')"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -312,7 +346,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_12_13,
                         MIGRATION_13_14,
                         MIGRATION_14_15,
-                        MIGRATION_15_16
+                        MIGRATION_15_16,
+                        MIGRATION_16_17
                     )
                     .addCallback(DatabaseCallback())
                     .build()
@@ -327,6 +362,9 @@ abstract class AppDatabase : RoomDatabase() {
             super.onCreate(db)
             db.execSQL(
                 "INSERT OR IGNORE INTO `produk` (`id`, `nama_produk`, `harga`, `updatedAt`, `syncId`) VALUES (1, 'Galon Air RO 19L', 6000.0, 1, 'default_galon_ro_19l')"
+            )
+            db.execSQL(
+                "INSERT OR IGNORE INTO `produk` (`id`, `nama_produk`, `harga`, `updatedAt`, `syncId`) VALUES (2, 'Galon Air Mineral 19L', 5000.0, 1, 'default_galon_mineral_19l')"
             )
             val now = System.currentTimeMillis()
             PerawatanScheduler.buildDefaultItems(now).forEach { item ->

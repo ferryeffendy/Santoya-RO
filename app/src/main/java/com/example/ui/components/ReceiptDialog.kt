@@ -52,11 +52,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.example.R
+import com.example.data.entity.DepotProfile
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
@@ -243,19 +246,28 @@ private fun extractReceiptUi(dialogData: ActiveReceiptDialog): ParsedReceiptUi {
     )
 }
 
+/**
+ * Dialog pratinjau nota dan struk transaksi dengan opsi cetak Bluetooth serta bagikan gambar/teks WhatsApp.
+ * Secara otomatis menggunakan kop dinamis dari [depotProfile] dan menampilkan pengisian cepat bila nama depot masih kosong.
+ */
 @Composable
 fun ReceiptDialog(
     dialogData: ActiveReceiptDialog,
+    depotProfile: DepotProfile = DepotProfile(),
+    isOwner: Boolean = false,
+    onQuickSaveDepotProfile: ((String, String, String, (DepotProfile) -> Unit) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var printStatus by remember { mutableStateOf<String?>(null) }
     val parsedReceipt = remember(dialogData) { extractReceiptUi(dialogData) }
+    var pendingQuickAction by remember(dialogData) { mutableStateOf<((String, DepotProfile) -> Unit)?>(null) }
+    var pendingBluetoothReceiptText by remember(dialogData) { mutableStateOf<String?>(null) }
 
-    val startBluetoothPrint: () -> Unit = {
+    val startBluetoothPrint: (String) -> Unit = { receiptText ->
         SantoyaReceiptHelper.printViaBluetooth(
             context = context,
-            receiptText = dialogData.receiptText
+            receiptText = receiptText
         ) { status ->
             printStatus = status
         }
@@ -263,10 +275,32 @@ fun ReceiptDialog(
     val bluetoothPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
+        val textToPrint = pendingBluetoothReceiptText ?: dialogData.receiptText
+        pendingBluetoothReceiptText = null
         if (granted) {
-            startBluetoothPrint()
+            startBluetoothPrint(textToPrint)
         } else {
-            printStatus = "Izin Bluetooth ditolak. Aktifkan di Pengaturan aplikasi untuk mencetak."
+            printStatus = context.getString(R.string.receipt_bluetooth_denied)
+        }
+    }
+    val launchBluetoothPrint: (String) -> Unit = { receiptText ->
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.BLUETOOTH_CONNECT
+            ) != PackageManager.PERMISSION_GRANTED
+        if (needsPermission) {
+            pendingBluetoothReceiptText = receiptText
+            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            startBluetoothPrint(receiptText)
+        }
+    }
+    val executeOrPromptQuickFill: ((String, DepotProfile) -> Unit) -> Unit = { action ->
+        if (isOwner && !depotProfile.hasConfiguredDepotName() && onQuickSaveDepotProfile != null) {
+            pendingQuickAction = action
+        } else {
+            action(dialogData.receiptText, depotProfile)
         }
     }
 
@@ -287,13 +321,16 @@ fun ReceiptDialog(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Pratinjau & Cetak Struk",
+                        text = stringResource(R.string.receipt_preview_subtitle),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                    Icon(imageVector = Icons.Outlined.Close, contentDescription = "Tutup")
+                    Icon(
+                        imageVector = Icons.Outlined.Close,
+                        contentDescription = stringResource(R.string.action_close)
+                    )
                 }
             }
         },
@@ -304,7 +341,10 @@ fun ReceiptDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                ReceiptPreviewCard(receipt = parsedReceipt)
+                ReceiptPreviewCard(
+                    receipt = parsedReceipt,
+                    depotProfile = depotProfile
+                )
 
                 printStatus?.let { status ->
                     Surface(
@@ -324,15 +364,8 @@ fun ReceiptDialog(
 
                 Button(
                     onClick = {
-                        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-                            ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.BLUETOOTH_CONNECT
-                            ) != PackageManager.PERMISSION_GRANTED
-                        if (needsPermission) {
-                            bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-                        } else {
-                            startBluetoothPrint()
+                        executeOrPromptQuickFill { textToPrint, _ ->
+                            launchBluetoothPrint(textToPrint)
                         }
                     },
                     shape = RoundedCornerShape(SantoyaRadius.md),
@@ -344,7 +377,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Outlined.Print, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Cetak Struk (Bluetooth)",
+                        text = stringResource(R.string.receipt_btn_print),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -354,11 +387,14 @@ fun ReceiptDialog(
 
                 FilledTonalButton(
                     onClick = {
-                        SantoyaReceiptHelper.shareReceiptImage(
-                            context = context,
-                            receiptText = dialogData.receiptText,
-                            phoneNumber = dialogData.customerPhone
-                        )
+                        executeOrPromptQuickFill { textToShare, activeProfile ->
+                            SantoyaReceiptHelper.shareReceiptImage(
+                                context = context,
+                                receiptText = textToShare,
+                                phoneNumber = dialogData.customerPhone,
+                                depotName = activeProfile.effectiveDepotName()
+                            )
+                        }
                     },
                     shape = RoundedCornerShape(SantoyaRadius.md),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
@@ -373,7 +409,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Kirim Gambar ke WhatsApp",
+                        text = stringResource(R.string.receipt_btn_share_image),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -383,11 +419,14 @@ fun ReceiptDialog(
 
                 OutlinedButton(
                     onClick = {
-                        SantoyaReceiptHelper.shareReceiptText(
-                            context = context,
-                            text = dialogData.receiptText,
-                            phoneNumber = dialogData.customerPhone
-                        )
+                        executeOrPromptQuickFill { textToShare, activeProfile ->
+                            SantoyaReceiptHelper.shareReceiptText(
+                                context = context,
+                                text = textToShare,
+                                phoneNumber = dialogData.customerPhone,
+                                depotName = activeProfile.effectiveDepotName()
+                            )
+                        }
                     },
                     shape = RoundedCornerShape(SantoyaRadius.md),
                     contentPadding = PaddingValues(vertical = 12.dp, horizontal = 16.dp),
@@ -398,7 +437,7 @@ fun ReceiptDialog(
                     Icon(imageVector = Icons.Outlined.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Kirim Teks Struk",
+                        text = stringResource(R.string.receipt_btn_share_text),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
@@ -409,10 +448,33 @@ fun ReceiptDialog(
         },
         confirmButton = {}
     )
+
+    if (pendingQuickAction != null) {
+        DepotQuickFillDialog(
+            initialProfile = depotProfile,
+            onDismiss = { pendingQuickAction = null },
+            onSaveAndContinue = { name, addr, phone ->
+                val savedAction = pendingQuickAction
+                pendingQuickAction = null
+                onQuickSaveDepotProfile?.invoke(name, addr, phone) { updated ->
+                    val rebuiltText = dialogData.receiptBuilder?.invoke(updated) ?: dialogData.receiptText
+                    savedAction?.invoke(rebuiltText, updated)
+                }
+            },
+            onSkip = {
+                val skippedAction = pendingQuickAction
+                pendingQuickAction = null
+                skippedAction?.invoke(dialogData.receiptText, depotProfile)
+            }
+        )
+    }
 }
 
 @Composable
-private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
+private fun ReceiptPreviewCard(
+    receipt: ParsedReceiptUi,
+    depotProfile: DepotProfile
+) {
     val isLunas = receipt.statusNota.contains("LUNAS", ignoreCase = true)
     val santoyaColors = MaterialTheme.santoyaColors
 
@@ -446,13 +508,36 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            val cleanDepotName = remember(depotProfile.depotName) { depotProfile.effectiveDepotName().uppercase() }
+            val cleanAddress = remember(depotProfile.address) { depotProfile.address.trim() }
+            val cleanPhone = remember(depotProfile.phoneNumber) { depotProfile.phoneNumber.trim() }
+            val cleanFooter = remember(depotProfile.receiptFooter) { depotProfile.receiptFooter.trim() }
+
             Text(
-                text = "SANTOYA RO",
+                text = cleanDepotName,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = santoyaColors.receiptOnSurface,
                 textAlign = TextAlign.Center
             )
+            if (cleanAddress.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = cleanAddress,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = santoyaColors.receiptMuted,
+                    textAlign = TextAlign.Center
+                )
+            }
+            if (cleanPhone.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = stringResource(R.string.depot_profile_preview_phone_prefix, cleanPhone),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = santoyaColors.receiptMuted,
+                    textAlign = TextAlign.Center
+                )
+            }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = receipt.subtitle1,
@@ -475,13 +560,13 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 if (!receipt.noNota.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "No. Nota", value = receipt.noNota)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_no_nota), value = receipt.noNota)
                 }
                 if (!receipt.tanggal.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "Tgl", value = receipt.tanggal)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_tgl), value = receipt.tanggal)
                 }
                 if (!receipt.pelanggan.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "Pelanggan", value = receipt.pelanggan)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_pelanggan), value = receipt.pelanggan)
                 }
                 if (!receipt.alamat.isNullOrBlank()) {
                     Row(
@@ -490,7 +575,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                         verticalAlignment = Alignment.Top
                     ) {
                         Text(
-                            text = "Alamat",
+                            text = stringResource(R.string.receipt_label_alamat),
                             style = MaterialTheme.typography.bodyMedium,
                             color = santoyaColors.receiptMuted
                         )
@@ -506,7 +591,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                     }
                 }
                 if (!receipt.kurir.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "Kurir", value = receipt.kurir)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_kurir), value = receipt.kurir)
                 }
             }
 
@@ -589,7 +674,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
                 if (!receipt.metodeBayar.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "Metode Bayar", value = receipt.metodeBayar)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_metode), value = receipt.metodeBayar)
                 }
 
                 Row(
@@ -598,7 +683,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Status Nota",
+                        text = stringResource(R.string.receipt_label_status),
                         style = MaterialTheme.typography.bodyMedium,
                         color = santoyaColors.receiptMuted
                     )
@@ -617,7 +702,7 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
                 }
 
                 if (!receipt.sisaKasbon.isNullOrBlank()) {
-                    ReceiptInfoRow(label = "Sisa Kasbon", value = receipt.sisaKasbon)
+                    ReceiptInfoRow(label = stringResource(R.string.receipt_label_sisa_kasbon), value = receipt.sisaKasbon)
                 }
             }
 
@@ -625,19 +710,25 @@ private fun ReceiptPreviewCard(receipt: ParsedReceiptUi) {
 
             Spacer(modifier = Modifier.height(2.dp))
 
+            val footerDisplay = depotProfile.receiptFooter.trim().ifBlank {
+                stringResource(R.string.receipt_footer_thanks)
+            }
             Text(
-                text = "Terima Kasih",
+                text = footerDisplay,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Medium,
                 color = santoyaColors.receiptMuted,
                 textAlign = TextAlign.Center
             )
-            Text(
-                text = "Santoya RO Siap Antar",
-                style = MaterialTheme.typography.bodySmall,
-                color = santoyaColors.receiptMuted,
-                textAlign = TextAlign.Center
-            )
+            if (!depotProfile.isProUser()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = DepotProfile.WATERMARK_TEXT,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = santoyaColors.receiptMuted.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

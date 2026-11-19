@@ -436,3 +436,429 @@ test("owner can CRUD perawatan_jadwal and perawatan_log while staff, outsider, a
   await assertSucceeds(jadwalRef.delete());
 });
 
+test("transaksi enforces isValidTransaksiMath on total_harga, uangMuka, sisaKasbon, komisi, jumlah, and harga_satuan", async () => {
+  await seedDepotWithStaff();
+  const oDb = ownerDb();
+  const txCol = oDb.collection("depots").doc(DEPOT_ID).collection("transaksi");
+
+  const validBase = (id, overrides = {}) => ({
+    syncId: id,
+    tanggal: 1700000000000,
+    pelangganSyncId: "cust_1",
+    jumlah: 3,
+    harga_satuan: 6000,
+    total_harga: 18000,
+    total_komisi: 3000,
+    metode_bayar: "Cash",
+    status: "Lunas",
+    uangMuka: 0,
+    sisaKasbon: 0,
+    updatedAt: 1700000000000,
+    isDeleted: false,
+    serverUpdatedAt: ts(),
+    ...overrides,
+  });
+
+  // Valid Lunas, Kasbon penuh, Bayar Sebagian, and soft-deleted Dihapus
+  await assertSucceeds(txCol.doc("tx_math_lunas").set(validBase("tx_math_lunas")));
+  await assertSucceeds(
+    txCol.doc("tx_math_kasbon").set(
+      validBase("tx_math_kasbon", {
+        metode_bayar: "-",
+        status: "Kasbon",
+        uangMuka: 0,
+        sisaKasbon: 18000,
+      })
+    )
+  );
+  await assertSucceeds(
+    txCol.doc("tx_math_dp").set(
+      validBase("tx_math_dp", {
+        metode_bayar: "Bayar Sebagian",
+        status: "Kasbon",
+        uangMuka: 5000,
+        sisaKasbon: 13000,
+      })
+    )
+  );
+  await assertSucceeds(
+    txCol.doc("tx_math_dihapus").set(
+      validBase("tx_math_dihapus", {
+        status: "Dihapus",
+        isDeleted: true,
+        total_komisi: 0,
+      })
+    )
+  );
+
+  // Manipulated total_harga (jumlah * harga_satuan mismatch)
+  await assertFails(
+    txCol.doc("tx_bad_total").set(
+      validBase("tx_bad_total", {
+        total_harga: 1000,
+      })
+    )
+  );
+
+  // uangMuka exceeds total_harga
+  await assertFails(
+    txCol.doc("tx_bad_dp").set(
+      validBase("tx_bad_dp", {
+        status: "Kasbon",
+        uangMuka: 20000,
+        sisaKasbon: 0,
+      })
+    )
+  );
+
+  // Kasbon sisaKasbon does not match total_harga - uangMuka
+  await assertFails(
+    txCol.doc("tx_bad_kasbon_sisa").set(
+      validBase("tx_bad_kasbon_sisa", {
+        status: "Kasbon",
+        metode_bayar: "Bayar Sebagian",
+        uangMuka: 5000,
+        sisaKasbon: 1000,
+      })
+    )
+  );
+
+  // Lunas with non-zero sisaKasbon
+  await assertFails(
+    txCol.doc("tx_bad_lunas_sisa").set(
+      validBase("tx_bad_lunas_sisa", {
+        status: "Lunas",
+        sisaKasbon: 5000,
+      })
+    )
+  );
+
+  // Negative komisi, invalid jumlah, negative harga_satuan
+  await assertFails(txCol.doc("tx_bad_komisi").set(validBase("tx_bad_komisi", { total_komisi: -100 })));
+  await assertFails(txCol.doc("tx_bad_jumlah").set(validBase("tx_bad_jumlah", { jumlah: 0, total_harga: 0 })));
+  await assertFails(txCol.doc("tx_bad_harga").set(validBase("tx_bad_harga", { harga_satuan: -1000, total_harga: -3000 })));
+});
+
+test("kasbon_logs enforces isValidKasbonLogMath on jumlah_bayar and sisa_kasbon balances", async () => {
+  await seedDepotWithStaff();
+  const sDb = staffDb(true);
+  const logsCol = sDb.collection("depots").doc(DEPOT_ID).collection("kasbon_logs");
+
+  const validLog = (id, overrides = {}) => ({
+    syncId: id,
+    pelangganSyncId: "cust_1",
+    tanggal: 1700000000000,
+    jumlah_bayar: 10000,
+    sisa_kasbon_sebelum: 18000,
+    sisa_kasbon_sesudah: 8000,
+    metode_bayar: "Cash",
+    catatan: "Cicilan kasbon",
+    updatedAt: 1700000000000,
+    isDeleted: false,
+    serverUpdatedAt: ts(),
+    ...overrides,
+  });
+
+  await assertSucceeds(logsCol.doc("log_valid").set(validLog("log_valid")));
+
+  // Negative jumlah_bayar
+  await assertFails(
+    logsCol.doc("log_neg_bayar").set(
+      validLog("log_neg_bayar", {
+        jumlah_bayar: -5000,
+        sisa_kasbon_sebelum: 10000,
+        sisa_kasbon_sesudah: 15000,
+      })
+    )
+  );
+
+  // Negative sisa_kasbon_sebelum
+  await assertFails(
+    logsCol.doc("log_neg_sebelum").set(
+      validLog("log_neg_sebelum", {
+        jumlah_bayar: 0,
+        sisa_kasbon_sebelum: -1000,
+        sisa_kasbon_sesudah: -1000,
+      })
+    )
+  );
+
+  // Mismatched sisa_kasbon_sesudah != sisa_kasbon_sebelum - jumlah_bayar
+  await assertFails(
+    logsCol.doc("log_mismatch_sesudah").set(
+      validLog("log_mismatch_sesudah", {
+        jumlah_bayar: 10000,
+        sisa_kasbon_sebelum: 18000,
+        sisa_kasbon_sesudah: 0,
+      })
+    )
+  );
+
+  // Negative sisa_kasbon_sesudah (jumlah_bayar > sisa_kasbon_sebelum)
+  await assertFails(
+    logsCol.doc("log_neg_sesudah").set(
+      validLog("log_neg_sesudah", {
+        jumlah_bayar: 20000,
+        sisa_kasbon_sebelum: 18000,
+        sisa_kasbon_sesudah: -2000,
+      })
+    )
+  );
+});
+
+test("users/{uid} allows owner self-registration & merge updates while locking registeredAt and subscriptionTier", async () => {
+  const oDb = ownerDb();
+  const sDb = staffDb(true);
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const createdAt = new Date(Date.now() - 10000);
+
+  const validInitialUser = {
+    uid: OWNER_UID,
+    email: OWNER_EMAIL,
+    googleDisplayName: "Budi Santoso",
+    ownerName: "Budi Santoso",
+    depotName: "",
+    phoneNumber: "",
+    address: "",
+    receiptFooter: "",
+    role: "OWNER",
+    subscriptionTier: "FREE",
+    registeredAt: createdAt,
+    lastActiveAt: createdAt,
+    appVersion: "1.3",
+  };
+
+  // Unauthenticated or cross-user read/write must fail
+  await assertFails(unauthDb.collection("users").doc(OWNER_UID).set(validInitialUser));
+  await assertFails(sDb.collection("users").doc(OWNER_UID).set(validInitialUser));
+  await assertFails(oDb.collection("users").get());
+
+  // Initial create with PRO tier from client must fail
+  await assertFails(
+    oDb.collection("users").doc(OWNER_UID).set({
+      ...validInitialUser,
+      subscriptionTier: "PRO",
+    })
+  );
+
+  // Valid initial create succeeds
+  await assertSucceeds(oDb.collection("users").doc(OWNER_UID).set(validInitialUser));
+  await assertSucceeds(oDb.collection("users").doc(OWNER_UID).get());
+
+  // Cross-user read fails
+  await assertFails(sDb.collection("users").doc(OWNER_UID).get());
+
+  // Valid profile merge update without modifying registeredAt or subscriptionTier succeeds
+  await assertSucceeds(
+    oDb.collection("users").doc(OWNER_UID).set(
+      {
+        depotName: "Berkah RO",
+        phoneNumber: "081234567890",
+        address: "Jl. Merdeka No. 12, Malang",
+        receiptFooter: "Terima kasih sudah berlangganan",
+        lastActiveAt: ts(),
+        appVersion: "1.3",
+      },
+      { merge: true }
+    )
+  );
+
+  // Tampering with subscriptionTier or registeredAt on update must fail
+  await assertFails(
+    oDb.collection("users").doc(OWNER_UID).set(
+      {
+        subscriptionTier: "PRO",
+        lastActiveAt: ts(),
+      },
+      { merge: true }
+    )
+  );
+  await assertFails(
+    oDb.collection("users").doc(OWNER_UID).set(
+      {
+        registeredAt: ts(),
+        lastActiveAt: ts(),
+      },
+      { merge: true }
+    )
+  );
+});
+
+test("depots/{depotId} allows owner to sync optional profile fields and verified staff to read them", async () => {
+  await seedDepotWithStaff();
+  const oDb = ownerDb();
+  const sDb = staffDb(true);
+
+  await assertSucceeds(
+    oDb.collection("depots").doc(DEPOT_ID).set(
+      {
+        name: "Berkah RO",
+        depotName: "Berkah RO",
+        ownerName: "Budi Santoso",
+        phoneNumber: "081234567890",
+        address: "Jl. Merdeka No. 12, Malang",
+        receiptFooter: "Segar setiap hari",
+        subscriptionTier: "FREE",
+        updatedAt: ts(),
+      },
+      { merge: true }
+    )
+  );
+
+  await assertSucceeds(sDb.collection("depots").doc(DEPOT_ID).get());
+
+  // Staff cannot overwrite depot profile metadata
+  await assertFails(
+    sDb.collection("depots").doc(DEPOT_ID).set(
+      {
+        depotName: "Dibajak Staff",
+        updatedAt: ts(),
+      },
+      { merge: true }
+    )
+  );
+});
+
+test("ai_insights/{insightId} enforces strict owner-only isolation, schema bounds, and filtered queries", async () => {
+  const oDb = ownerDb();
+  const sDb = staffDb(true);
+  const outDb = outsiderDb();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+
+  const insightDocId = `latest_${OWNER_UID}`;
+  const validInsightPayload = (overrides = {}) => ({
+    ownerId: OWNER_UID,
+    depotId: DEPOT_ID,
+    periodDays: 30,
+    insights: [
+      "Penjualan galon RO mendominasi 78% omzet 30 hari terakhir.",
+      "Pelanggan aktif meningkat dan rasio lunas tetap terjaga baik.",
+      "Pengeluaran operasional utama berasal dari biaya filter & listrik.",
+    ],
+    stockAdvice: "Stok air RO toren masih cukup untuk sekitar 3 hari, jadwalkan pengisian sebelum akhir pekan.",
+    healthStatus: "SEHAT",
+    priorityActionTitle: "Tagih Kasbon >30 Hari",
+    priorityActionTarget: "KASBON",
+    totalOmzet: 1250000,
+    totalKasMasuk: 1180000,
+    totalKomisiKurir: 150000,
+    totalPengeluaran: 220000,
+    labaBersih: 810000,
+    marginLabaPersen: 68.6,
+    totalGalon: 210,
+    activeCustomers: 45,
+    totalPiutang: 95000,
+    overduePiutangOver30d: 35000,
+    omzetGrowthPercent: 12.5,
+    galonGrowthPercent: 8.0,
+    labaGrowthPercent: 15.2,
+    modelName: "gemini-3.8-flash",
+    timestamp: ts(),
+    ...overrides,
+  });
+
+  // 1. Owner can attach listener/get non-existent latest_{uid} before first analysis
+  await assertSucceeds(oDb.collection("ai_insights").doc(insightDocId).get());
+
+  // 2. Unauthenticated, staff, and outsider cannot read non-existent or other user's doc
+  await assertFails(unauthDb.collection("ai_insights").doc(insightDocId).get());
+  await assertFails(sDb.collection("ai_insights").doc(insightDocId).get());
+  await assertFails(outDb.collection("ai_insights").doc(insightDocId).get());
+  await assertFails(unauthDb.collection("ai_insights").where("ownerId", "==", OWNER_UID).get());
+
+  // 3. Unfiltered collection list is denied even for owner
+  await assertFails(oDb.collection("ai_insights").get());
+
+  // 4. Schema & ownership validation on create
+  await assertFails(
+    oDb.collection("ai_insights").doc("custom_doc_id").set(validInsightPayload())
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ ownerId: OUTSIDER_UID }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ depotId: `depot_${OUTSIDER_UID}` }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ insights: [] }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ stockAdvice: "" }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ stockAdvice: "x".repeat(1001) }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ totalOmzet: -1 }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ totalKasMasuk: -10 }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ overduePiutangOver30d: -5 }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ periodDays: 14 }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ healthStatus: "BURUK" }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ priorityActionTarget: "SETTINGS" }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ priorityActionTitle: "x".repeat(81) }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ id: insightDocId }))
+  );
+  await assertFails(
+    oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload({ timestamp: new Date(Date.now() + 60000) }))
+  );
+
+  // 5. Valid create & update (including negative net profit / deficit) by owner succeeds, plus minimal legacy doc
+  await assertSucceeds(oDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload()));
+  await assertSucceeds(oDb.collection("ai_insights").doc(insightDocId).get());
+  await assertSucceeds(oDb.collection("ai_insights").where("ownerId", "==", OWNER_UID).get());
+  await assertSucceeds(
+    oDb.collection("ai_insights").doc(insightDocId).set(
+      validInsightPayload({
+        periodDays: 7,
+        healthStatus: "KRITIS",
+        labaBersih: -125000,
+        marginLabaPersen: -15.4,
+        totalOmzet: 1320000,
+        totalGalon: 220,
+      })
+    )
+  );
+  await assertSucceeds(
+    oDb.collection("ai_insights").doc(insightDocId).set({
+      ownerId: OWNER_UID,
+      depotId: DEPOT_ID,
+      insights: ["Omzet stabil."],
+      stockAdvice: "Stok aman.",
+      totalOmzet: 500000,
+      totalGalon: 80,
+      activeCustomers: 12,
+      modelName: "gemini-3.8-flash",
+      timestamp: ts(),
+    })
+  );
+
+  // 6. Staff & outsider cannot read, list, overwrite, or delete owner's ai_insights
+  await assertFails(sDb.collection("ai_insights").doc(insightDocId).get());
+  await assertFails(sDb.collection("ai_insights").where("ownerId", "==", OWNER_UID).get());
+  await assertFails(sDb.collection("ai_insights").doc(insightDocId).set(validInsightPayload()));
+  await assertFails(sDb.collection("ai_insights").doc(insightDocId).delete());
+
+  await assertFails(outDb.collection("ai_insights").doc(insightDocId).get());
+  await assertFails(outDb.collection("ai_insights").where("ownerId", "==", OWNER_UID).get());
+  await assertFails(outDb.collection("ai_insights").doc(insightDocId).delete());
+
+  // 7. Owner can delete own ai_insight
+  await assertSucceeds(oDb.collection("ai_insights").doc(insightDocId).delete());
+});
+
+
+

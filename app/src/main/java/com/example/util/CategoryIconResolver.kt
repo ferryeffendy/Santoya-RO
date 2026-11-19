@@ -84,8 +84,8 @@ object CategoryIconResolver {
 
         return when {
             containsAny(normNama, "tds", "ppm", "ukur air", "kualitas") -> PerawatanIconType.CEK_TDS
+            containsAny(normNama, "membran", "membrane", "cip") -> PerawatanIconType.MEMBRAN_RO
             containsAny(normNama, "tangki", "tandon", "cuci", "kuras", "reservoir") -> PerawatanIconType.CUCI_TANGKI
-            containsAny(normNama, "membran", "membrane") -> PerawatanIconType.MEMBRAN_RO
             containsAny(normNama, "uv", "lampu", "ultraviolet", "steril") -> PerawatanIconType.LAMPU_UV
             containsAny(normNama, "pompa", "pump", "booster", "tekanan") -> PerawatanIconType.SERVICE_POMPA
             containsAny(normNama, "filter", "sedimen", "karbon", "carbon", "cartridge", "resin") -> PerawatanIconType.FILTER_RO

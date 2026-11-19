@@ -307,6 +307,10 @@ object KaryawanScopeHelper {
         }
     }
 
+    /**
+     * Menghitung ringkasan performa harian & bulanan kurir, termasuk setoran uang tunai fisik hari ini
+     * (tidak menghitung pembayaran non-tunai/Transfer yang langsung masuk ke rekening pemilik).
+     */
     fun summarizeKaryawanDashboardMetrics(
         transaksiList: List<TransaksiDetail>,
         activeKurir: Kurir?,
@@ -325,11 +329,13 @@ object KaryawanScopeHelper {
         val todayTxs = courierTxs.filter { it.transaksi.tanggal in todayStart..todayEnd }
         val monthTxs = courierTxs.filter { it.transaksi.tanggal in monthStart..todayEnd }
 
-        val setoranTunaiHariIni = todayTxs.sumOf {
-            if (it.transaksi.status.equals("Lunas", ignoreCase = true)) {
-                it.transaksi.total_harga
-            } else {
-                it.transaksi.uangMuka.toDouble()
+        val setoranTunaiHariIni = todayTxs.sumOf { detail ->
+            val tx = detail.transaksi
+            val isNonCash = LaporanFinanceCalculator.isNonCashPaymentMethod(tx.metode_bayar)
+            when {
+                isNonCash -> 0.0
+                tx.status.equals("Lunas", ignoreCase = true) -> tx.total_harga.coerceAtLeast(0.0)
+                else -> tx.uangMuka.coerceAtLeast(0L).toDouble()
             }
         }
         val todayComp = KomisiCalculator.summarizeCourierCompensation(activeKurir, todayTxs)

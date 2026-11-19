@@ -17,7 +17,8 @@ data class RankingRawEntry(
     val title: String,
     val totalGalon: Int,
     val totalTransaksi: Int,
-    val totalPendapatan: Double
+    val totalPendapatan: Double,
+    val totalKomisi: Double = 0.0
 )
 
 /**
@@ -29,7 +30,8 @@ data class RankingEntryUi(
     val totalTransaksi: Int,
     val totalPendapatan: Double,
     val omzetSharePercent: Double,
-    val progressFraction: Float
+    val progressFraction: Float,
+    val totalKomisi: Double = 0.0
 )
 
 /**
@@ -88,7 +90,8 @@ object RankingMetricsHelper {
                 totalTransaksi = entry.totalTransaksi,
                 totalPendapatan = entry.totalPendapatan,
                 omzetSharePercent = sharePercent,
-                progressFraction = progress
+                progressFraction = progress,
+                totalKomisi = entry.totalKomisi
             )
         }
     }

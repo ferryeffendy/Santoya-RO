@@ -29,3 +29,14 @@
 -dontwarn kotlinx.coroutines.**
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Firebase App Check & AI Logic
+-keep class com.google.firebase.appcheck.** { *; }
+-keep class com.google.firebase.ai.** { *; }
+
+# Strip verbose and debug Android logs from release bytecode
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+}

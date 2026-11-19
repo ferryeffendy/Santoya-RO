@@ -34,7 +34,8 @@ data class Transaksi(
     override val updatedAt: Long = System.currentTimeMillis(),
     override val syncId: String = UUID.randomUUID().toString(),
     val isDeleted: Boolean = false,
-    val deletedBy: String? = null
+    val deletedBy: String? = null,
+    val waterType: String = WATER_TYPE_RO
 ) : SyncableEntity {
     fun remainingKasbonAmount(): Double {
         if (!status.equals("Kasbon", ignoreCase = true)) return 0.0
@@ -45,5 +46,10 @@ data class Transaksi(
             }
             else -> total_harga
         }
+    }
+
+    companion object {
+        const val WATER_TYPE_RO = "RO"
+        const val WATER_TYPE_MINERAL = "MINERAL"
     }
 }

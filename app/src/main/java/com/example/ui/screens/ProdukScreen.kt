@@ -60,12 +60,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.data.entity.Produk
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.ProdukCategoryIcon
@@ -254,12 +256,14 @@ fun ProdukScreen(
         val hargaFocusRequester = remember { FocusRequester() }
         val sheetFocusManager = LocalFocusManager.current
 
+        val sheetContext = androidx.compose.ui.platform.LocalContext.current
+
         val submitProduk = {
             val trimmedNama = nama.trim()
             val hVal = harga.toDoubleOrNull() ?: 0.0
             when {
-                trimmedNama.isBlank() -> errorMessage = "Nama produk wajib diisi"
-                hVal <= 0.0 -> errorMessage = "Harga harus lebih dari 0"
+                trimmedNama.isBlank() -> errorMessage = sheetContext.getString(R.string.produk_err_name)
+                hVal <= 0.0 -> errorMessage = sheetContext.getString(R.string.produk_err_price)
                 else -> {
                     if (target == null) {
                         viewModel.addProduk(trimmedNama, hVal)
@@ -273,8 +277,11 @@ fun ProdukScreen(
         }
 
         SantoyaFormBottomSheet(
-            title = if (target == null) "Tambah Produk" else "Edit Produk",
-            subtitle = "Atur nama dan harga jual per galon",
+            title = stringResource(
+                if (target == null) R.string.produk_form_add_title
+                else R.string.produk_form_edit_title
+            ),
+            subtitle = stringResource(R.string.produk_form_subtitle),
             headerIconContent = {
                 ProdukCategoryIcon(
                     namaProduk = nama,
@@ -282,7 +289,10 @@ fun ProdukScreen(
                     modifier = Modifier.size(21.dp)
                 )
             },
-            confirmLabel = if (target == null) "Simpan" else "Perbarui",
+            confirmLabel = stringResource(
+                if (target == null) R.string.action_save
+                else R.string.action_update
+            ),
             onDismiss = {
                 showAddDialog = false
                 editingProduk = null
@@ -295,8 +305,8 @@ fun ProdukScreen(
                     nama = it
                     errorMessage = null
                 },
-                label = { Text("Nama Produk *") },
-                placeholder = { Text("Contoh: Galon RO 19L") },
+                label = { Text(stringResource(R.string.produk_name_label)) },
+                placeholder = { Text(stringResource(R.string.produk_name_hint)) },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Text,
                     imeAction = ImeAction.Next
@@ -316,7 +326,7 @@ fun ProdukScreen(
                     harga = it.filter { c -> c.isDigit() }
                     errorMessage = null
                 },
-                label = { Text("Harga Satuan (Rp) *") },
+                label = { Text(stringResource(R.string.produk_price_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number,
@@ -359,7 +369,7 @@ fun ProdukScreen(
             },
             title = {
                 Text(
-                    text = "Hapus Produk?",
+                    text = stringResource(R.string.produk_delete_title),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
                 )
@@ -367,7 +377,7 @@ fun ProdukScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "\"${target.nama_produk}\" akan dihapus dari katalog.",
+                        text = stringResource(R.string.produk_delete_msg, target.nama_produk),
                         style = MaterialTheme.typography.bodyMedium
                     )
 
@@ -387,7 +397,10 @@ fun ProdukScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Harga: ${FormatUtils.formatRupiah(target.harga)}",
+                                text = stringResource(
+                                    R.string.produk_delete_price,
+                                    FormatUtils.formatRupiah(target.harga)
+                                ),
                                 style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"),
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.primary
@@ -396,7 +409,7 @@ fun ProdukScreen(
                     }
 
                     Text(
-                        text = "Catatan transaksi lama tetap aman di laporan.",
+                        text = stringResource(R.string.produk_delete_note),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -421,12 +434,12 @@ fun ProdukScreen(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Hapus")
+                    Text(stringResource(R.string.action_delete))
                 }
             },
             dismissButton = {
                 OutlinedButton(onClick = { produkToDelete = null }) {
-                    Text("Batal")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

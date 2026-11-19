@@ -35,8 +35,14 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import com.example.ui.components.TransaksiSkeletonItem
 import androidx.compose.foundation.rememberScrollState
+import android.app.Activity
+import android.content.Intent
+import android.provider.ContactsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -45,6 +51,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.ContactPhone
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
@@ -76,6 +83,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -88,18 +96,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
+import com.example.data.entity.DepotProfile
 import com.example.data.entity.Kurir
 import com.example.data.entity.Pelanggan
 import com.example.data.entity.Produk
@@ -107,10 +122,12 @@ import com.example.data.entity.Transaksi
 import com.example.data.entity.TransaksiDetail
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
+import com.example.ui.components.DepotQuickFillDialog
 import com.example.ui.components.HighlightedSearchText
 import com.example.ui.components.HydroBentoCard
 import com.example.ui.components.HydroGalonIcon
 import com.example.ui.components.HydroGradientBadge
+import com.example.ui.components.PelangganFormDialog
 import com.example.ui.components.ProdukCategoryIcon
 import com.example.ui.components.SantoyaAdaptiveCurrencyText
 import com.example.ui.components.SantoyaAdaptiveTabPillRow
@@ -133,6 +150,7 @@ import com.example.util.KomisiCalculator
 import com.example.util.SantoyaReceiptHelper
 import com.example.util.SearchField
 import com.example.util.SearchMatcher
+import com.example.util.TorenWaterCalculator
 import com.example.viewmodel.ActiveReceiptDialog
 import com.example.viewmodel.SantoyaViewModel
 import java.util.Calendar
@@ -180,45 +198,31 @@ fun TransaksiScreen(
         pelangganList.filter { !KaryawanScopeHelper.isSoftDeletedPelanggan(it) }
     }
 
-    val recentCustomers = remember(transaksiList, activePelangganList) {
-        val byId = activePelangganList.associateBy { it.id }
-        val seen = LinkedHashSet<Int>()
-        val result = mutableListOf<Pelanggan>()
-        transaksiList
-            .asSequence()
-            .filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
-            .sortedByDescending { it.transaksi.tanggal }
-            .forEach { detail ->
-                val pId = detail.transaksi.id_pelanggan
-                if (pId != null && seen.add(pId)) {
-                    byId[pId]?.let { result.add(it) }
-                }
-            }
-        if (result.size < 6) {
-            activePelangganList.forEach { cust ->
-                if (result.size < 6 && seen.add(cust.id)) {
-                    result.add(cust)
-                }
-            }
-        }
-        result.take(6)
-    }
-
     val activeTransaksiCount = remember(transaksiList) {
         transaksiList.count { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
     }
 
     val effectiveKasbonByCustomer = remember(activePelangganList, transaksiList) {
-        val unpaidByCustomer = transaksiList
-            .filter {
-                !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) &&
-                    it.transaksi.status.equals("Kasbon", ignoreCase = true)
-            }
+        val activeTxByCustomer = transaksiList
+            .filter { !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) }
             .groupBy { it.transaksi.id_pelanggan }
         activePelangganList.associate { p ->
-            val unpaidNotes = unpaidByCustomer[p.id] ?: emptyList()
+            val customerTxs = activeTxByCustomer[p.id] ?: emptyList()
+            val unpaidNotes = customerTxs.filter {
+                it.transaksi.status.equals("Kasbon", ignoreCase = true)
+            }
             val unpaidSum = unpaidNotes.sumOf { it.transaksi.remainingKasbonAmount() }
-            val effectiveKasbon = if (unpaidNotes.isNotEmpty()) unpaidSum else p.sisa_kasbon
+            val hasSettledKasbonNote = customerTxs.any { detail ->
+                val tx = detail.transaksi
+                tx.status.equals("Lunas", ignoreCase = true) &&
+                    tx.tanggalBayar != null &&
+                    tx.tanggalBayar != tx.tanggal
+            }
+            val effectiveKasbon = when {
+                unpaidNotes.isNotEmpty() -> unpaidSum
+                hasSettledKasbonNote -> 0.0
+                else -> p.sisa_kasbon
+            }
             p.id to effectiveKasbon
         }
     }
@@ -269,7 +273,6 @@ fun TransaksiScreen(
                     CatatPenjualanTab(
                         viewModel = viewModel,
                         pelangganList = activePelangganList,
-                        recentCustomers = recentCustomers,
                         produkList = produkList,
                         kurirList = kurirList,
                         effectiveKasbonByCustomer = effectiveKasbonByCustomer,
@@ -302,8 +305,7 @@ fun CatatPenjualanTab(
     kurirList: List<Kurir>,
     effectiveKasbonByCustomer: Map<Int, Double> = emptyMap(),
     isKaryawan: Boolean = false,
-    activeKaryawan: Kurir? = null,
-    recentCustomers: List<Pelanggan> = emptyList()
+    activeKaryawan: Kurir? = null
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
@@ -318,7 +320,9 @@ fun CatatPenjualanTab(
     val metodeBayar by viewModel.txMetodeBayar.collectAsState()
     val status by viewModel.txStatus.collectAsState()
     val uangMuka by viewModel.txUangMuka.collectAsState()
+    val txWaterType by viewModel.txWaterType.collectAsStateWithLifecycle()
     val isBusyAction by viewModel.isBusyAction.collectAsState()
+    val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
     val formScrollState = rememberScrollState()
 
     LaunchedEffect(isKaryawan, activeKaryawan?.id, selectedKurirId) {
@@ -328,7 +332,6 @@ fun CatatPenjualanTab(
     }
 
     var showAddCustomerDialog by remember { mutableStateOf(false) }
-    var showEditJumlahDialog by remember { mutableStateOf(false) }
 
     val selectedPelanggan = pelangganList.find { it.id == selectedPelangganId }
     val selectedKurir = kurirList.find { it.id == selectedKurirId }
@@ -362,8 +365,12 @@ fun CatatPenjualanTab(
     }
 
     if (selectedProdukId == null && produkList.isNotEmpty()) {
-        val first = produkList.first()
-        viewModel.setTxProdukId(first.id, first.harga)
+        val preferred = if (depotProfile.depotType == DepotProfile.TYPE_MINERAL) {
+            produkList.firstOrNull { it.nama_produk.contains("mineral", ignoreCase = true) } ?: produkList.first()
+        } else {
+            produkList.first()
+        }
+        viewModel.setTxProdukId(preferred.id, preferred.harga)
     }
 
     val totalHarga = jumlah * hargaSatuan
@@ -490,46 +497,7 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 2. Quick-Customer 1-Ketuk + Autocomplete Pemilihan Pelanggan
-            if (recentCustomers.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Cepat:",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    recentCustomers.forEach { cust ->
-                        val isChipSelected = cust.id == selectedPelangganId
-                        FilterChip(
-                            selected = isChipSelected,
-                            onClick = {
-                                searchQuery = cust.nama
-                                isDropdownExpanded = false
-                                viewModel.onPelangganSelected(cust.id)
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                            },
-                            label = {
-                                Text(
-                                    text = cust.nama,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isChipSelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            },
-                            modifier = Modifier.height(32.dp)
-                        )
-                    }
-                }
-            }
+            // 2. Autocomplete Pemilihan Pelanggan
 
             ExposedDropdownMenuBox(
                 expanded = isDropdownExpanded,
@@ -549,7 +517,7 @@ fun CatatPenjualanTab(
                     textStyle = MaterialTheme.typography.bodyLarge,
                     label = {
                         Text(
-                            "Pelanggan *",
+                            "Pelanggan (Wajib untuk Kasbon / Antar)",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -864,6 +832,73 @@ fun CatatPenjualanTab(
                 }
             }
 
+            // 3B. Pemilih Jenis Air Cepat (Khusus Mode Campuran RO & Mineral) + Peringatan Stok Toren Menipis
+            if (depotProfile.isBothType()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${stringResource(R.string.pos_water_type_label)}:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val isRoSelected = txWaterType == Transaksi.WATER_TYPE_RO
+                    FilterChip(
+                        selected = isRoSelected,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.setTxWaterType(Transaksi.WATER_TYPE_RO)
+                            produkList.firstOrNull {
+                                it.nama_produk.contains("ro", ignoreCase = true) &&
+                                    !it.nama_produk.contains("mineral", ignoreCase = true)
+                            }?.let { roProd ->
+                                viewModel.setTxProdukId(roProd.id, roProd.harga)
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.pos_water_type_ro),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isRoSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .testTag("chip_pos_water_ro")
+                    )
+                    val isMineralSelected = txWaterType == Transaksi.WATER_TYPE_MINERAL
+                    FilterChip(
+                        selected = isMineralSelected,
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            viewModel.setTxWaterType(Transaksi.WATER_TYPE_MINERAL)
+                            produkList.firstOrNull {
+                                it.nama_produk.contains("mineral", ignoreCase = true)
+                            }?.let { minProd ->
+                                viewModel.setTxProdukId(minProd.id, minProd.harga)
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(R.string.pos_water_type_mineral),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (isMineralSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                            .testTag("chip_pos_water_mineral")
+                    )
+                }
+            }
+
             // 4. Katalog Produk (Hydro Bento Product Tiles dengan Ikon Galon & Badge Gradien)
             val chunkedProduk = produkList.chunked(2)
             chunkedProduk.forEach { pair ->
@@ -963,204 +998,254 @@ fun CatatPenjualanTab(
                 }
             }
 
-            // 5. Baris Horizontal: Harga Satuan & Counter Galon + Quick-Qty Chips
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    OutlinedTextField(
-                        value = if (hargaSatuan > 0) hargaSatuan.toLong().toString() else "",
-                        onValueChange = { input ->
-                            if (!isKaryawan) {
-                                val num = input.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
-                                viewModel.setTxHargaSatuan(num)
-                            }
-                        },
-                        readOnly = isKaryawan,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = if (isKaryawan) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
-                        ),
-                        label = {
-                            Text(
-                                "Harga Satuan (Rp) *",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        },
-                        prefix = {
-                            Text(
-                                "Rp ",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        trailingIcon = if (isKaryawan) {
-                            {
-                                Icon(
-                                    imageVector = Icons.Outlined.Lock,
-                                    contentDescription = "Harga dikunci Pemilik",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        } else null,
-                        supportingText = if (isKaryawan) {
-                            {
-                                Text(
-                                    text = "Harga dikunci Pemilik",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        } else null,
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = if (isKaryawan) {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            },
-                            unfocusedContainerColor = if (isKaryawan) {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
-                        ),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier
-                            .weight(1.3f)
-                            .bringIntoViewOnFocus()
-                            .testTag("input_harga_satuan")
+            // 5. Baris Horizontal: Harga Satuan & Input Langsung Jumlah Galon
+            var jumlahField by remember {
+                mutableStateOf(
+                    TextFieldValue(
+                        text = jumlah.toString(),
+                        selection = TextRange(jumlah.toString().length)
                     )
+                )
+            }
+            var isJumlahFocused by remember { mutableStateOf(false) }
 
-                    HydroBentoCard(
-                        accentColor = MaterialTheme.colorScheme.primary,
-                        cornerRadius = SantoyaRadius.md,
-                        tintAlpha = 0.07f,
-                        showWaterRipple = false,
+            LaunchedEffect(jumlah) {
+                val parsed = jumlahField.text.toIntOrNull()
+                if (parsed != jumlah && !(isJumlahFocused && jumlahField.text.isEmpty())) {
+                    val synced = jumlah.toString()
+                    jumlahField = TextFieldValue(
+                        text = synced,
+                        selection = TextRange(synced.length)
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = if (hargaSatuan > 0) hargaSatuan.toLong().toString() else "",
+                    onValueChange = { input ->
+                        if (!isKaryawan) {
+                            val num = input.filter { it.isDigit() }.toDoubleOrNull() ?: 0.0
+                            viewModel.setTxHargaSatuan(num)
+                        }
+                    },
+                    readOnly = isKaryawan,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (isKaryawan) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                    ),
+                    label = {
+                        Text(
+                            "Harga Satuan (Rp) *",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    prefix = {
+                        Text(
+                            "Rp ",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    trailingIcon = if (isKaryawan) {
+                        {
+                            Icon(
+                                imageVector = Icons.Outlined.Lock,
+                                contentDescription = "Harga dikunci Pemilik",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    } else null,
+                    supportingText = if (isKaryawan) {
+                        {
+                            Text(
+                                text = "Harga dikunci Pemilik",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    } else null,
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = if (isKaryawan) {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                        unfocusedContainerColor = if (isKaryawan) {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+                    ),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .bringIntoViewOnFocus()
+                        .testTag("input_harga_satuan")
+                )
+
+                HydroBentoCard(
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    cornerRadius = SantoyaRadius.md,
+                    tintAlpha = 0.07f,
+                    showWaterRipple = false,
+                    modifier = Modifier
+                        .weight(1.25f)
+                        .heightIn(min = 68.dp)
+                        .padding(top = 4.dp)
+                ) {
+                    Column(
                         modifier = Modifier
-                            .weight(1.2f)
-                            .height(64.dp)
-                            .padding(top = 4.dp)
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            HydroGalonIcon(
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                text = "Jumlah Galon",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    viewModel.decrementTxJumlah()
+                                },
+                                enabled = jumlah > 1,
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(34.dp)
+                                    .testTag("btn_minus_galon")
                             ) {
-                                HydroGalonIcon(
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(12.dp)
-                                )
-                                Text(
-                                    text = "Jumlah Galon",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                Icon(Icons.Outlined.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
                             }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        focusManager.clearFocus()
-                                        keyboardController?.hide()
-                                        viewModel.decrementTxJumlah()
-                                    },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .testTag("btn_minus_galon")
-                                ) {
-                                    Icon(Icons.Outlined.Remove, contentDescription = "Kurang", modifier = Modifier.size(16.dp))
-                                }
 
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable {
-                                            focusManager.clearFocus()
-                                            keyboardController?.hide()
-                                            showEditJumlahDialog = true
+                            BasicTextField(
+                                value = jumlahField,
+                                onValueChange = { incoming ->
+                                    val digits = incoming.text.filter { it.isDigit() }.take(4)
+                                    jumlahField = incoming.copy(
+                                        text = digits,
+                                        selection = if (digits.length != incoming.text.length) {
+                                            TextRange(digits.length)
+                                        } else {
+                                            incoming.selection
                                         }
-                                        .testTag("btn_ketik_jumlah_galon")
-                                ) {
-                                    Text(
-                                        text = "$jumlah",
-                                        style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"),
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.animateContentSize(),
-                                        maxLines = 1
                                     )
-                                }
-
-                                OutlinedButton(
-                                    onClick = {
+                                    val parsed = digits.toIntOrNull()
+                                    if (parsed != null && parsed >= 1) {
+                                        viewModel.setTxJumlah(parsed)
+                                    }
+                                },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontFeatureSettings = "tnum",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textAlign = TextAlign.Center
+                                ),
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        val validQty = jumlahField.text.toIntOrNull()?.takeIf { it >= 1 } ?: jumlah.coerceAtLeast(1)
+                                        viewModel.setTxJumlah(validQty)
+                                        val synced = validQty.toString()
+                                        jumlahField = TextFieldValue(synced, TextRange(synced.length))
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
-                                        viewModel.incrementTxJumlah()
-                                    },
-                                    shape = CircleShape,
-                                    contentPadding = PaddingValues(0.dp),
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .testTag("btn_plus_galon")
-                                ) {
-                                    Icon(Icons.Outlined.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
-                                }
+                                    }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Box(
+                                        contentAlignment = Alignment.Center,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                                    ) {
+                                        if (jumlahField.text.isEmpty()) {
+                                            Text(
+                                                text = "$jumlah",
+                                                style = MaterialTheme.typography.titleLarge.copy(
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFeatureSettings = "tnum",
+                                                    textAlign = TextAlign.Center
+                                                ),
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                                                maxLines = 1
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .bringIntoViewOnFocus()
+                                    .onFocusChanged { focusState ->
+                                        isJumlahFocused = focusState.isFocused
+                                        if (focusState.isFocused) {
+                                            jumlahField = jumlahField.copy(
+                                                selection = TextRange(0, jumlahField.text.length)
+                                            )
+                                        } else {
+                                            val validQty = jumlahField.text.toIntOrNull()?.takeIf { it >= 1 } ?: jumlah.coerceAtLeast(1)
+                                            viewModel.setTxJumlah(validQty)
+                                            val synced = validQty.toString()
+                                            jumlahField = TextFieldValue(synced, TextRange(synced.length))
+                                        }
+                                    }
+                                    .testTag("input_jumlah_galon")
+                            )
+
+                            OutlinedButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
+                                    viewModel.incrementTxJumlah()
+                                },
+                                shape = CircleShape,
+                                contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(34.dp)
+                                    .testTag("btn_plus_galon")
+                            ) {
+                                Icon(Icons.Outlined.Add, contentDescription = "Tambah", modifier = Modifier.size(16.dp))
                             }
                         }
-                    }
-                }
-
-                // Quick-Quantity Chips untuk input cepat 1 ketukan (Eceran & Grosir/Warung)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf(1, 2, 3, 5, 10, 15, 20).forEach { presetQty ->
-                        val isQtySelected = jumlah == presetQty
-                        FilterChip(
-                            selected = isQtySelected,
-                            onClick = {
-                                focusManager.clearFocus()
-                                keyboardController?.hide()
-                                viewModel.setTxJumlah(presetQty)
-                            },
-                            label = {
-                                Text(
-                                    text = "$presetQty Galon",
-                                    maxLines = 1,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = if (isQtySelected) FontWeight.Bold else FontWeight.Medium
-                                )
-                            },
-                            modifier = Modifier.height(30.dp)
-                        )
                     }
                 }
             }
@@ -1192,7 +1277,7 @@ fun CatatPenjualanTab(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Otomatis Akun Anda",
+                                text = stringResource(R.string.staff_auto_courier_badge),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -1659,13 +1744,16 @@ fun CatatPenjualanTab(
                                     } else {
                                         prevKasbon
                                     }
-                                    val text = SantoyaReceiptHelper.generateSaleReceipt(savedDetail, newKasbonTotal)
+                                    val text = SantoyaReceiptHelper.generateSaleReceipt(savedDetail, newKasbonTotal, depotProfile)
                                     viewModel.showReceiptDialog(
                                         ActiveReceiptDialog(
                                             title = "Struk Transaksi Penjualan",
                                             receiptText = text,
                                             customerPhone = savedDetail.pelanggan?.no_hp,
-                                            data = savedDetail
+                                            data = savedDetail,
+                                            receiptBuilder = { profile ->
+                                                SantoyaReceiptHelper.generateSaleReceipt(savedDetail, newKasbonTotal, profile)
+                                            }
                                         )
                                     )
                                 }
@@ -1726,327 +1814,38 @@ fun CatatPenjualanTab(
         }
     }
 
-    if (showEditJumlahDialog) {
-        var jumlahInput by remember(jumlah) { mutableStateOf(jumlah.toString()) }
-        val applyJumlah = {
-            val parsed = jumlahInput.toIntOrNull() ?: 1
-            viewModel.setTxJumlah(parsed.coerceAtLeast(1))
-            focusManager.clearFocus()
-            keyboardController?.hide()
-            showEditJumlahDialog = false
-        }
-        SantoyaFormBottomSheet(
-            title = "Atur Jumlah Galon",
-            subtitle = "Pilih cepat atau ketik jumlah manual",
-            headerIcon = Icons.Outlined.Edit,
-            onDismiss = { showEditJumlahDialog = false },
-            confirmLabel = "Terapkan",
-            onConfirm = applyJumlah
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(1, 2, 3, 5, 10, 15, 20).forEach { preset ->
-                    val isSelected = jumlahInput == preset.toString()
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { jumlahInput = preset.toString() },
-                        label = {
-                            Text(
-                                text = "$preset Galon",
-                                maxLines = 1,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        modifier = Modifier.height(34.dp)
-                    )
-                }
-            }
-            OutlinedTextField(
-                value = jumlahInput,
-                onValueChange = { text ->
-                    jumlahInput = text.filter { it.isDigit() }.take(4)
-                },
-                textStyle = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontFeatureSettings = "tnum",
-                    textAlign = TextAlign.Center
-                ),
-                label = {
-                    Text(
-                        "Jumlah Galon *",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(onDone = { applyJumlah() }),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .bringIntoViewOnFocus()
-            )
-            Text(
-                text = "Isi jumlah galon (minimal 1).",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+
 
     if (showAddCustomerDialog) {
-        val initialNama = if (pelangganList.none { it.nama.equals(searchQuery.trim(), ignoreCase = true) }) searchQuery.trim() else ""
-        var namaBaru by remember { mutableStateOf(initialNama) }
-        var alamatBaru by remember { mutableStateOf("") }
-        var noHpBaru by remember { mutableStateOf("") }
-        var hargaKhususBaru by remember { mutableStateOf("") }
-        val lockedKurirBaruId = if (isKaryawan && activeKaryawan != null) activeKaryawan.id else null
-        var selectedKurirBaruId by remember(lockedKurirBaruId) { mutableStateOf<Int?>(lockedKurirBaruId) }
-
-        val namaFocus = remember { FocusRequester() }
-        val alamatFocus = remember { FocusRequester() }
-        val hpFocus = remember { FocusRequester() }
-        val hargaFocus = remember { FocusRequester() }
-
-        SantoyaFormBottomSheet(
-            title = "Tambah Pelanggan Baru",
-            subtitle = "Otomatis terpilih di transaksi ini",
-            headerIcon = Icons.Outlined.PersonAdd,
-            onDismiss = { showAddCustomerDialog = false },
-            confirmLabel = "Simpan",
-            confirmEnabled = namaBaru.isNotBlank(),
-            onConfirm = {
-                if (namaBaru.isNotBlank()) {
-                    val hKhusus = hargaKhususBaru.toDoubleOrNull()
-                    viewModel.addPelanggan(
-                        nama = namaBaru,
-                        alamat = alamatBaru,
-                        noHp = noHpBaru,
-                        hargaKhusus = hKhusus,
-                        idKurirLangganan = selectedKurirBaruId
-                    )
-                    searchQuery = namaBaru.trim()
-                    isDropdownExpanded = false
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
-                    showAddCustomerDialog = false
-                }
-            }
-        ) {
-            OutlinedTextField(
-                value = namaBaru,
-                onValueChange = { namaBaru = it },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                label = {
-                    Text(
-                        "Nama Pelanggan *",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { alamatFocus.requestFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(namaFocus)
-                    .bringIntoViewOnFocus(),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = alamatBaru,
-                onValueChange = { alamatBaru = it },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                label = {
-                    Text(
-                        "Alamat / Desa / Blok",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                keyboardActions = KeyboardActions(onNext = { hpFocus.requestFocus() }),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(alamatFocus)
-                    .bringIntoViewOnFocus(),
-                shape = RoundedCornerShape(12.dp)
-            )
-            OutlinedTextField(
-                value = noHpBaru,
-                onValueChange = { noHpBaru = it.filter { c -> c.isDigit() || c == '+' } },
-                textStyle = MaterialTheme.typography.bodyLarge,
-                label = {
-                    Text(
-                        "No. HP / WhatsApp",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Phone,
-                    imeAction = if (isKaryawan) ImeAction.Done else ImeAction.Next
-                ),
-                keyboardActions = KeyboardActions(
-                    onNext = { if (!isKaryawan) hargaFocus.requestFocus() },
-                    onDone = {
-                        focusManager.clearFocus()
-                        keyboardController?.hide()
-                    }
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .focusRequester(hpFocus)
-                    .bringIntoViewOnFocus(),
-                shape = RoundedCornerShape(12.dp)
-            )
-            if (isKaryawan) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Lock,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                            Text(
-                                text = "Tarif Harga Terkunci",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Harga mengikuti tarif dari Pemilik.",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            } else {
-                OutlinedTextField(
-                    value = hargaKhususBaru,
-                    onValueChange = { hargaKhususBaru = it.filter { c -> c.isDigit() } },
-                    textStyle = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    label = {
-                        Text(
-                            "Harga Khusus Galon (Rp) (Opsional)",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            "Isi jika pakai harga khusus",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number,
-                        imeAction = ImeAction.Done
-                    ),
-                    keyboardActions = KeyboardActions(
-                        onDone = {
-                            focusManager.clearFocus()
-                            keyboardController?.hide()
-                        }
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(hargaFocus)
-                        .bringIntoViewOnFocus(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-            }
-            Text(
-                text = if (isKaryawan && activeKaryawan != null) "Kurir Langganan" else "Kurir Langganan (Opsional)",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            if (isKaryawan && activeKaryawan != null) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "Otomatis: ${activeKaryawan.nama}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "Pelanggan ini otomatis jadi langganan Anda.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                        )
-                    }
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilterChip(
-                        selected = selectedKurirBaruId == null,
-                        onClick = { selectedKurirBaruId = null },
-                        label = {
-                            Text(
-                                "Tanpa Kurir",
-                                maxLines = 1,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (selectedKurirBaruId == null) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        modifier = Modifier.height(34.dp)
-                    )
-                    kurirList.forEach { kurir ->
-                        FilterChip(
-                            selected = selectedKurirBaruId == kurir.id,
-                            onClick = { selectedKurirBaruId = kurir.id },
-                            label = {
-                                Text(
-                                    kurir.nama,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontWeight = if (selectedKurirBaruId == kurir.id) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            modifier = Modifier.height(34.dp)
-                        )
-                    }
-                }
-            }
+        val initialNama = if (pelangganList.none { it.nama.equals(searchQuery.trim(), ignoreCase = true) }) {
+            searchQuery.trim()
+        } else {
+            ""
         }
+        PelangganFormDialog(
+            title = "Tambah Pelanggan Baru",
+            pelanggan = null,
+            existingPelanggan = pelangganList,
+            kurirList = kurirList,
+            isKaryawan = isKaryawan,
+            activeKaryawan = activeKaryawan,
+            initialNama = initialNama,
+            onDismiss = { showAddCustomerDialog = false },
+            onConfirm = { namaBaru, alamatBaru, noHpBaru, hKhusus, selectedKurirBaruId ->
+                viewModel.addPelanggan(
+                    nama = namaBaru,
+                    alamat = alamatBaru,
+                    noHp = noHpBaru,
+                    hargaKhusus = hKhusus,
+                    idKurirLangganan = selectedKurirBaruId
+                )
+                searchQuery = namaBaru.trim()
+                isDropdownExpanded = false
+                focusManager.clearFocus()
+                keyboardController?.hide()
+                showAddCustomerDialog = false
+            }
+        )
     }
 }
 
@@ -2072,12 +1871,15 @@ fun RiwayatTransaksiTab(
     val items: LazyPagingItems<Transaksi> = viewModel.transaksiPagingFlow.collectAsLazyPagingItems()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val depotProfile by viewModel.depotProfile.collectAsStateWithLifecycle()
+    val isOwnerProfile = !isKaryawan && depotProfile.isOwnerRole()
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(RiwayatFilterOption.SEMUA) }
     var showAllHistory by remember { mutableStateOf(false) }
     var editingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
     var deletingTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
     var markingLunasTransaksi by remember { mutableStateOf<TransaksiDetail?>(null) }
+    var quickFillPendingAction by remember { mutableStateOf<((DepotProfile) -> Unit)?>(null) }
 
     val detailById = remember(transaksiList) { transaksiList.associateBy { it.transaksi.id } }
     val pelangganById = remember(pelangganList) { pelangganList.associateBy { it.id } }
@@ -2436,7 +2238,7 @@ fun RiwayatTransaksiTab(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Tidak ada data",
+                            text = stringResource(R.string.transaksi_empty_list),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -2461,6 +2263,9 @@ fun RiwayatTransaksiTab(
                         kurirList = kurirList,
                         pelangganList = pelangganList,
                         effectiveKasbonByCustomer = effectiveKasbonByCustomer,
+                        depotProfile = depotProfile,
+                        isOwner = isOwnerProfile,
+                        onRequireQuickFill = { quickFillPendingAction = it },
                         viewModel = viewModel,
                         onEdit = { editingTransaksi = detail },
                         onDelete = { deletingTransaksi = detail },
@@ -2508,6 +2313,9 @@ fun RiwayatTransaksiTab(
                         kurirList = kurirList,
                         pelangganList = pelangganList,
                         effectiveKasbonByCustomer = effectiveKasbonByCustomer,
+                        depotProfile = depotProfile,
+                        isOwner = isOwnerProfile,
+                        onRequireQuickFill = { quickFillPendingAction = it },
                         viewModel = viewModel,
                         onEdit = { editingTransaksi = detail },
                         onDelete = { deletingTransaksi = detail },
@@ -2625,22 +2433,41 @@ fun RiwayatTransaksiTab(
             shape = RoundedCornerShape(SantoyaRadius.lg),
             title = {
                 Text(
-                    text = if (isAuditDeleted) "Hapus Permanen Transaksi?" else "Hapus Transaksi?",
+                    text = stringResource(
+                        if (isAuditDeleted) R.string.transaksi_delete_title_perm
+                        else R.string.transaksi_delete_title
+                    ),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
             },
             text = {
+                val namaPelanggan = target.pelanggan?.nama ?: "Pelanggan Umum"
+                val nominalFormatted = FormatUtils.formatRupiah(target.transaksi.total_harga)
                 Text(
                     text = when {
                         isAuditDeleted -> {
-                            "Nota ${target.pelanggan?.nama ?: "Pelanggan Umum"} (${FormatUtils.formatRupiah(target.transaksi.total_harga)}) yang dihapus $deletedBy akan dihapus permanen dari HP dan Cloud."
+                            stringResource(
+                                R.string.transaksi_delete_msg_perm,
+                                namaPelanggan,
+                                nominalFormatted,
+                                deletedBy
+                            )
                         }
                         isKaryawan -> {
-                            "Nota ${target.pelanggan?.nama ?: "Pelanggan Umum"} (${FormatUtils.formatRupiah(target.transaksi.total_harga)}) akan disembunyikan dari daftar Anda dan dicatat 'Dihapus oleh ${activeKaryawan?.nama ?: "Karyawan"}' untuk laporan Pemilik."
+                            stringResource(
+                                R.string.transaksi_delete_msg_staff,
+                                namaPelanggan,
+                                nominalFormatted,
+                                activeKaryawan?.nama ?: "Karyawan"
+                            )
                         }
                         else -> {
-                            "Nota ${target.pelanggan?.nama ?: "Pelanggan Umum"} (${FormatUtils.formatRupiah(target.transaksi.total_harga)}) akan dihapus. Sisa kasbon pelanggan ikut diperbarui."
+                            stringResource(
+                                R.string.transaksi_delete_msg_owner,
+                                namaPelanggan,
+                                nominalFormatted
+                            )
                         }
                     },
                     style = MaterialTheme.typography.bodyMedium,
@@ -2664,7 +2491,10 @@ fun RiwayatTransaksiTab(
                     shape = RoundedCornerShape(SantoyaRadius.md)
                 ) {
                     Text(
-                        if (isAuditDeleted) "Hapus Permanen" else "Hapus",
+                        stringResource(
+                            if (isAuditDeleted) R.string.action_delete_perm
+                            else R.string.action_delete
+                        ),
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onError
@@ -2697,6 +2527,7 @@ fun RiwayatTransaksiTab(
             mutableStateOf(lockedEditKurirId ?: detail.transaksi.id_kurir)
         }
         var editProdukId by remember(detail) { mutableStateOf(detail.transaksi.id_produk) }
+        var editWaterType by remember(detail) { mutableStateOf(detail.transaksi.waterType) }
 
         val parsedJumlah = editJumlah.toIntOrNull() ?: 0
         val parsedHarga = editHarga.toDoubleOrNull() ?: 0.0
@@ -2748,11 +2579,37 @@ fun RiwayatTransaksiTab(
                         metodeBayar = finalMetode,
                         status = finalStatus,
                         uangMuka = finalUangMuka,
+                        waterType = editWaterType,
                         onSuccess = { editingTransaksi = null }
                     )
                 }
             }
         ) {
+            if (depotProfile.isBothType()) {
+                Text(
+                    stringResource(R.string.pos_water_type_label),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = editWaterType == Transaksi.WATER_TYPE_RO,
+                        onClick = { editWaterType = Transaksi.WATER_TYPE_RO },
+                        label = { Text(stringResource(R.string.pos_water_type_ro)) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = editWaterType == Transaksi.WATER_TYPE_MINERAL,
+                        onClick = { editWaterType = Transaksi.WATER_TYPE_MINERAL },
+                        label = { Text(stringResource(R.string.pos_water_type_mineral)) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
             if (produkList.isNotEmpty()) {
                 Text(
                     "Produk:",
@@ -2770,6 +2627,11 @@ fun RiwayatTransaksiTab(
                             selected = isSelected,
                             onClick = {
                                 editProdukId = prod.id
+                                if (prod.nama_produk.contains("mineral", ignoreCase = true)) {
+                                    editWaterType = Transaksi.WATER_TYPE_MINERAL
+                                } else if (prod.nama_produk.contains("ro", ignoreCase = true)) {
+                                    editWaterType = Transaksi.WATER_TYPE_RO
+                                }
                                 editHarga = if (isKaryawan) {
                                     KaryawanScopeHelper.resolveAuthoritativeUnitPrice(
                                         pelanggan = detail.pelanggan,
@@ -3149,7 +3011,7 @@ fun RiwayatTransaksiTab(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = "Otomatis Akun Anda",
+                            text = stringResource(R.string.staff_auto_courier_badge),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
@@ -3190,6 +3052,25 @@ fun RiwayatTransaksiTab(
             }
         }
     }
+
+    if (quickFillPendingAction != null) {
+        DepotQuickFillDialog(
+            initialProfile = depotProfile,
+            onDismiss = { quickFillPendingAction = null },
+            onSaveAndContinue = { name, addr, phone ->
+                val action = quickFillPendingAction
+                quickFillPendingAction = null
+                viewModel.quickSaveDepotProfile(name, addr, phone) { updated ->
+                    action?.invoke(updated)
+                }
+            },
+            onSkip = {
+                val action = quickFillPendingAction
+                quickFillPendingAction = null
+                action?.invoke(depotProfile)
+            }
+        )
+    }
 }
 
 @Composable
@@ -3199,6 +3080,9 @@ private fun TransaksiHistoryCard(
     kurirList: List<Kurir>,
     pelangganList: List<Pelanggan>,
     effectiveKasbonByCustomer: Map<Int, Double>,
+    depotProfile: DepotProfile,
+    isOwner: Boolean,
+    onRequireQuickFill: ((DepotProfile) -> Unit) -> Unit,
     viewModel: SantoyaViewModel,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
@@ -3318,8 +3202,17 @@ private fun TransaksiHistoryCard(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        val rawProdName = detail.produk?.nama_produk ?: if (detail.transaksi.waterType == Transaksi.WATER_TYPE_MINERAL) "Galon Air Mineral" else "Galon Air RO"
+                        val displayProdName = if (depotProfile.isBothType() &&
+                            !rawProdName.contains("mineral", ignoreCase = true) &&
+                            !rawProdName.contains("ro", ignoreCase = true)
+                        ) {
+                            if (detail.transaksi.waterType == Transaksi.WATER_TYPE_MINERAL) "$rawProdName (Air Mineral)" else "$rawProdName (Air RO)"
+                        } else {
+                            rawProdName
+                        }
                         HighlightedSearchText(
-                            text = "${detail.produk?.nama_produk ?: "Air RO"} • ${detail.transaksi.jumlah} Galon",
+                            text = "$displayProdName • ${detail.transaksi.jumlah} Galon",
                             query = searchQuery,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -3487,13 +3380,16 @@ private fun TransaksiHistoryCard(
                                 val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
                                     ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
                                     ?: 0.0
-                                val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
+                                val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon, depotProfile)
                                 viewModel.showReceiptDialog(
                                     ActiveReceiptDialog(
                                         title = "Struk Transaksi Penjualan",
                                         receiptText = text,
                                         customerPhone = detail.pelanggan?.no_hp,
-                                        data = detail
+                                        data = detail,
+                                        receiptBuilder = { profile ->
+                                            SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon, profile)
+                                        }
                                     )
                                 )
                             },
@@ -3512,12 +3408,20 @@ private fun TransaksiHistoryCard(
                                 val custKasbon = effectiveKasbonByCustomer[detail.transaksi.id_pelanggan]
                                     ?: pelangganList.find { it.id == detail.transaksi.id_pelanggan }?.sisa_kasbon
                                     ?: 0.0
-                                val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon)
-                                SantoyaReceiptHelper.shareReceiptText(
-                                    context = viewModel.getApplication(),
-                                    text = text,
-                                    phoneNumber = detail.pelanggan?.no_hp
-                                )
+                                val action: (DepotProfile) -> Unit = { activeProfile ->
+                                    val text = SantoyaReceiptHelper.generateSaleReceipt(detail, custKasbon, activeProfile)
+                                    SantoyaReceiptHelper.shareReceiptText(
+                                        context = viewModel.getApplication(),
+                                        text = text,
+                                        phoneNumber = detail.pelanggan?.no_hp,
+                                        depotName = activeProfile.effectiveDepotName()
+                                    )
+                                }
+                                if (isOwner && !depotProfile.hasConfiguredDepotName()) {
+                                    onRequireQuickFill(action)
+                                } else {
+                                    action(depotProfile)
+                                }
                             },
                             modifier = Modifier.size(48.dp)
                         ) {

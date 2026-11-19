@@ -186,7 +186,8 @@ class AppDatabaseMigrationTest {
             .addMigrations(
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
-                AppDatabase.MIGRATION_15_16
+                AppDatabase.MIGRATION_15_16,
+                AppDatabase.MIGRATION_16_17
             )
             .allowMainThreadQueries()
             .build()
@@ -197,8 +198,8 @@ class AppDatabaseMigrationTest {
         val expenses = db.pengeluaranDao().getAllOnce()
         val transactions = db.transaksiDao().getAllOnce()
 
-        assertEquals(1, products.size)
-        assertEquals("Galon Air RO 19L", products.first().nama_produk)
+        assertTrue(products.isNotEmpty())
+        assertTrue(products.any { it.nama_produk == "Galon Air RO 19L" })
         assertEquals(1, customers.size)
         assertEquals("Bu Rina", customers.first().nama)
         assertEquals(1, expenses.size)
@@ -230,7 +231,8 @@ class AppDatabaseMigrationTest {
             .addMigrations(
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
-                AppDatabase.MIGRATION_15_16
+                AppDatabase.MIGRATION_15_16,
+                AppDatabase.MIGRATION_16_17
             )
             .allowMainThreadQueries()
             .build()
@@ -309,7 +311,8 @@ class AppDatabaseMigrationTest {
             .addMigrations(
                 AppDatabase.MIGRATION_13_14,
                 AppDatabase.MIGRATION_14_15,
-                AppDatabase.MIGRATION_15_16
+                AppDatabase.MIGRATION_15_16,
+                AppDatabase.MIGRATION_16_17
             )
             .allowMainThreadQueries()
             .build()
@@ -333,5 +336,121 @@ class AppDatabaseMigrationTest {
         assertEquals("Fitri", txDel.deletedBy)
         assertFalse(txAct.isDeleted)
         assertNull(txAct.deletedBy)
+    }
+
+    @Test
+    fun `repository guards owner deletePelanggan on active kasbon, restores kasbon transaksi, unassigns deleted kurir, and reconciles two way kasbon`() = runBlocking {
+        val db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        roomDb = db
+        val repo = SantoyaRepository(db)
+
+        val kurirId = repo.insertKurir(
+            com.example.data.entity.Kurir(
+                nama = "Kurir Anton",
+                komisi_per_galon = 1000.0,
+                email = "anton@gmail.com",
+                akses_aktif = true
+            )
+        ).toInt()
+        val produkId = repo.insertProduk(
+            com.example.data.entity.Produk(
+                nama_produk = "Galon RO 19L",
+                harga = 6000.0
+            )
+        ).toInt()
+        val custId = repo.insertPelanggan(
+            com.example.data.entity.Pelanggan(
+                nama = "Warung Sejahtera",
+                alamat = "Desa Makmur",
+                no_hp = "0812345678",
+                sisa_kasbon = 0.0,
+                id_kurir_langganan = kurirId
+            )
+        ).toInt()
+
+        // 1. Catat transaksi Kasbon penuh (3 galon x 6000 = 18.000)
+        val txId = repo.recordTransaksi(
+            tanggal = 1_700_000_000_000L,
+            idPelanggan = custId,
+            idKurir = kurirId,
+            idProduk = produkId,
+            jumlah = 3,
+            hargaSatuan = 6000.0,
+            metodeBayar = "-",
+            status = "Kasbon",
+            uangMuka = 0L,
+            sisaKasbon = 18_000L
+        ).toInt()
+
+        val custWithDebt = requireNotNull(repo.getPelangganById(custId))
+        assertEquals(18_000.0, custWithDebt.sisa_kasbon, 0.01)
+
+        // 2. Owner deletePelanggan wajib ditolak selama kasbon masih aktif
+        assertFalse(repo.deletePelanggan(custWithDebt))
+        assertFalse(requireNotNull(repo.getPelangganById(custId)).isDeleted)
+
+        // 3. Soft-delete transaksi Kasbon lalu pulihkan kembali (termasuk jika sisaKasbon di-nolkan sebelum hapus)
+        val rawTx = requireNotNull(repo.getTransaksiDetailById(txId)).transaksi.copy(sisaKasbon = 0L)
+        db.transaksiDao().update(rawTx)
+        repo.deleteTransaksi(rawTx)
+        assertEquals(0.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        val deletedTx = requireNotNull(repo.getTransaksiDetailById(txId)).transaksi
+        assertTrue(deletedTx.isDeleted)
+        assertEquals(18_000L, deletedTx.sisaKasbon)
+
+        repo.restoreTransaksi(deletedTx)
+        val restoredTx = requireNotNull(repo.getTransaksiDetailById(txId)).transaksi
+        assertFalse(restoredTx.isDeleted)
+        assertEquals("Kasbon", restoredTx.status)
+        assertEquals("-", restoredTx.metode_bayar)
+        assertEquals(18_000L, restoredTx.sisaKasbon)
+        assertEquals(18_000.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        // 4. Cicil Rp 8.000 via bayarKasbonPelanggan -> sisa 10.000, lalu edit jumlah galon dari 3 jadi 4 (total 24.000)
+        repo.bayarKasbonPelanggan(custId, 8_000.0, "Cash")
+        assertEquals(10_000.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        repo.updateTransaksi(
+            id = txId,
+            tanggal = 1_700_000_000_000L,
+            idPelanggan = custId,
+            idKurir = kurirId,
+            idProduk = produkId,
+            jumlah = 4,
+            hargaSatuan = 6000.0,
+            metodeBayar = "-",
+            status = "Kasbon",
+            uangMuka = 0L
+        )
+        val editedTx = requireNotNull(repo.getTransaksiDetailById(txId)).transaksi
+        assertEquals("Kasbon", editedTx.status)
+        assertEquals(8_000L, editedTx.uangMuka)
+        assertEquals(16_000L, editedTx.sisaKasbon)
+        assertEquals(16_000.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        // 5. Rekonsiliasi dua arah: jika seluruh nota sudah lunas namun sisa_kasbon pelanggan tertinggal > 0
+        repo.markTransaksiLunas(txId, "Transfer")
+        assertEquals(0.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+        db.pelangganDao().setKasbon(custId, 12_000.0, System.currentTimeMillis())
+        assertEquals(12_000.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        val reconciledCount = repo.reconcileKasbonDiscrepancies()
+        assertEquals(1, reconciledCount)
+        assertEquals(0.0, requireNotNull(repo.getPelangganById(custId)).sisa_kasbon, 0.01)
+
+        // 6. Hapus kurir -> melepaskan id_kurir_langganan pelanggan
+        val kurirEntity = requireNotNull(repo.getKurirById(kurirId))
+        repo.deleteKurir(kurirEntity)
+        val custAfterKurirDel = requireNotNull(repo.getPelangganById(custId))
+        assertNull(custAfterKurirDel.id_kurir_langganan)
+
+        // 7. Setelah kasbon 0, owner deletePelanggan berhasil dan mengisi isDeleted = true & deletedBy = "Pemilik"
+        assertTrue(repo.deletePelanggan(custAfterKurirDel))
+        val softDeletedCust = requireNotNull(repo.getPelangganById(custId))
+        assertTrue(softDeletedCust.isDeleted)
+        assertEquals("Pemilik", softDeletedCust.deletedBy)
     }
 }

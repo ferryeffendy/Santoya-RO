@@ -195,14 +195,11 @@ object FormatUtils {
         return cal.timeInMillis
     }
 
-    fun getStartOfWeek(): Long {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        return cal.timeInMillis
+    fun getStartOfWeek(timestamp: Long = System.currentTimeMillis()): Long {
+        val zone = java.time.ZoneId.systemDefault()
+        val date = java.time.Instant.ofEpochMilli(timestamp).atZone(zone).toLocalDate()
+        val monday = date.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+        return monday.atStartOfDay(zone).toInstant().toEpochMilli()
     }
 
     fun getStartOfMonth(timestamp: Long = System.currentTimeMillis()): Long {
@@ -239,18 +236,24 @@ object FormatUtils {
     /**
      * O(K log K) CRM prediction operating directly on a single customer's transactions
      * (where K is the number of transactions for that customer), avoiding O(N) full-table scans.
+     * Menggunakan pembobotan interval terbaru, penjagaan outlier jeda libur panjang, serta skor prioritas.
      */
     fun calculateCrmPredictionForCustomer(
-        customerTransaksiList: List<com.example.data.entity.TransaksiDetail>
+        customerTransaksiList: List<com.example.data.entity.TransaksiDetail>,
+        today: java.time.LocalDate = java.time.LocalDate.now(java.time.ZoneId.systemDefault()),
+        zone: java.time.ZoneId = java.time.ZoneId.systemDefault()
     ): CrmOrderPrediction {
-        if (customerTransaksiList.size < 2) {
-            return CrmOrderPrediction(
-                status = CrmOrderStatus.INSUFFICIENT_DATA,
-                badgeText = "Belum terjadwal"
-            )
+        val validTxs = customerTransaksiList.filter {
+            !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) && it.transaksi.jumlah > 0
         }
-        val zone = java.time.ZoneId.systemDefault()
-        val distinctDates = customerTransaksiList
+        val lastOrderMillis = validTxs.maxOfOrNull { it.transaksi.tanggal }
+        val avgGallons = if (validTxs.isNotEmpty()) {
+            kotlin.math.round(validTxs.map { it.transaksi.jumlah }.average()).toInt().coerceAtLeast(1)
+        } else {
+            null
+        }
+
+        val distinctDates = validTxs
             .asSequence()
             .map {
                 java.time.Instant.ofEpochMilli(it.transaksi.tanggal)
@@ -264,7 +267,12 @@ object FormatUtils {
         if (distinctDates.size < 2) {
             return CrmOrderPrediction(
                 status = CrmOrderStatus.INSUFFICIENT_DATA,
-                badgeText = "Belum terjadwal"
+                badgeText = "Belum terjadwal",
+                priorityScore = 0,
+                avgGallonsPerOrder = avgGallons,
+                lastOrderMillis = lastOrderMillis,
+                distinctOrderDays = distinctDates.size,
+                isReliableCycle = false
             )
         }
 
@@ -277,14 +285,45 @@ object FormatUtils {
         if (differences.isEmpty()) {
             return CrmOrderPrediction(
                 status = CrmOrderStatus.INSUFFICIENT_DATA,
-                badgeText = "Belum terjadwal"
+                badgeText = "Belum terjadwal",
+                priorityScore = 0,
+                avgGallonsPerOrder = avgGallons,
+                lastOrderMillis = lastOrderMillis,
+                distinctOrderDays = distinctDates.size,
+                isReliableCycle = false
             )
         }
 
-        val avgIntervalDays = kotlin.math.round(differences.average()).toInt().coerceAtLeast(1)
+        // Ambil hingga 6 interval terbaru agar adaptif terhadap perubahan pola konsumsi terkini
+        val recentIntervals = differences.takeLast(6)
+        val guardedIntervals = if (recentIntervals.size >= 3) {
+            val sorted = recentIntervals.sorted()
+            val mid = sorted.size / 2
+            val median = if (sorted.size % 2 == 1) {
+                sorted[mid].toDouble()
+            } else {
+                (sorted[mid - 1] + sorted[mid]) / 2.0
+            }
+            val upperCap = (median * 2.5).coerceAtLeast(median + 7.0)
+            recentIntervals.map { it.toDouble().coerceAtMost(upperCap) }
+        } else {
+            recentIntervals.map { it.toDouble() }
+        }
+
+        // Rata-rata berbobot: interval terbaru memiliki bobot lebih besar (1, 2, ..., k)
+        var weightedSum = 0.0
+        var totalWeight = 0.0
+        guardedIntervals.forEachIndexed { idx, intervalDays ->
+            val weight = (idx + 1).toDouble()
+            weightedSum += intervalDays * weight
+            totalWeight += weight
+        }
+
+        val avgIntervalDays = kotlin.math.round(weightedSum / totalWeight.coerceAtLeast(1.0))
+            .toInt()
+            .coerceAtLeast(1)
         val lastOrderDate = distinctDates.last()
         val nextExpectedDate = lastOrderDate.plusDays(avgIntervalDays.toLong())
-        val today = java.time.LocalDate.now(zone)
         val daysUntilExpected = java.time.temporal.ChronoUnit.DAYS.between(today, nextExpectedDate).toInt()
 
         val nextExpectedMillis = nextExpectedDate.atStartOfDay(zone).toInstant().toEpochMilli()
@@ -298,9 +337,27 @@ object FormatUtils {
 
         val badgeText = when (status) {
             CrmOrderStatus.ACTIVE -> "Prediksi: $formattedDate"
-            CrmOrderStatus.DUE_SOON -> "Waktunya isi ulang"
+            CrmOrderStatus.DUE_SOON -> if (daysUntilExpected <= 0) "Isi ulang hari ini" else "Besok isi ulang"
             CrmOrderStatus.OVERDUE -> "Lewat ${-daysUntilExpected} hari"
             CrmOrderStatus.INSUFFICIENT_DATA -> "Belum terjadwal"
+        }
+
+        val isReliableCycle = distinctDates.size >= 3
+        val urgencyScore = when (status) {
+            CrmOrderStatus.OVERDUE -> {
+                val ratio = (-daysUntilExpected).toDouble() / avgIntervalDays.coerceAtLeast(1).toDouble()
+                55 + kotlin.math.round(ratio * 35.0).toInt().coerceIn(5, 45)
+            }
+            CrmOrderStatus.DUE_SOON -> if (daysUntilExpected <= 0) 50 else 36
+            CrmOrderStatus.ACTIVE -> (22 - daysUntilExpected).coerceIn(1, 22)
+            CrmOrderStatus.INSUFFICIENT_DATA -> 0
+        }
+        val volumeBonus = ((avgGallons ?: 1) * 3).coerceIn(3, 18)
+        val reliabilityBonus = if (isReliableCycle) 8 else 0
+        val priorityScore = if (status == CrmOrderStatus.INSUFFICIENT_DATA) {
+            0
+        } else {
+            urgencyScore + volumeBonus + reliabilityBonus
         }
 
         return CrmOrderPrediction(
@@ -309,7 +366,12 @@ object FormatUtils {
             nextExpectedDateMillis = nextExpectedMillis,
             nextExpectedDateFormatted = formattedDate,
             daysUntilExpected = daysUntilExpected,
-            badgeText = badgeText
+            badgeText = badgeText,
+            priorityScore = priorityScore,
+            avgGallonsPerOrder = avgGallons,
+            lastOrderMillis = lastOrderMillis,
+            distinctOrderDays = distinctDates.size,
+            isReliableCycle = isReliableCycle
         )
     }
 
@@ -332,10 +394,13 @@ object FormatUtils {
         prediction: CrmOrderPrediction,
         customerTxs: List<com.example.data.entity.TransaksiDetail>
     ): EmployeeCustomerInsight {
-        val lastOrderMillis = customerTxs.maxOfOrNull { it.transaksi.tanggal }
+        val validTxs = customerTxs.filter {
+            !KaryawanScopeHelper.isDeletedTransaksi(it.transaksi) && it.transaksi.jumlah > 0
+        }
+        val lastOrderMillis = prediction.lastOrderMillis ?: validTxs.maxOfOrNull { it.transaksi.tanggal }
         val daysSinceLastOrder = lastOrderMillis?.let { daysSince(it) }
-        val avgGallons = if (customerTxs.isNotEmpty()) {
-            kotlin.math.round(customerTxs.map { it.transaksi.jumlah }.average()).toInt().coerceAtLeast(1)
+        val avgGallons = prediction.avgGallonsPerOrder ?: if (validTxs.isNotEmpty()) {
+            kotlin.math.round(validTxs.map { it.transaksi.jumlah }.average()).toInt().coerceAtLeast(1)
         } else {
             null
         }
@@ -362,7 +427,7 @@ object FormatUtils {
             EmployeeScheduleBucket.BESOK -> "Jadwal Besok"
             EmployeeScheduleBucket.JADWAL_NANTI -> "Jadwal: ${prediction.nextExpectedDateFormatted ?: "-"}"
             EmployeeScheduleBucket.BELUM_TERPREDIKSI -> {
-                if (customerTxs.isNotEmpty()) "Baru ${customerTxs.size}x order" else "Langganan Baru"
+                if (validTxs.isNotEmpty()) "Baru ${validTxs.size}x order" else "Langganan Baru"
             }
         }
 
@@ -414,6 +479,11 @@ data class CrmOrderPrediction(
     val nextExpectedDateMillis: Long? = null,
     val nextExpectedDateFormatted: String? = null,
     val daysUntilExpected: Int? = null,
-    val badgeText: String = "Belum terjadwal"
+    val badgeText: String = "Belum terjadwal",
+    val priorityScore: Int = 0,
+    val avgGallonsPerOrder: Int? = null,
+    val lastOrderMillis: Long? = null,
+    val distinctOrderDays: Int = 0,
+    val isReliableCycle: Boolean = false
 )
 

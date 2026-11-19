@@ -6,7 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -75,6 +75,7 @@ fun HydroBentoCard(
     cornerRadius: Dp = 20.dp,
     tintAlpha: Float = 0.08f,
     showWaterRipple: Boolean = true,
+    contentAlignment: Alignment = Alignment.TopStart,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -105,7 +106,7 @@ fun HydroBentoCard(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .background(cardBackground)
                 .drawBehind {
                     if (showWaterRipple) {
@@ -123,6 +124,7 @@ fun HydroBentoCard(
                         )
                     }
                 },
+            contentAlignment = contentAlignment,
             content = content
         )
     }

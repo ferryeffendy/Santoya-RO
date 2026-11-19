@@ -23,6 +23,9 @@ interface PerawatanLogDao {
     @Query("SELECT * FROM perawatan_log WHERE syncId = :syncId LIMIT 1")
     suspend fun getBySyncId(syncId: String): PerawatanLog?
 
+    @Query("SELECT * FROM perawatan_log WHERE perawatanSyncId = :perawatanSyncId ORDER BY tanggalSelesai DESC, id DESC")
+    suspend fun getByPerawatanSyncId(perawatanSyncId: String): List<PerawatanLog>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(log: PerawatanLog): Long
 

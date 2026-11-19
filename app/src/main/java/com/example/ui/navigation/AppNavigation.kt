@@ -39,6 +39,9 @@ import kotlinx.coroutines.launch
 fun AppNavigation(
     viewModel: SantoyaViewModel,
     auth: FirebaseAuth,
+    isOfflineMode: Boolean = false,
+    onExitOfflineToAuth: () -> Unit = {},
+    onGoogleLinked: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val navController = rememberNavController()
@@ -88,6 +91,9 @@ fun AppNavigation(
                 Log.e("AppNavigation", "Clear credential failed", e)
             }
             auth.signOut()
+            if (isOfflineMode) {
+                onExitOfflineToAuth()
+            }
         }
     }
 
@@ -110,6 +116,8 @@ fun AppNavigation(
                 pengeluaranList = if (isKaryawan) emptyList() else pengeluaranList,
                 pelangganUiModels = scopedPelangganUiModels,
                 onSignOut = performSignOut,
+                onGoogleLinked = onGoogleLinked,
+                isOfflineMode = isOfflineMode,
                 isKaryawan = isKaryawan,
                 activeKaryawan = activeKaryawan
             )
@@ -183,6 +191,9 @@ fun AppNavigation(
                 transaksiList = transaksiList,
                 produkList = produkList,
                 kurirList = kurirList,
+                isOfflineMode = isOfflineMode,
+                onExitOfflineToAuth = onExitOfflineToAuth,
+                onGoogleLinked = onGoogleLinked,
                 onSignOut = performSignOut
             )
         }

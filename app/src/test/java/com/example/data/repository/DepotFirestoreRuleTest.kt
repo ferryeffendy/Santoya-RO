@@ -405,6 +405,154 @@ class DepotFirestoreRuleTest : FirestoreEmulatorTestBase() {
         }
     }
 
+    @Test
+    fun mathValidationEnforcesConsistencyForTransaksiAndKasbonLogs() = runBlocking {
+        val ownerUid = signInTestUser(OWNER_EMAIL, verifyEmail = true)
+        val depotId = setupOwnerDepot(ownerUid, OWNER_EMAIL, listOf(STAFF_EMAIL))
+        signInTestUser(STAFF_EMAIL, verifyEmail = true)
+
+        val txKasbonId = "tx_kasbon_${UUID.randomUUID()}"
+        withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("depots").document(depotId)
+                .collection("transaksi").document(txKasbonId)
+                .set(
+                    mapOf(
+                        "syncId" to txKasbonId,
+                        "tanggal" to 2000L,
+                        "pelangganSyncId" to "pel_1",
+                        "kurirSyncId" to null,
+                        "produkSyncId" to null,
+                        "jumlah" to 3,
+                        "harga_satuan" to 6000.0,
+                        "total_harga" to 18000.0,
+                        "total_komisi" to 3000.0,
+                        "metode_bayar" to "Bayar Sebagian",
+                        "status" to "Kasbon",
+                        "uangMuka" to 5000L,
+                        "sisaKasbon" to 13000L,
+                        "updatedAt" to 200L,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+        }
+
+        val logValidId = "klog_ok_${UUID.randomUUID()}"
+        withTimeout(DEFAULT_TIMEOUT_MS) {
+            firestore.collection("depots").document(depotId)
+                .collection("kasbon_logs").document(logValidId)
+                .set(
+                    mapOf(
+                        "syncId" to logValidId,
+                        "pelangganSyncId" to "pel_1",
+                        "tanggal" to 2100L,
+                        "jumlah_bayar" to 5000.0,
+                        "sisa_kasbon_sebelum" to 13000.0,
+                        "sisa_kasbon_sesudah" to 8000.0,
+                        "metode_bayar" to "Cash",
+                        "catatan" to "Cicilan pertama",
+                        "updatedAt" to 210L,
+                        "isDeleted" to false,
+                        "serverUpdatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+        }
+
+        // Tampered total_harga should be denied
+        try {
+            val badTotalId = "tx_bad_total_${UUID.randomUUID()}"
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("transaksi").document(badTotalId)
+                    .set(
+                        mapOf(
+                            "syncId" to badTotalId,
+                            "tanggal" to 2000L,
+                            "pelangganSyncId" to "pel_1",
+                            "kurirSyncId" to null,
+                            "produkSyncId" to null,
+                            "jumlah" to 3,
+                            "harga_satuan" to 6000.0,
+                            "total_harga" to 1000.0,
+                            "total_komisi" to 0.0,
+                            "metode_bayar" to "Cash",
+                            "status" to "Lunas",
+                            "uangMuka" to 0L,
+                            "sisaKasbon" to 0L,
+                            "updatedAt" to 200L,
+                            "isDeleted" to false,
+                            "serverUpdatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+            }
+            fail("Expected PERMISSION_DENIED for manipulated total_harga")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        // Inconsistent kasbon sisaKasbon should be denied
+        try {
+            val badKasbonId = "tx_bad_kasbon_${UUID.randomUUID()}"
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("transaksi").document(badKasbonId)
+                    .set(
+                        mapOf(
+                            "syncId" to badKasbonId,
+                            "tanggal" to 2000L,
+                            "pelangganSyncId" to "pel_1",
+                            "kurirSyncId" to null,
+                            "produkSyncId" to null,
+                            "jumlah" to 3,
+                            "harga_satuan" to 6000.0,
+                            "total_harga" to 18000.0,
+                            "total_komisi" to 0.0,
+                            "metode_bayar" to "Bayar Sebagian",
+                            "status" to "Kasbon",
+                            "uangMuka" to 5000L,
+                            "sisaKasbon" to 1000L,
+                            "updatedAt" to 200L,
+                            "isDeleted" to false,
+                            "serverUpdatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+            }
+            fail("Expected PERMISSION_DENIED for inconsistent sisaKasbon")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+
+        // Tampered kasbon_log math should be denied
+        try {
+            val badLogId = "klog_bad_${UUID.randomUUID()}"
+            withTimeout(DEFAULT_TIMEOUT_MS) {
+                firestore.collection("depots").document(depotId)
+                    .collection("kasbon_logs").document(badLogId)
+                    .set(
+                        mapOf(
+                            "syncId" to badLogId,
+                            "pelangganSyncId" to "pel_1",
+                            "tanggal" to 2100L,
+                            "jumlah_bayar" to 5000.0,
+                            "sisa_kasbon_sebelum" to 13000.0,
+                            "sisa_kasbon_sesudah" to 0.0,
+                            "metode_bayar" to "Cash",
+                            "catatan" to "Manipulasi",
+                            "updatedAt" to 210L,
+                            "isDeleted" to false,
+                            "serverUpdatedAt" to FieldValue.serverTimestamp()
+                        )
+                    ).await()
+            }
+            fail("Expected PERMISSION_DENIED for tampered kasbon_log sisa_kasbon_sesudah")
+        } catch (e: Exception) {
+            val ffe = e.unwrapFirestoreException() ?: throw e
+            assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, ffe.code)
+        }
+    }
+
     private companion object {
         const val OWNER_EMAIL = "owner_rule@test.com"
         const val STAFF_EMAIL = "staff_rule@test.com"

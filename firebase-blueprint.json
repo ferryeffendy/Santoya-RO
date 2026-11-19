@@ -1,5 +1,29 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil datar setiap pendaftar Google untuk pemantauan rilis dan identitas kop depot",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID pengguna" },
+        "email": { "type": "string", "description": "Alamat email Google pengguna" },
+        "googleDisplayName": { "type": "string", "description": "Nama asli akun Google pengguna" },
+        "ownerName": { "type": "string", "description": "Nama Pemilik Depot" },
+        "depotName": { "type": "string", "description": "Nama Depot untuk kop struk dan PDF" },
+        "phoneNumber": { "type": "string", "description": "Nomor HP / WhatsApp Depot" },
+        "address": { "type": "string", "description": "Alamat lengkap atau kota Depot" },
+        "receiptFooter": { "type": "string", "description": "Catatan kaki struk opsional" },
+        "role": { "type": "string", "enum": ["OWNER", "STAFF"], "description": "Peran pengguna di depot" },
+        "subscriptionTier": { "type": "string", "enum": ["FREE", "PRO"], "description": "Paket langganan akun" },
+        "registeredAt": { "type": "string", "format": "date-time", "description": "Server timestamp pendaftaran pertama" },
+        "lastActiveAt": { "type": "string", "format": "date-time", "description": "Server timestamp aktivitas terakhir" },
+        "appVersion": { "type": "string", "description": "Versi aplikasi (BuildConfig.VERSION_NAME)" },
+        "depotType": { "type": "string", "enum": ["RO", "MINERAL", "BOTH"], "description": "Jenis usaha depot" },
+        "tankCapacityLiters": { "type": "number", "description": "Kapasitas toren air mineral (liter)" },
+        "currentTankStockLiters": { "type": "number", "description": "Sisa stok air toren saat ini (liter)" }
+      },
+      "required": ["uid", "email", "googleDisplayName", "ownerName", "depotName", "phoneNumber", "address", "receiptFooter", "role", "subscriptionTier", "registeredAt", "lastActiveAt", "appVersion"]
+    },
     "Depot": {
       "title": "Depot",
       "description": "Workspace depot bersama antara Pemilik dan Karyawan aktif",
@@ -8,10 +32,19 @@
         "depotId": { "type": "string", "description": "ID unik depot" },
         "ownerUid": { "type": "string", "description": "UID Pemilik Depot" },
         "ownerEmail": { "type": "string", "description": "Email Google Pemilik Depot" },
-        "name": { "type": "string", "description": "Nama depot" },
+        "name": { "type": "string", "description": "Nama tampilan depot" },
+        "depotName": { "type": "string", "description": "Nama resmi depot untuk kop struk/nota/PDF" },
+        "ownerName": { "type": "string", "description": "Nama pemilik depot" },
+        "phoneNumber": { "type": "string", "description": "Nomor HP / WhatsApp depot" },
+        "address": { "type": "string", "description": "Alamat atau kota depot" },
+        "receiptFooter": { "type": "string", "description": "Catatan kaki struk opsional" },
+        "subscriptionTier": { "type": "string", "enum": ["FREE", "PRO"], "description": "Status paket pemilik depot" },
         "memberEmails": { "type": "array", "description": "Daftar email karyawan aktif (maksimal 30)" },
         "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembuatan" },
-        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan terakhir" }
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan terakhir" },
+        "depotType": { "type": "string", "enum": ["RO", "MINERAL", "BOTH"], "description": "Jenis usaha depot" },
+        "tankCapacityLiters": { "type": "number", "description": "Kapasitas toren air mineral (liter)" },
+        "currentTankStockLiters": { "type": "number", "description": "Sisa stok air toren saat ini (liter)" }
       },
       "required": ["depotId", "ownerUid", "ownerEmail", "name", "memberEmails", "createdAt", "updatedAt"]
     },
@@ -98,6 +131,8 @@
         "status": { "type": "string", "description": "Status pembayaran (Lunas/Kasbon)" },
         "uangMuka": { "type": "number", "description": "Nominal DP" },
         "sisaKasbon": { "type": "number", "description": "Sisa kasbon belum dibayar" },
+        "tanggalBayar": { "type": "number", "description": "Epoch millis tanggal pelunasan nota" },
+        "waterType": { "type": "string", "enum": ["RO", "MINERAL"], "description": "Jenis air galon" },
         "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
         "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
         "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
@@ -172,9 +207,63 @@
         "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
       },
       "required": ["syncId", "perawatanSyncId", "namaPerawatan", "tanggalSelesai", "biaya", "catatan", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "TangkiRefill": {
+      "title": "TangkiRefill",
+      "description": "Riwayat pasokan air tangki toren mineral (khusus Pemilik)",
+      "type": "object",
+      "properties": {
+        "syncId": { "type": "string", "description": "UUID unik sinkronisasi" },
+        "tanggal": { "type": "number", "description": "Epoch millis waktu pasokan air masuk" },
+        "volumeLiter": { "type": "number", "description": "Volume air masuk dalam liter" },
+        "totalHarga": { "type": "number", "description": "Biaya beli pasokan air tangki" },
+        "namaPemasok": { "type": "string", "description": "Nama sopir atau pemasok air tangki" },
+        "catatan": { "type": "string", "description": "Keterangan tambahan" },
+        "linkedExpenseId": { "type": "number", "description": "ID lokal pengeluaran terkait jika ada" },
+        "pengeluaranSyncId": { "type": "string", "description": "SyncId pengeluaran operasional terkait" },
+        "updatedAt": { "type": "number", "description": "Epoch millis pembaruan terakhir" },
+        "isDeleted": { "type": "boolean", "description": "Penanda hapus sinkronisasi" },
+        "serverUpdatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp pembaruan" }
+      },
+      "required": ["syncId", "tanggal", "volumeLiter", "totalHarga", "namaPemasok", "catatan", "updatedAt", "isDeleted", "serverUpdatedAt"]
+    },
+    "AiInsight": {
+      "title": "AiInsight",
+      "description": "Hasil analisis bisnis & saran operasional terbaru dari Gemini AI per akun Google pemilik depot",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "description": "Firebase Auth UID pemilik depot" },
+        "depotId": { "type": "string", "description": "ID depot milik pemilik (depot_{uid})" },
+        "periodDays": { "type": "number", "description": "Rentang hari evaluasi (7, 30, atau 90 hari)" },
+        "insights": { "type": "array", "description": "Daftar 3 insight bisnis singkat dari Gemini AI" },
+        "stockAdvice": { "type": "string", "description": "Rekomendasi stok air baku/toren mineral atau perawatan mesin RO" },
+        "healthStatus": { "type": "string", "enum": ["SEHAT", "WASPADA", "KRITIS"], "description": "Status kesehatan bisnis depot" },
+        "priorityActionTitle": { "type": "string", "description": "Judul tombol aksi prioritas paling mendesak" },
+        "priorityActionTarget": { "type": "string", "enum": ["KASBON", "CRM", "STOK", "PERAWATAN", "LAPORAN"], "description": "Target layar navigasi aksi prioritas" },
+        "totalOmzet": { "type": "number", "description": "Ringkasan omzet penjualan periode analisis" },
+        "totalKasMasuk": { "type": "number", "description": "Total kas masuk riil (nota lunas, DP, dan pelunasan kasbon)" },
+        "totalKomisiKurir": { "type": "number", "description": "Total beban komisi pengantaran kurir periode analisis" },
+        "totalPengeluaran": { "type": "number", "description": "Total pengeluaran operasional periode analisis" },
+        "labaBersih": { "type": "number", "description": "Laba bersih (totalKasMasuk - pengeluaran - komisiKurir)" },
+        "marginLabaPersen": { "type": "number", "description": "Persentase margin laba bersih terhadap kas masuk" },
+        "totalGalon": { "type": "number", "description": "Total galon terjual pada periode analisis" },
+        "activeCustomers": { "type": "number", "description": "Jumlah pelanggan aktif depot" },
+        "totalPiutang": { "type": "number", "description": "Total piutang/kasbon pelanggan aktif saat ini" },
+        "overduePiutangOver30d": { "type": "number", "description": "Nominal piutang macet berumur lebih dari 30 hari" },
+        "omzetGrowthPercent": { "type": "number", "description": "Pertumbuhan omzet dibanding periode sebelumnya (%)" },
+        "galonGrowthPercent": { "type": "number", "description": "Pertumbuhan volume galon dibanding periode sebelumnya (%)" },
+        "labaGrowthPercent": { "type": "number", "description": "Pertumbuhan laba bersih dibanding periode sebelumnya (%)" },
+        "modelName": { "type": "string", "description": "Nama model Gemini AI Logic yang digunakan" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Server timestamp analisis dibuat/diperbarui" }
+      },
+      "required": ["ownerId", "depotId", "insights", "stockAdvice", "totalOmzet", "totalGalon", "activeCustomers", "modelName", "timestamp"]
     }
   },
   "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Dokumen datar pengguna pendaftar Google untuk pemantauan dan profil depot"
+    },
     "/depots/{depotId}": {
       "schema": { "$ref": "#/entities/Depot" },
       "description": "Dokumen induk workspace depot bersama antara Pemilik dan Karyawan"
@@ -214,6 +303,14 @@
     "/depots/{depotId}/perawatan_log/{docId}": {
       "schema": { "$ref": "#/entities/PerawatanLog" },
       "description": "Koleksi riwayat perawatan mesin RO (hanya Pemilik)"
+    },
+    "/depots/{depotId}/tangki_refill/{docId}": {
+      "schema": { "$ref": "#/entities/TangkiRefill" },
+      "description": "Koleksi riwayat pasokan air tangki toren mineral (hanya Pemilik)"
+    },
+    "/ai_insights/{insightId}": {
+      "schema": { "$ref": "#/entities/AiInsight" },
+      "description": "Hasil AI Business Insights terbaru per pemilik depot (terisolasi ketat per ownerId)"
     }
   }
 }

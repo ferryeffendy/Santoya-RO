@@ -211,11 +211,17 @@ class KaryawanScopeUnitTest {
             set(Calendar.MILLISECOND, 0)
         }.timeInMillis
 
+        val transferTxDetail = sampleTx(6, nowMillis, pFitri, fitri, jumlah = 3, hargaSatuan = 5_000.0, status = "Lunas").let {
+            it.copy(transaksi = it.transaksi.copy(metode_bayar = "Transfer"))
+        }
+
         val txs = listOf(
-            // Today, Fitri, Lunas: 5 galon * 5000 = 25000 cash, 5000 komisi
+            // Today, Fitri, Lunas Cash: 5 galon * 5000 = 25000 cash, 5000 komisi
             sampleTx(1, nowMillis, pFitri, fitri, jumlah = 5, hargaSatuan = 5_000.0, status = "Lunas"),
             // Today, Fitri, Kasbon w/ DP 10000: 4 galon, 10000 cash handover, 4000 komisi
             sampleTx(2, nowMillis - 3_600_000L, pFitri, fitri, jumlah = 4, hargaSatuan = 5_000.0, status = "Kasbon", uangMuka = 10_000L),
+            // Today, Fitri, Lunas Transfer: 3 galon * 5000 = 15000 bank transfer (0 cash handover), 3000 komisi
+            transferTxDetail,
             // Earlier this month, Fitri, Lunas: 6 galon, 6000 komisi (not today)
             sampleTx(3, earlierThisMonth, pFitri, fitri, jumlah = 6, hargaSatuan = 5_000.0, status = "Lunas"),
             // Last month, Fitri, Lunas: 10 galon (ignored)
@@ -230,13 +236,28 @@ class KaryawanScopeUnitTest {
             nowMillis = nowMillis
         )
 
+        // Setoran tunai hanya menghitung Cash (25.000) + DP (10.000) = 35.000; Transfer (15.000) dikecualikan
         assertEquals(35_000.0, metrics.setoranTunaiHariIni, 0.01)
-        assertEquals(2, metrics.pesananHariIni)
-        assertEquals(9, metrics.galonHariIni)
-        assertEquals(9_000.0, metrics.komisiHariIni, 0.01)
-        assertEquals(3, metrics.pesananBulanIni)
-        assertEquals(15, metrics.galonBulanIni)
-        assertEquals(15_000.0, metrics.komisiBulanIni, 0.01)
+        assertEquals(3, metrics.pesananHariIni)
+        assertEquals(12, metrics.galonHariIni)
+        assertEquals(12_000.0, metrics.komisiHariIni, 0.01)
+        assertEquals(4, metrics.pesananBulanIni)
+        assertEquals(18, metrics.galonBulanIni)
+        assertEquals(18_000.0, metrics.komisiBulanIni, 0.01)
+
+        // Pastikan getStartOfWeek pada hari Minggu selalu mengembalikan hari Senin minggu berjalan (tidak melompat ke depan)
+        val sundayCal = Calendar.getInstance().apply {
+            set(2026, Calendar.MAY, 17, 15, 30, 0) // Minggu, 17 Mei 2026
+            set(Calendar.MILLISECOND, 0)
+        }
+        val expectedMondayCal = Calendar.getInstance().apply {
+            set(2026, Calendar.MAY, 11, 0, 0, 0) // Senin, 11 Mei 2026 00:00
+            set(Calendar.MILLISECOND, 0)
+        }
+        assertEquals(
+            expectedMondayCal.timeInMillis,
+            com.example.util.FormatUtils.getStartOfWeek(sundayCal.timeInMillis)
+        )
     }
 
     @Test
